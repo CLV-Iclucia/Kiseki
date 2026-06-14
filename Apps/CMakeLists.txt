@@ -20,7 +20,12 @@ add_executable(prescribed-motion prescribed-motion/main.cc)
 target_link_libraries(prescribed-motion PUBLIC FEM cxxopts Renderer)
 target_compile_features(prescribed-motion PUBLIC cxx_std_20)
 
-message(STATUS "Apps configured: ipc-fem, cube-drop, multi-body, prescribed-motion")
+# Energy Conservation Check (equivalent to python/examples/energy_conservation.py)
+add_executable(energy-check energy-check/main.cc)
+target_link_libraries(energy-check PUBLIC FEM cxxopts Renderer)
+target_compile_features(energy-check PUBLIC cxx_std_20)
+
+message(STATUS "Apps configured: ipc-fem, cube-drop, multi-body, prescribed-motion, energy-check")
 
 # ---- RHI demo apps (require Vulkan + GLFW, no OpenGL Renderer) ----
 if(SIMCRAFT_BUILD_RHI)

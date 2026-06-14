@@ -11,15 +11,27 @@ using maths::vectorize;
 void ElasticTetMesh::init(const SubVector<Real>& x, const SubVector<Real>& xdot, const SubVector<Real>& X) {
   tetRefVolumes.reserve(mesh.tets.size());
   tetDeformationGradients.reserve(mesh.tets.size());
+
+  const auto& restVerts = mesh.getVertices();          // rest shape → Dm_inverse
+  const auto& initVerts = mesh.getInitialPositions();  // initial config (may differ if pre-deformed)
+
   for (int i = 0; i < numTets(); i++) {
     auto &tet = mesh.tets[i];
-    Matrix<Real, 3, 3> local_x;
+
+    // Rest-shape edge matrix → defines Dm_inverse (reference configuration)
+    Matrix<Real, 3, 3> local_X;
     for (int j = 0; j < 3; j++)
-      local_x.col(j) = mesh.getVertices()[tet[j + 1]] - mesh.getVertices()[tet[0]];
-    Real volume = local_x.determinant() / 6.0;
+      local_X.col(j) = restVerts[tet[j + 1]] - restVerts[tet[0]];
+
+    Real volume = local_X.determinant() / 6.0;
     assert(volume > 0 && "Tet has non-positive volume after orientation fix — mesh is degenerate");
     tetRefVolumes.emplace_back(volume);
-    tetDeformationGradients.emplace_back(local_x);
+    tetDeformationGradients.emplace_back(local_X);  // stores Dm_inverse from rest shape
+
+    // Initial deformed edge matrix → initial F = local_x * Dm_inverse
+    Matrix<Real, 3, 3> local_x;
+    for (int j = 0; j < 3; j++)
+      local_x.col(j) = initVerts[tet[j + 1]] - initVerts[tet[0]];
     tetDeformationGradients.back().updateCurrentConfig(local_x);
   }
   mesh.commit(x, xdot, X);

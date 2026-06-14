@@ -6,7 +6,8 @@ void bind_mesh(py::module_& m)
 {
   py::class_<TetMesh>(m, "TetMesh")
     .def(py::init([](py::array_t<double> vertices, py::array_t<int> tets,
-                     std::optional<py::array_t<double>> velocities) {
+                     std::optional<py::array_t<double>> velocities,
+                     std::optional<py::array_t<double>> initial_positions) {
       auto vbuf = vertices.unchecked<2>();
       auto tbuf = tets.unchecked<2>();
 
@@ -33,12 +34,27 @@ void bind_mesh(py::module_& m)
           vels[i] = Vector<Real, 3>(velbuf(i, 0), velbuf(i, 1), velbuf(i, 2));
       }
 
-      return TetMesh(verts, tetras, vels);
-    }), py::arg("vertices"), py::arg("tets"), py::arg("velocities") = py::none(),
+      std::vector<Vector<Real, 3>> initPos;
+      if (initial_positions.has_value()) {
+        auto pbuf = initial_positions->unchecked<2>();
+        if (pbuf.shape(0) != vbuf.shape(0) || pbuf.shape(1) != 3)
+          throw py::value_error("initial_positions must have shape (N, 3), same N as vertices");
+        initPos.resize(pbuf.shape(0));
+        for (py::ssize_t i = 0; i < pbuf.shape(0); i++)
+          initPos[i] = Vector<Real, 3>(pbuf(i, 0), pbuf(i, 1), pbuf(i, 2));
+      }
+
+      return TetMesh(verts, tetras, vels, initPos);
+    }), py::arg("vertices"), py::arg("tets"),
+       py::arg("velocities") = py::none(),
+       py::arg("initial_positions") = py::none(),
        "Construct TetMesh from numpy arrays.\n"
-       "  vertices: (N, 3) positions\n"
-       "  tets: (M, 4) tet indices\n"
-       "  velocities: optional (N, 3) initial velocities")
+       "  vertices         : (N, 3) rest-shape vertex positions (defines X)\n"
+       "  tets             : (M, 4) tetrahedral element indices\n"
+       "  velocities       : optional (N, 3) initial velocities\n"
+       "  initial_positions: optional (N, 3) initial deformed positions at t=0.\n"
+       "                     If given, the body starts deformed (x ≠ X, PE > 0).\n"
+       "                     If omitted, x = X (body starts at rest).")
 
     .def_static("from_file", [](const std::string& path) {
       auto mesh = readTetMeshFromTOBJ(std::filesystem::path(path));

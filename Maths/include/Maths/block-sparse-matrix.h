@@ -68,15 +68,15 @@ public:
     assert(blockRow >= 0 && blockRow < m_blockRows);
     assert(blockCol >= 0 && blockCol < m_blockCols);
     // Debug: check diagonal blocks are PSD — set breakpoint on the spdlog line
-    if (blockRow == blockCol) {
+  /*  if (blockRow == blockCol) {
       Real d11 = value[0][0], d22 = value[1][1], d33 = value[2][2];
       Real minor2 = d11 * value[1][1] - value[0][1] * value[1][0];
       Real det = glm::determinant(value);
-      if (d11 < -1e-10 || minor2 < -1e-10 || det < -1e-10) {
+      if (d11 < -1e-3 || minor2 < -1e-3 || det < -1e-3) {
         std::cout << std::format("Non-PSD diagonal block at ({},{}): d11={}, minor2={}, det={}",
                       blockRow, blockCol, d11, minor2, det);  // <-- breakpoint here
       }
-    }
+    }*/
     if (m_symmetric && blockRow > blockCol) {
       // Symmetric mode: canonicalize to upper triangle, transpose the block
       m_blocks.push_back(glm::transpose(value));

@@ -40,5 +40,21 @@ void bind_simulation(py::module_& m)
 
     .def_property_readonly("locked", [](const PySimulation& self) {
       return self.has_run;
-    }, "Whether simulation has been run (system locked)");
+    }, "Whether simulation has been run (system locked)")
+
+    .def_property_readonly("kinetic_energy", [](const PySimulation& self) -> Real {
+      return self.py_system->system.kineticEnergy();
+    }, "Current kinetic energy of the system (J)")
+
+    .def_property_readonly("potential_energy", [](const PySimulation& self) -> Real {
+      return self.py_system->system.potentialEnergy();
+    }, "Current elastic potential energy of the system (J)")
+
+    .def_property_readonly("total_energy", [](const PySimulation& self) -> Real {
+      return self.py_system->system.totalEnergy();
+    }, "Current total mechanical energy KE + PE (J)")
+
+    .def_property_readonly("time", [](const PySimulation& self) -> Real {
+      return self.py_system->system.currentTime();
+    }, "Current simulation time (s)");
 }
