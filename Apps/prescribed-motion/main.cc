@@ -22,10 +22,9 @@
 #include <fem/ipc/implicit-euler.h>
 #include <Maths/block-solvers/block-pcg.h>
 #include <Deform/strain-energy-density.h>
-#include <Renderer/renderer.h>
+#include <Renderer/simulation-app.h>
+#include <Renderer/fem-scene-proxy.h>
 #include <iostream>
-#include <thread>
-#include <atomic>
 #include <cmath>
 #include <format>
 #include <numbers>
@@ -33,68 +32,6 @@
 using namespace sim;
 using namespace sim::fem;
 using namespace sim::deform;
-
-// ─── Scene Proxy Builder ───────────────────────────────────────────────────────
-
-static void computeSmoothNormals(renderer::MeshProxy& mesh) {
-  const auto& pos = mesh.positions;
-  const auto& tris = mesh.triangles;
-
-  mesh.normals.assign(pos.size(), glm::vec3(0.0f));
-
-  for (const auto& tri : tris) {
-    glm::vec3 e1 = pos[tri.y] - pos[tri.x];
-    glm::vec3 e2 = pos[tri.z] - pos[tri.x];
-    glm::vec3 fn = glm::cross(e1, e2);
-
-    mesh.normals[tri.x] += fn;
-    mesh.normals[tri.y] += fn;
-    mesh.normals[tri.z] += fn;
-  }
-
-  for (auto& n : mesh.normals) {
-    float len = glm::length(n);
-    n = (len > 1e-8f) ? n / len : glm::vec3(0.0f, 1.0f, 0.0f);
-  }
-}
-
-static std::unique_ptr<renderer::SceneProxy> buildSceneProxy(
-    const System& system, int frame, glm::vec3 objectColor) {
-  auto proxy = std::make_unique<renderer::SceneProxy>();
-  proxy->frameIndex = frame;
-  proxy->simulationTime = system.currentTime();
-
-  for (int i = 0; i < static_cast<int>(system.primitives().size()); i++) {
-    const auto& pr = system.primitives()[i];
-    auto surfaceView = pr.getSurfaceView();
-    auto vertCount = pr.getVertexCount();
-    int dofStart = pr.getDofStart();
-
-    renderer::MeshProxy mesh;
-    mesh.name = "primitive_" + std::to_string(i);
-    mesh.objectColor = objectColor;
-
-    mesh.positions.resize(vertCount);
-    for (size_t v = 0; v < vertCount; v++) {
-      const auto& pos = system.x[(dofStart / 3) + static_cast<int>(v)];
-      mesh.positions[v] = glm::vec3(pos);
-    }
-
-    mesh.triangles.resize(surfaceView.size());
-    for (size_t t = 0; t < surfaceView.size(); t++) {
-      auto tri = surfaceView[t];
-      mesh.triangles[t] = {
-          static_cast<unsigned>(tri.x),
-          static_cast<unsigned>(tri.y),
-          static_cast<unsigned>(tri.z)};
-    }
-
-    computeSmoothNormals(mesh);
-    proxy->meshes.push_back(std::move(mesh));
-  }
-
-  return proxy;
-}
 
 // ─── Main ──────────────────────────────────────────────────────────────────────
 
@@ -198,45 +135,38 @@ int main(int argc, char** argv) {
   // 物体颜色：青色 (同 Python 例子)
   glm::vec3 color(0.35f, 0.80f, 0.80f);
 
-  if (noRender) {
-    for (int step = 0; step < maxSteps; step++) {
-      integrator->step(dt);
-      system.advanceTime(dt);
-      if (step % 50 == 0) {
-        std::cout << std::format("Step {:4d}, t = {:.4f}\n", step, system.currentTime());
-      }
-    }
-    std::cout << "Done.\n";
-    return 0;
-  }
-
-  // 有渲染模式
-  auto renderer = renderer::createRenderer({
+  renderer::SimulationApp app({
       .windowWidth = 1280,
       .windowHeight = 720,
       .windowTitle = "SimCraft - Prescribed Motion",
   });
 
-  std::atomic<int> stepsCompleted{0};
-  std::thread simThread([&]() {
-    for (int step = 0; step < maxSteps && renderer->isRunning(); step++) {
-      integrator->step(dt);
-      system.advanceTime(dt);
+  app.stepFn = [&](int) {
+    integrator->step(dt);
+  };
 
-      auto proxy = buildSceneProxy(system, step, color);
-      renderer->queue().push(std::move(proxy));
-      stepsCompleted = step + 1;
-
-      if (step % 50 == 0) {
-        std::cout << std::format("Step {:4d}, t = {:.4f}\n", step, system.currentTime());
-      }
+  // 使用自定义 buildProxy 以设置 per-object 颜色
+  app.buildProxy = [&](int step) {
+    auto proxy = renderer::buildSceneProxyFromSystem(system, step);
+    // 设置自定义物体颜色
+    for (auto& mesh : proxy->meshes) {
+      mesh.objectColor = color;
     }
-    renderer->shutdown();
-  });
+    return proxy;
+  };
 
-  renderer->runOnCurrentThread();
+  app.logInterval = 50;
+  app.logFn = [&](int step) {
+    std::cout << std::format("Step {:4d}, t = {:.4f}\n", step, system.currentTime());
+  };
 
-  simThread.join();
-  std::cout << std::format("Done. {} steps completed.\n", stepsCompleted.load());
+  int completed;
+  if (noRender) {
+    completed = app.runHeadless(maxSteps);
+  } else {
+    completed = app.run(maxSteps);
+  }
+
+  std::cout << std::format("Done. {} steps completed.\n", completed);
   return 0;
 }

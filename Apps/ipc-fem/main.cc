@@ -3,88 +3,13 @@
 //
 #include <cxxopts.hpp>
 #include <fem/fem-simulation.h>
-#include <Renderer/renderer.h>
+#include <Renderer/simulation-app.h>
+#include <Renderer/fem-scene-proxy.h>
 #include <iostream>
-#include <thread>
-#include <atomic>
+#include <format>
 
 using namespace sim;
 using namespace sim::fem;
-
-/// 计算加权平滑法线（area-weighted vertex normals）
-static void computeSmoothNormals(renderer::MeshProxy& mesh) {
-  const auto& pos = mesh.positions;
-  const auto& tris = mesh.triangles;
-
-  mesh.normals.assign(pos.size(), glm::vec3(0.0f));
-
-  for (const auto& tri : tris) {
-    const auto& p0 = pos[tri.x];
-    const auto& p1 = pos[tri.y];
-    const auto& p2 = pos[tri.z];
-
-    glm::vec3 e1 = p1 - p0;
-    glm::vec3 e2 = p2 - p0;
-    glm::vec3 faceNormal = glm::cross(e1, e2); // 未归一化 = 面积加权
-
-    mesh.normals[tri.x] += faceNormal;
-    mesh.normals[tri.y] += faceNormal;
-    mesh.normals[tri.z] += faceNormal;
-  }
-
-  for (auto& n : mesh.normals) {
-    float len = glm::length(n);
-    if (len > 1e-8f) {
-      n /= len;
-    } else {
-      n = glm::vec3(0.0f, 1.0f, 0.0f); // 退化三角形给个安全默认
-    }
-  }
-}
-
-/// 从 System 构建渲染用的 SceneProxy
-std::unique_ptr<renderer::SceneProxy> buildSceneProxy(const fem::System& system, int frame) {
-  auto proxy = std::make_unique<renderer::SceneProxy>();
-  proxy->frameIndex = frame;
-  proxy->simulationTime = system.currentTime();
-
-  // 遍历每个 Primitive，提取表面网格
-  for (int i = 0; i < system.primitives().size(); i++) {
-    const auto& pr = system.primitives()[i];
-    auto surfaceView = pr.getSurfaceView();
-    auto vertCount = pr.getVertexCount();
-    int dofStart = pr.getDofStart();
-
-    renderer::MeshProxy mesh;
-    mesh.name = "primitive_" + std::to_string(i);
-
-    // 将 double 位置转换为 float
-    mesh.positions.resize(vertCount);
-    for (size_t v = 0; v < vertCount; v++) {
-      // system.x 是 BlockVector<3>，每个块是一个 glm::dvec3
-      // dofStart 是标量索引，除以 3 得到块索引
-      const auto& pos = system.x[(dofStart / 3) + static_cast<int>(v)];
-      mesh.positions[v] = glm::vec3(pos);  // double → float
-    }
-
-    // 三角形索引（primitive 内部局部索引）
-    mesh.triangles.resize(surfaceView.size());
-    for (size_t t = 0; t < surfaceView.size(); t++) {
-      auto tri = surfaceView[t];
-      mesh.triangles[t] = {
-          static_cast<unsigned>(tri.x),
-          static_cast<unsigned>(tri.y),
-          static_cast<unsigned>(tri.z)};
-    }
-
-    // 计算加权平滑法线
-    computeSmoothNormals(mesh);
-
-    proxy->meshes.push_back(std::move(mesh));
-  }
-
-  return proxy;
-}
 
 void checkArgs(const cxxopts::ParseResult& result) {
   if (!result.count("input")) {
@@ -117,47 +42,36 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  core::Frame frame;
   auto femSim = simBuilder.build(*simConfig);
+  core::Frame frame;
 
   bool useRenderer = !result["no-render"].as<bool>();
 
+  // ─── Run ────────────────────────────────────────────────────────────────────
+
+  renderer::SimulationApp app({.windowTitle = "SimCraft - IPC FEM"});
+
+  app.stepFn = [&](int) {
+    femSim.step(frame);
+  };
+
+  app.buildProxy = [&](int step) {
+    return renderer::buildSceneProxyFromSystem(femSim.getSystem(), step);
+  };
+
+  app.logInterval = 10;
+  app.logFn = [&](int step) {
+    std::cout << std::format("Simulated frame {}, time = {:.4f}\n",
+                             step, femSim.getSystem().currentTime());
+  };
+
+  int completed;
   if (!useRenderer) {
-    // 无渲染模式：直接跑模拟
-    while (frame.idx < 1000) {
-      femSim.step(frame);
-      if (frame.idx % 100 == 0) {
-        std::cout << "Frame " << frame.idx << ", time = " << femSim.getSystem().currentTime() << std::endl;
-      }
-    }
-    return 0;
+    completed = app.runHeadless(1000);
+  } else {
+    completed = app.run(1000);
   }
 
-  // 有渲染模式：模拟线程 + 主线程渲染
-  auto renderer = renderer::createRenderer({.windowTitle = "SimCraft - IPC FEM"});
-
-  // 模拟在子线程
-  std::atomic<bool> simFinished{false};
-  std::thread simThread([&]() {
-    core::Frame frame;
-    while (frame.idx < 1000 && renderer->isRunning()) {
-      femSim.step(frame);
-      auto proxy = buildSceneProxy(femSim.getSystem(), frame.idx);
-      renderer->queue().push(std::move(proxy));  // 阻塞提交（队列满则等渲染追上）
-
-      if (frame.idx % 10 == 0) {
-        std::cout << "Simulated frame " << frame.idx << ", time = " << femSim.getSystem().currentTime() << std::endl;
-      }
-    }
-    renderer->shutdown();  // 模拟结束，通知渲染线程退出
-    simFinished = true;
-    std::cout << "Simulation finished" << std::endl;
-  });
-
-  // 渲染在主线程（满足 GLFW/macOS 要求）
-  renderer->runOnCurrentThread();  // 阻塞直到 shutdown
-
-  simThread.join();
-  std::cout << "Application terminated" << std::endl;
+  std::cout << std::format("Application terminated. {} steps completed.\n", completed);
   return 0;
 }

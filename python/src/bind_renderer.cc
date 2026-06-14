@@ -1,10 +1,12 @@
 // Phase 10: Renderer binding + run_and_display orchestration
 // Design: Renderer is fully decoupled from Simulation.
 // run_and_display() is a free function that composes them via SceneProxy.
+// The API automatically pushes frames after every step — users cannot forget.
 #include "bindings.h"
 #include <Renderer/renderer.h>
 #include <Renderer/scene-proxy.h>
 #include <thread>
+#include <atomic>
 
 using namespace sim::renderer;
 using sim::core::Vec3f;
@@ -138,9 +140,12 @@ void bind_renderer(py::module_& m)
     });
 
   // run_and_display: top-level composition function
+  // Automatically pushes frames after every step — user cannot forget.
   m.def("run_and_display", [](std::shared_ptr<PySimulation> sim,
                                std::shared_ptr<PyRenderer> renderer,
-                               Real dt, int steps) {
+                               Real dt, int steps,
+                               py::object on_step,
+                               int log_interval) {
     if (!sim)
       throw py::type_error("simulation must be a valid Simulation object");
     if (!renderer)
@@ -150,6 +155,9 @@ void bind_renderer(py::module_& m)
     if (steps <= 0)
       throw py::value_error("steps must be positive");
 
+    // Determine if we have a Python per-step callback
+    bool has_on_step = !on_step.is_none();
+
     // Ensure simulation is initialized (system.init + integrator created)
     sim->ensure_initialized();
     sim->lock_all();
@@ -158,34 +166,42 @@ void bind_renderer(py::module_& m)
     renderer->create();
     auto& rend = *renderer->impl;
 
-    // Push initial frame
+    // Push initial frame (step 0 = initial state before simulation starts)
     const auto& colors = sim->py_system->primitive_colors;
     auto initScene = buildSceneProxy(sim->py_system->system, colors, 0,
                                      static_cast<float>(sim->py_system->system.currentTime()));
     rend.queue().push(std::move(initScene));
 
-    // Simulation runs in background thread, pushes frames
+    // Simulation runs in background thread, pushes frames automatically
     std::exception_ptr sim_exception;
     std::thread simThread([&]() {
-      // Note: this is a new OS thread with no Python thread state.
-      // All work here is pure C++ (no Python callbacks), so no GIL needed.
       try {
         for (int i = 0; i < steps; i++) {
           if (!rend.isRunning()) break;
 
           sim->integrator->step(dt);
-          // Note: IpcIntegrator::step() already calls advanceTime(dt)
           sim->steps_completed++;
 
+          // ─── Automatic frame push (the key design guarantee) ─────────
           auto scene = buildSceneProxy(sim->py_system->system, colors, i + 1,
                                        static_cast<float>(sim->py_system->system.currentTime()));
           rend.queue().push(std::move(scene));
+
+          // ─── Optional per-step callback (with GIL for Python safety) ──
+          if (has_on_step) {
+            py::gil_scoped_acquire acquire;
+            on_step(i + 1, sim->py_system->system.currentTime());
+          }
+
+          // ─── Default logging ──────────────────────────────────────────
+          if (log_interval > 0 && (i + 1) % log_interval == 0) {
+            spdlog::info("[run_and_display] step {}/{}, t = {:.4f}",
+                         i + 1, steps, sim->py_system->system.currentTime());
+          }
         }
       } catch (...) {
         sim_exception = std::current_exception();
       }
-      // Signal renderer to stop after all frames consumed
-      // (renderer will drain queue then exit)
       rend.shutdown();
     });
 
@@ -202,7 +218,19 @@ void bind_renderer(py::module_& m)
 
   }, py::arg("simulation"), py::arg("renderer"),
      py::arg("dt") = 0.01, py::arg("steps") = 1000,
-     "Run simulation with real-time display.\n"
+     py::arg("on_step") = py::none(), py::arg("log_interval") = 0,
+     "Run simulation with real-time display.\n\n"
+     "Rendering frames are pushed automatically after every step — you cannot\n"
+     "forget to update the display. The user only provides physics setup.\n\n"
+     "Args:\n"
+     "    simulation: A Simulation object (system + integrator).\n"
+     "    renderer:   A Renderer object (window config).\n"
+     "    dt:         Timestep size (seconds).\n"
+     "    steps:      Number of timesteps to run.\n"
+     "    on_step:    Optional callback(step: int, time: float) called after each step.\n"
+     "               Use for logging, energy tracking, etc.\n"
+     "    log_interval: Print progress every N steps (0 = silent). Default: 0.\n\n"
      "Main thread renders (GLFW), background thread simulates.\n"
      "Window closes when simulation completes or user closes window.");
+
 }

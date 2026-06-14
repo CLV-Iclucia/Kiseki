@@ -116,6 +116,9 @@ void IpcIntegrator::step(Real dt) {
     x_prev = system().x;
     E_prev = E;
     iter++;
+
+    if (onNewtonIter)
+      onNewtonIter(iter);
   }
   velocityUpdate(x_t, h);
 

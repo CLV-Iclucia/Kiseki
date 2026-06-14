@@ -9,6 +9,7 @@
 //   - Multiple elastic bodies with initial velocities
 //   - Zero gravity (pure momentum exchange)
 //   - Elastic-elastic collision via IPC
+//   - SimulationApp API (no manual frame pushing needed)
 //
 // Usage:
 //   multi-body [--dt 0.005] [--steps 500] [--no-render]
@@ -22,73 +23,14 @@
 #include <fem/ipc/implicit-euler.h>
 #include <Maths/block-solvers/block-pcg.h>
 #include <Deform/strain-energy-density.h>
-#include <Renderer/renderer.h>
+#include <Renderer/simulation-app.h>
+#include <Renderer/fem-scene-proxy.h>
 #include <iostream>
-#include <thread>
-#include <atomic>
 #include <format>
 
 using namespace sim;
 using namespace sim::fem;
 using namespace sim::deform;
-
-// ─── Scene Proxy Builder ───────────────────────────────────────────────────────
-
-static void computeSmoothNormals(renderer::MeshProxy& mesh) {
-  const auto& pos = mesh.positions;
-  const auto& tris = mesh.triangles;
-  mesh.normals.assign(pos.size(), glm::vec3(0.0f));
-
-  for (const auto& tri : tris) {
-    glm::vec3 e1 = pos[tri.y] - pos[tri.x];
-    glm::vec3 e2 = pos[tri.z] - pos[tri.x];
-    glm::vec3 fn = glm::cross(e1, e2);
-    mesh.normals[tri.x] += fn;
-    mesh.normals[tri.y] += fn;
-    mesh.normals[tri.z] += fn;
-  }
-
-  for (auto& n : mesh.normals) {
-    float len = glm::length(n);
-    n = (len > 1e-8f) ? n / len : glm::vec3(0.0f, 1.0f, 0.0f);
-  }
-}
-
-static std::unique_ptr<renderer::SceneProxy> buildSceneProxy(const System& system, int frame) {
-  auto proxy = std::make_unique<renderer::SceneProxy>();
-  proxy->frameIndex = frame;
-  proxy->simulationTime = system.currentTime();
-
-  for (int i = 0; i < static_cast<int>(system.primitives().size()); i++) {
-    const auto& pr = system.primitives()[i];
-    auto surfaceView = pr.getSurfaceView();
-    auto vertCount = pr.getVertexCount();
-    int dofStart = pr.getDofStart();
-
-    renderer::MeshProxy mesh;
-    mesh.name = "body_" + std::to_string(i);
-
-    mesh.positions.resize(vertCount);
-    for (size_t v = 0; v < vertCount; v++) {
-      const auto& pos = system.x[(dofStart / 3) + static_cast<int>(v)];
-      mesh.positions[v] = glm::vec3(pos);
-    }
-
-    mesh.triangles.resize(surfaceView.size());
-    for (size_t t = 0; t < surfaceView.size(); t++) {
-      auto tri = surfaceView[t];
-      mesh.triangles[t] = {
-          static_cast<unsigned>(tri.x),
-          static_cast<unsigned>(tri.y),
-          static_cast<unsigned>(tri.z)};
-    }
-
-    computeSmoothNormals(mesh);
-    proxy->meshes.push_back(std::move(mesh));
-  }
-
-  return proxy;
-}
 
 // ─── Main ──────────────────────────────────────────────────────────────────────
 
@@ -136,7 +78,6 @@ int main(int argc, char** argv) {
                            nVerts, baseTets.size(), width);
 
   // ─── 2. Material ────────────────────────────────────────────────────────────
-  // NeoHookean: Young's modulus = 2e5, Poisson's ratio = 0.4
   auto makeEnergy = []() {
     return std::make_unique<StableNeoHookean<Real>>(
         ElasticityParameters<Real>{.E = 2e5, .nu = 0.4});
@@ -195,54 +136,32 @@ int main(int argc, char** argv) {
 
   // ─── 5. Run ─────────────────────────────────────────────────────────────────
 
-  if (noRender) {
-    for (int step = 0; step < maxSteps; step++) {
-      integrator->step(dt);
-      if (step % 10 == 0) {
-        std::cout << std::format("Step {:4d}, t = {:.4f}, T = {:.6e}, V = {:.6e}\n",
-                                 step, system.currentTime(),
-                                 system.kineticEnergy(), system.potentialEnergy());
-      }
-    }
-    std::cout << "Done.\n";
-    return 0;
-  }
-
-  // 有渲染模式
-  auto renderer = renderer::createRenderer({
+  renderer::SimulationApp app({
       .windowWidth = 1280,
       .windowHeight = 720,
       .windowTitle = "SimCraft - Multi-Body Collision",
   });
 
-  // Push initial frame
-  renderer->queue().push(buildSceneProxy(system, 0));
-
-  // Hook: push a frame after every Newton iteration so we can see intermediate states
-  std::atomic<int> frameCounter{1};
-  integrator->onNewtonIter = [&](int newtonIter) {
-    if (!renderer->isRunning()) return;
-    auto proxy = buildSceneProxy(system, frameCounter++);
-    renderer->queue().push(std::move(proxy));
+  app.stepFn = [&](int) {
+    integrator->step(dt);
   };
 
-  std::atomic<int> stepsCompleted{0};
-  std::thread simThread([&]() {
-    for (int step = 0; step < maxSteps && renderer->isRunning(); step++) {
-      integrator->step(dt);
+  app.buildProxy = [&](int step) {
+    return renderer::buildSceneProxyFromSystem(system, step);
+  };
 
-      stepsCompleted = step + 1;
+  app.logInterval = 50;
+  app.logFn = [&](int step) {
+    std::cout << std::format("Step {:4d}, t = {:.4f}\n", step, system.currentTime());
+  };
 
-      if (step % 50 == 0) {
-        std::cout << std::format("Step {:4d}, t = {:.4f}\n", step, system.currentTime());
-      }
-    }
-    renderer->shutdown();
-  });
+  int completed;
+  if (noRender) {
+    completed = app.runHeadless(maxSteps);
+  } else {
+    completed = app.run(maxSteps);
+  }
 
-  renderer->runOnCurrentThread();
-  simThread.join();
-
-  std::cout << std::format("Done. {} steps completed.\n", stepsCompleted.load());
+  std::cout << std::format("Done. {} steps completed.\n", completed);
   return 0;
 }

@@ -123,30 +123,39 @@ if NO_RENDER:
     print(f"Done. {sim.steps_completed} steps completed.")
 
 else:
-    # ── Render mode ─────────────────────────────────────────────────────────
-    # Energy is sampled before and after via sim.kinetic_energy etc.
-    # run_and_display blocks until the window is closed.
-    renderer = simcraft.Renderer(width=1280, height=720,
-                                  title="Energy Conservation Check")
-
+    # ── Render mode with per-step energy callback ────────────────────────────
+    # The new on_step callback lets us log energy even during rendered runs.
     print(f"\nStarting... close window to stop.")
     print(HDR)
 
-    # Capture initial energy before the run starts.
-    # (system.init() is deferred until ensure_initialized() inside run_and_display;
-    #  we trigger one step manually first to get E0, then use run_and_display
-    #  for the remaining steps with the renderer.)
-    #
-    # Alternative: use --no-render for detailed per-step energy logging.
-    simcraft.run_and_display(sim, renderer, dt=DT, steps=STEPS)
+    E0_container = [None]  # mutable container for closure
 
-    # After the run, report final energy (system is now locked).
+    def on_step(step, t):
+        """Per-step callback: log energy drift while rendering."""
+        ke = sim.kinetic_energy
+        pe = sim.potential_energy
+        E  = ke + pe
+
+        if E0_container[0] is None:
+            E0_container[0] = E if abs(E) > 1e-12 else 1.0
+
+        drift = (E - E0_container[0]) / abs(E0_container[0])
+
+        if step % 20 == 0 or step <= 5:
+            print(f"{step:>6d}  {t:>8.4f}  {ke:>14.6f}  {pe:>14.6f}"
+                  f"  {E:>14.6f}  {drift:>+10.4%}")
+
+    sim.display(dt=DT, steps=STEPS,
+                title="Energy Conservation Check",
+                on_step=on_step)
+
+    # Final report
     ke = sim.kinetic_energy
     pe = sim.potential_energy
     E  = ke + pe
-    print(f"\nFinal state after {sim.steps_completed} steps:")
-    print(f"  KE = {ke:.6f} J")
-    print(f"  PE = {pe:.6f} J")
-    print(f"  E  = {E:.6f} J")
-    print("  (Use --no-render for per-step energy table)")
+    E0 = E0_container[0] or 1.0
+    drift = (E - E0) / abs(E0)
+    print(SEP)
+    print(f"Final energy drift: {drift:+.4%}")
+    print("Note: Implicit Euler is dissipative — some negative drift is expected.")
     print(f"Done. {sim.steps_completed} steps.")

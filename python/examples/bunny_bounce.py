@@ -56,8 +56,7 @@ print(f"Pinned {len(top_verts)} vertices at the top (y >= {y_threshold:.3f})")
 # ─── Run ─────────────────────────────────────────────────────────────────────
 integrator = simcraft.IpcIntegrator(dHat=1e-3, kappa=1e8)
 sim = simcraft.Simulation(system, integrator)
-renderer = simcraft.Renderer(width=1280, height=720, title="Hanging Bunny")
 
 print("Running... close window to stop.")
-simcraft.run_and_display(sim, renderer, dt=0.01, steps=500)
+sim.display(dt=0.01, steps=500, title="Hanging Bunny")
 print(f"Done. {sim.steps_completed} steps.")

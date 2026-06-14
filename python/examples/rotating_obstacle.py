@@ -63,8 +63,7 @@ system.add_kinematic_body(rotating_wall)
 # ─── 4. Run with rendering ──────────────────────────────────────────────────
 integrator = simcraft.IpcIntegrator(dHat=2e-3, kappa=1e9)
 sim = simcraft.Simulation(system, integrator)
-renderer = simcraft.Renderer(width=1280, height=720, title="Rotating Obstacle")
 
 print("Starting... close window to stop.")
-simcraft.run_and_display(sim, renderer, dt=0.005, steps=500)
+sim.display(dt=0.005, steps=500, title="Rotating Obstacle")
 print(f"Done. {sim.steps_completed} steps.")

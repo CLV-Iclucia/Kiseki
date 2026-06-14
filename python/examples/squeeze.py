@@ -63,9 +63,8 @@ integrator = simcraft.IpcIntegrator(dHat=5e-3, kappa=1e10)
 
 # ─── 5. Run with rendering ──────────────────────────────────────────────────
 sim = simcraft.Simulation(system, integrator)
-renderer = simcraft.Renderer(width=1280, height=720, title="Double Plane Squeeze")
 
 print("Starting... close window to stop.")
 print("Two planes approach from y=±2 at 0.3 m/s each")
-simcraft.run_and_display(sim, renderer, dt=0.005, steps=400)
+sim.display(dt=0.005, steps=400, title="Double Plane Squeeze")
 print(f"Done. {sim.steps_completed} steps.")

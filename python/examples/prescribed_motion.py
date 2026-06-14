@@ -58,8 +58,7 @@ print(f"Prescribed sinusoidal motion on {len(driven_face)} vertices (x_max face)
 # ─── Run ─────────────────────────────────────────────────────────────────────
 integrator = simcraft.IpcIntegrator(dHat=1e-3, kappa=1e8)
 sim = simcraft.Simulation(system, integrator)
-renderer = simcraft.Renderer(width=1280, height=720, title="Prescribed Motion")
 
 print("Running... close window to stop.")
-simcraft.run_and_display(sim, renderer, dt=0.01, steps=300)
+sim.display(dt=0.01, steps=300, title="Prescribed Motion")
 print(f"Done. {sim.steps_completed} steps.")

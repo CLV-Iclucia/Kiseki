@@ -68,8 +68,7 @@ integrator = simcraft.IpcIntegrator(dHat=1e-3, kappa=1e8)
 
 # ─── 5. Run with rendering ──────────────────────────────────────────────────
 sim = simcraft.Simulation(system, integrator)
-renderer = simcraft.Renderer(width=1280, height=720, title="Twist Test")
 
 print("Starting... close window to stop.")
-simcraft.run_and_display(sim, renderer, dt=0.01, steps=400)
+sim.display(dt=0.01, steps=400, title="Twist Test")
 print(f"Done. {sim.steps_completed} steps.")
