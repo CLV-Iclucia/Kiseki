@@ -1,9 +1,8 @@
-#include <Core/transfer-stencil.h>
 #include <FluidSim/cpu/util.h>
 #include <FluidSim/cpu/advect-solver.h>
+#include <FluidSim/kernel.h>
 
 namespace fluid::cpu {
-using core::CubicKernel;
 void PicAdvector3D::solveG2P(const std::span<Vec3d> pos,
                              const FaceCentredGrid<Real, Real, 3, 0> &ug,
                              const FaceCentredGrid<Real, Real, 3, 1> &vg,
@@ -30,7 +29,7 @@ void PicAdvector3D::solveP2G(const std::span<Vec3d> pos,
   int n = pos.size();
   for (int idx = 0; idx < n; idx++) {
     auto &p = pos[idx];
-    auto &h = ug.gridSpacing();
+    Real h = ug.gridSpacing().x;
     Vec3i u_idx = ug.nearest(p);
     Vec3i v_idx = vg.nearest(p);
     Vec3i w_idx = wg.nearest(p);
@@ -41,7 +40,7 @@ void PicAdvector3D::solveP2G(const std::span<Vec3d> pos,
               u_idx.y + j >= 0 && u_idx.y + j < ug.height() &&
               u_idx.z + k >= 0 && u_idx.z + k < ug.depth()) {
             Vec3d pn = ug.indexToCoord(u_idx + Vec3i(i, j, k));
-            Real w_u = CubicKernel::weight<Real, 3>(h, p - pn);
+            Real w_u = cubicWeight3D(h, p - pn);
             ug(u_idx + Vec3i(i, j, k)) += vel(idx).x * w_u;
             uw(u_idx + Vec3i(i, j, k)) += w_u;
           }
@@ -49,7 +48,7 @@ void PicAdvector3D::solveP2G(const std::span<Vec3d> pos,
               v_idx.y + j >= 0 && v_idx.y + j < vg.height() &&
               v_idx.z + k >= 0 && v_idx.z + k < vg.depth()) {
             Vec3d pn = vg.indexToCoord(v_idx + Vec3i(i, j, k));
-            Real w_v = CubicKernel::weight<Real, 3>(h, p - pn);
+            Real w_v = cubicWeight3D(h, p - pn);
             vg(v_idx + Vec3i(i, j, k)) += vel(idx).y * w_v;
             vw(v_idx + Vec3i(i, j, k)) += w_v;
           }
@@ -57,7 +56,7 @@ void PicAdvector3D::solveP2G(const std::span<Vec3d> pos,
               w_idx.y + j >= 0 && w_idx.y + j < wg.height() &&
               w_idx.z + k >= 0 && w_idx.z + k < wg.depth()) {
             Vec3d pn = wg.indexToCoord(w_idx + Vec3i(i, j, k));
-            Real w_w = CubicKernel::weight<Real, 3>(h, p - pn);
+            Real w_w = cubicWeight3D(h, p - pn);
             wg(w_idx + Vec3i(i, j, k)) += vel(idx).z * w_w;
             ww(w_idx + Vec3i(i, j, k)) += w_w;
           }
@@ -200,7 +199,7 @@ void FlipAdvectionSolver3D::solveP2G(std::span<Vec3d> pos,
   int n = pos.size();
   tbb::parallel_for(0, n, [&](int idx) {
     auto &p = pos[idx];
-    auto &h = ug.gridSpacing();
+    Real h = ug.gridSpacing().x;
     Vec3i u_idx = ug.nearest(p);
     Vec3i v_idx = vg.nearest(p);
     Vec3i w_idx = wg.nearest(p);
@@ -211,7 +210,7 @@ void FlipAdvectionSolver3D::solveP2G(std::span<Vec3d> pos,
               u_idx.y + j >= 0 && u_idx.y + j < ug.height() &&
               u_idx.z + k >= 0 && u_idx.z + k < ug.depth()) {
             Vec3d pn = ug.indexToCoord(u_idx + Vec3i(i, j, k));
-            Real w_u = CubicKernel::weight<Real, 3>(h, p - pn);
+            Real w_u = cubicWeight3D(h, p - pn);
             ug(u_idx + Vec3i(i, j, k)) += vel(idx).x * w_u;
             uw(u_idx + Vec3i(i, j, k)) += w_u;
           }
@@ -219,7 +218,7 @@ void FlipAdvectionSolver3D::solveP2G(std::span<Vec3d> pos,
               v_idx.y + j >= 0 && v_idx.y + j < vg.height() &&
               v_idx.z + k >= 0 && v_idx.z + k < vg.depth()) {
             Vec3d pn = vg.indexToCoord(v_idx + Vec3i(i, j, k));
-            Real w_v = CubicKernel::weight<Real, 3>(h, p - pn);
+            Real w_v = cubicWeight3D(h, p - pn);
             vg(v_idx + Vec3i(i, j, k)) += vel(idx).y * w_v;
             vw(v_idx + Vec3i(i, j, k)) += w_v;
           }
@@ -227,7 +226,7 @@ void FlipAdvectionSolver3D::solveP2G(std::span<Vec3d> pos,
               w_idx.y + j >= 0 && w_idx.y + j < wg.height() &&
               w_idx.z + k >= 0 && w_idx.z + k < wg.depth()) {
             Vec3d pn = wg.indexToCoord(w_idx + Vec3i(i, j, k));
-            Real w_w = CubicKernel::weight<Real, 3>(h, p - pn);
+            Real w_w = cubicWeight3D(h, p - pn);
             wg(w_idx + Vec3i(i, j, k)) += vel(idx).z * w_w;
             ww(w_idx + Vec3i(i, j, k)) += w_w;
           }

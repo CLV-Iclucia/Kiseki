@@ -3,6 +3,7 @@
 //
 #include <Maths/linear-solver.h>
 #include <Maths/block-solvers/block-pcg.h>
+#include <Core/profiler.h>
 #include <fem/integrator-factory.h>
 #include <fem/ipc/collision-detector.h>
 #include <fem/ipc/distances.h>
@@ -30,6 +31,8 @@ static int ipc_auto_reg = ([]() {
   }(), 0);
 
 void IpcIntegrator::step(Real dt) {
+  SIM_PROFILE_FUNCTION();
+
   Real t_next = system().currentTime() + dt;
   system().advanceKinematicBodies(t_next);
 
@@ -40,6 +43,7 @@ void IpcIntegrator::step(Real dt) {
   x_prev = system().x;
 
   if (!hasInitializedActiveConstraints) {
+    SIM_PROFILE_SCOPE("InitCollisionPairs");
     maths::BlockVector<3> zeroDirection(x_t.numBlocks());
     zeroDirection.setZero();
     precomputeCollisionPairs(zeroDirection, 0.0);
@@ -48,36 +52,47 @@ void IpcIntegrator::step(Real dt) {
   }
 
   Real h = dt;
-  spdlog::info("[IPC] computing initial energy...");
 
-  Real E_prev = barrierAugmentedIncrementalPotentialEnergy(x_t, h);
+  Real E_prev;
+  {
+    SIM_PROFILE_SCOPE_COLOR("InitialEnergy", sim::core::profiler_colors::kEnergy);
+    E_prev = barrierAugmentedIncrementalPotentialEnergy(x_t, h);
+  }
   spdlog::info("[IPC] E_prev = {}", E_prev);
   maths::BlockVector<3> p(x_t.numBlocks());
   int iter = 0;
   while (true) {
-    // Compute negative gradient directly as BlockVector<3>
-    spdlog::info("[IPC] iter {}: computing gradient...", iter);
-    auto negG = barrierAugmentedIncrementalPotentialEnergyGradient(x_t, h);
-    negG *= -1.0;
+    SIM_PROFILE_SCOPE("NewtonIteration");
 
-    system().constraints().zeroConstrainedGradient(negG);
+    // Compute negative gradient directly as BlockVector<3>
+    maths::BlockVector<3> negG;
+    {
+      SIM_PROFILE_SCOPE_COLOR("Gradient", sim::core::profiler_colors::kGradient);
+      negG = barrierAugmentedIncrementalPotentialEnergyGradient(x_t, h);
+      negG *= -1.0;
+      system().constraints().zeroConstrainedGradient(negG);
+    }
 
     // Compute Hessian directly as BlockSparseMatrix<3>
-    spdlog::info("[IPC] iter {}: computing Hessian...", iter);
-    auto H = spdProjectHessian(h);
+    maths::BlockSparseMatrix<3> H;
+    {
+      SIM_PROFILE_SCOPE_COLOR("HessianAssembly", sim::core::profiler_colors::kHessian);
+      H = spdProjectHessian(h);
+    }
 
-    spdlog::info("[IPC] iter {}: solving linear system...", iter);
-    p.setZero();
-    spdlog::info("[IPC] nnz: {}", H.blocks().size());
-    auto result = solver->solve(H, negG, p);
-    if (!result.converged)
-      spdlog::warn("BlockPCG: {} iters, residual={}", result.iterations, result.residualNorm);
-    else
-      spdlog::info("BlockPCG: {} iters, residual={}", result.iterations, result.residualNorm);
+    // Linear solve
+    {
+      SIM_PROFILE_SCOPE_COLOR("LinearSolve", sim::core::profiler_colors::kSolver);
+      p.setZero();
+      auto result = solver->solve(H, negG, p);
+      if (!result.converged)
+        spdlog::warn("BlockPCG: {} iters, residual={}", result.iterations, result.residualNorm);
+      else
+        spdlog::info("BlockPCG: {} iters, residual={}", result.iterations, result.residualNorm);
+    }
 
     system().constraints().projectToFreeSpace(p);
 
-    std::cout << "norm: " << p.infNorm() << " " << negG.infNorm() << std::endl;
     // Use scene bbox diagonal from LBVH root node as the length scale
     Real sceneScale = [&]() {
       const auto& bvh = collisionDetector->trianglesBVH();
@@ -89,33 +104,42 @@ void IpcIntegrator::step(Real dt) {
         config.eps * sceneScale * h)
       break;
 
-    spdlog::info("[IPC] iter {}: computing step size upper bound...", iter);
-    Real alphaElastic = computeStepSizeUpperBound(p);
-    Real alphaKinematic = 1.0;
-    if (!system().colliders().empty()) {
-      if (auto toiColliders = collisionDetector->detectDeformableVsKinematic(p, dt)) alphaKinematic = *toiColliders;
+    // CCD + line search
+    Real alpha;
+    {
+      SIM_PROFILE_SCOPE_COLOR("CCD", sim::core::profiler_colors::kCollision);
+      Real alphaElastic = computeStepSizeUpperBound(p);
+      Real alphaKinematic = 1.0;
+      if (!system().colliders().empty()) {
+        if (auto toiColliders = collisionDetector->detectDeformableVsKinematic(p, dt)) alphaKinematic = *toiColliders;
+      }
+      alpha = config.stepSizeScale * std::min({1.0, alphaElastic, alphaKinematic});
     }
-    Real alpha = config.stepSizeScale * std::min({1.0, alphaElastic, alphaKinematic});
     spdlog::info("[IPC] iter {}: alpha={}", iter, alpha);
 
     if (alpha == 0.0)
       throw std::runtime_error(
           "Invalid state: collision happened within an integration step");
-    precomputeCollisionPairs(p, alpha);
-    Real E;
-    do {
-      maths::BlockVector<3> x_candidate = x_prev;
-      x_candidate.axpy(alpha, p);
-      updateCandidateSolution(x_candidate);
-      system().constraints().enforcePosition(system(), t_next);
-      E = barrierAugmentedIncrementalPotentialEnergy(x_t, h);
-      if (E <= E_prev) break;
-      alpha *= 0.5;
-    } while (true);
+
+    {
+      SIM_PROFILE_SCOPE_COLOR("LineSearch", sim::core::profiler_colors::kLineSearch);
+      precomputeCollisionPairs(p, alpha);
+      Real E;
+      do {
+        maths::BlockVector<3> x_candidate = x_prev;
+        x_candidate.axpy(alpha, p);
+        updateCandidateSolution(x_candidate);
+        system().constraints().enforcePosition(system(), t_next);
+        E = barrierAugmentedIncrementalPotentialEnergy(x_t, h);
+        if (E <= E_prev) break;
+        alpha *= 0.5;
+      } while (true);
+      E_prev = E;
+    }
 
     x_prev = system().x;
-    E_prev = E;
     iter++;
+    SIM_PROFILE_VALUE("IPC/NewtonIter", iter);
 
     if (onNewtonIter)
       onNewtonIter(iter);
@@ -132,34 +156,42 @@ void IpcIntegrator::step(Real dt) {
   Real total = T + V + Vg;
   spdlog::info("[IPC] t={:.4f}  T={:.6e}  V_elastic={:.6e}  V_gravity={:.6e}  Total={:.6e}",
                system().currentTime(), T, V, Vg, total);
-  // Diagnostic: log first vertex position to verify system.x is changing
-  if (system().x.numBlocks() > 0) {
-    auto v0 = system().x[0];
-    spdlog::debug("[IPC] step done: x[0]=({:.6f},{:.6f},{:.6f})", v0.x, v0.y, v0.z);
-  }
+
+  SIM_PROFILE_VALUE("IPC/TotalEnergy", total);
+  SIM_PROFILE_FRAME_MARK();
 }
 
 maths::BlockSparseMatrix<3> IpcIntegrator::spdProjectHessian(Real h) const
 {
+  SIM_PROFILE_SCOPE("spdProjectHessian");
   int nBlocks = system().x.numBlocks();
   maths::BlockSparseMatrix<3> H(nBlocks, nBlocks);
-  H.setSymmetric(true);
 
   // Elastic Hessian
-  system().spdProjectHessian(H);
+  {
+    SIM_PROFILE_SCOPE("spdProjectHessian/Elastic");
+    system().spdProjectHessian(H);
+  }
 
   Real kappa = config.contactStiffness;
   const int activeConstraintPairCount = constraintPairs.typeOffsets.back();
-  for (int i = 0; i < activeConstraintPairCount; ++i) {
-    const auto& pair = constraintPairs.pairs[i];
-    ipc::constraintPairBarrierHessian(pair, system().x, system().X, H, barrier_, kappa);
+  {
+    SIM_PROFILE_SCOPE("spdProjectHessian/Barrier");
+    for (int i = 0; i < activeConstraintPairCount; ++i) {
+      const auto& pair = constraintPairs.pairs[i];
+      ipc::constraintPairBarrierHessian(pair, system().x, system().X, H, barrier_, kappa);
+    }
   }
 
-
-
   // H_total = h² * H_elastic_barrier + M
-  H.scale(h * h);
-  H.addFrom(system().blockMass());
+  {
+    SIM_PROFILE_SCOPE("spdProjectHessian/PostProcess");
+    H.scale(h * h);
+    H.addFrom(system().blockMass());
+
+    // Sort by row to build row-segment index, enabling parallel SpMV in BlockPCG.
+    H.sortByRow();
+  }
 
   return H;
 }
@@ -439,6 +471,7 @@ void IpcIntegrator::refreshActiveConstraintPairs() {
 }
 
 void IpcIntegrator::precomputeCollisionPairs(const maths::BlockVector<3>& p, Real alpha) {
+  SIM_PROFILE_SCOPE("PrecomputeCollisionPairs");
   collisionPairs.clear();
   
   collisionDetector->updateBVHs(p, alpha);
@@ -448,6 +481,7 @@ void IpcIntegrator::precomputeCollisionPairs(const maths::BlockVector<3>& p, Rea
 }
 
 void IpcIntegrator::computeVertexTriangleCollisionPairs(const maths::BlockVector<3>& p, Real alpha) {
+  SIM_PROFILE_SCOPE("VT-CollisionPairs");
   Real dHat = config.dHat;
   const int nVerts = system().numVertices();
 
@@ -487,6 +521,7 @@ void IpcIntegrator::computeVertexTriangleCollisionPairs(const maths::BlockVector
 }
 
 void IpcIntegrator::computeEdgeEdgeCollisionPairs(const maths::BlockVector<3>& p, Real alpha) {
+  SIM_PROFILE_SCOPE("EE-CollisionPairs");
   Real dHat = config.dHat;
   const int nEdges = system().numEdges();
 

@@ -12,7 +12,8 @@
     "vulkan-memory-allocator",
     "vk-bootstrap",
     "directx-dxc",
-    "spirv-reflect"
+    "spirv-reflect",
+    "tracy"
   ],
   "builtin-baseline": "c16c1bd46c7f6de21efc6dcf19c1069d6825df23"
 }

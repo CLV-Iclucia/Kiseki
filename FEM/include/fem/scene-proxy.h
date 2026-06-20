@@ -7,29 +7,6 @@
 
 namespace sim::renderer {
 
-/// 计算面积加权平滑法线（公共工具函数）
-inline void computeSmoothNormals(MeshProxy& mesh) {
-  const auto& pos = mesh.positions;
-  const auto& tris = mesh.triangles;
-
-  mesh.normals.assign(pos.size(), glm::vec3(0.0f));
-
-  for (const auto& tri : tris) {
-    glm::vec3 e1 = pos[tri.y] - pos[tri.x];
-    glm::vec3 e2 = pos[tri.z] - pos[tri.x];
-    glm::vec3 fn = glm::cross(e1, e2); // area-weighted
-
-    mesh.normals[tri.x] += fn;
-    mesh.normals[tri.y] += fn;
-    mesh.normals[tri.z] += fn;
-  }
-
-  for (auto& n : mesh.normals) {
-    float len = glm::length(n);
-    n = (len > 1e-8f) ? n / len : glm::vec3(0.0f, 1.0f, 0.0f);
-  }
-}
-
 /// 从 FEM System 构建渲染帧（公共工具函数）。
 /// 遍历所有 Primitive，提取表面三角形 + 当前顶点位置。
 /// 消除了每个 App 都重复实现 buildSceneProxy 的问题。

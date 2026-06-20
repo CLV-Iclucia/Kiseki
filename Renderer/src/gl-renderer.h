@@ -45,9 +45,8 @@ private:
   float m_pitch = 25.0f;    // 垂直角度（F2.3: 原 0.0f）
   float m_distance = 5.0f;   // 距离目标的距离
 
-  // 相机自适应与跟踪（F2.2）
+  // 首帧初始化标记
   bool m_cameraInitialized = false;
-  bool m_autoTrack = true;
 
   // 地面参考网格（F3.2）
   unsigned int m_groundGridVao = 0;
@@ -65,7 +64,7 @@ private:
   void setupInputCallbacks();
   void updateCameraFromInput();
 
-  // 场景包围盒计算（F2.1）
+  // 场景包围盒计算（仅首帧初始化用）
   SceneBounds computeSceneBounds(const SceneProxy& scene) const;
 
   // 地面参考网格（F3.2）

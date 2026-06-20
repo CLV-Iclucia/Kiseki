@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cstring>
 #include <iostream>
+#include <span>
 
 namespace spatify {
 template<typename T, int Dim>

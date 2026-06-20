@@ -38,14 +38,16 @@ class HybridAdvectionSolver3D {
                       const SDF<3> &collider_sdf,
                       Real dt) = 0;
 
+  [[nodiscard]] const std::vector<Vec3d>& velocities() const { return velocities_; }
+
   virtual ~HybridAdvectionSolver3D() = default;
 
  protected:
 
   void handleCollision(const SDF<3> &collider_sdf, Vec3d &p, Vec3d &v) const;
-  [[nodiscard]] const Vec3d &vel(int i) const { return velocities[i]; }
-  Vec3d &vel(int i) { return velocities[i]; }
-  std::vector<Vec3d> velocities{};
+  [[nodiscard]] const Vec3d &vel(int i) const { return velocities_[i]; }
+  Vec3d &vel(int i) { return velocities_[i]; }
+  std::vector<Vec3d> velocities_{};
   int n_particles;
   Vec3i resolution{};
   Real width{};
@@ -57,7 +59,7 @@ class PicAdvector3D final : public HybridAdvectionSolver3D {
  public:
   PicAdvector3D(int n, const Vec3i& resolution, Real width, Real height, Real depth)
       : HybridAdvectionSolver3D(n, resolution, width, height, depth) {
-    velocities.resize(n);
+    velocities_.resize(n);
   }
   void solveG2P(std::span<Vec3d> pos,
                 const FaceCentredGrid<Real, Real, 3, 0> &ug,
@@ -91,7 +93,7 @@ class FlipAdvectionSolver3D final : public HybridAdvectionSolver3D {
  public:
   FlipAdvectionSolver3D(int n, const Vec3i& resolution, Real width, Real height, Real depth)
       : HybridAdvectionSolver3D(n, resolution, width, height, depth) {
-    velocities.resize(n);
+    velocities_.resize(n);
     u_last = std::make_unique<FaceCentredGrid<Real, Real, 3, 0>>(resolution, Vec3d(width, height, depth));
     v_last = std::make_unique<FaceCentredGrid<Real, Real, 3, 1>>(resolution, Vec3d(width, height, depth));
     w_last = std::make_unique<FaceCentredGrid<Real, Real, 3, 2>>(resolution, Vec3d(width, height, depth));

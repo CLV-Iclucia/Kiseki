@@ -1,6 +1,7 @@
 //
 // Created by creeper on 10/31/24.
 //
+#include <Core/profiler.h>
 #include <Maths/tensor.h>
 #include <fem/primitives/elastic-tet-mesh.h>
 #include <tbb/parallel_for.h>
@@ -71,6 +72,7 @@ Real ElasticTetMesh::deformationEnergy() const {
 // New BlockSparseMatrix interface (Phase 2B) — Parallelized (Phase A-1)
 void ElasticTetMesh::assembleEnergyHessian(
     maths::BlockSparseMatrix<3> &globalH, int blockStart) const {
+  SIM_PROFILE_SCOPE("assembleElasticHessian");
   const int nTets = static_cast<int>(numTets());
 
   // For small meshes, stay serial to avoid TBB overhead
@@ -95,10 +97,8 @@ void ElasticTetMesh::assembleEnergyHessian(
   tbb::enumerable_thread_specific<maths::BlockSparseMatrix<3>> localH(
       [&]() {
         maths::BlockSparseMatrix<3> local(globalH.blockRows(), globalH.blockCols());
-        local.setSymmetric(globalH.isSymmetric());  // Inherit symmetric mode
         // Estimate: each tet contributes 16 blocks (4x4 tet connectivity)
-        // In symmetric mode, ~10 blocks per tet (upper triangle only)
-        local.reserve(nTets * (globalH.isSymmetric() ? 10 : 16) / 4);
+        local.reserve(nTets * 16 / 4);
         return local;
       });
 

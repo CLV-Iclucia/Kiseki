@@ -7,11 +7,10 @@
 #include <Spatify/arrays.h>
 #include <Spatify/grids.h>
 #include <FluidSim/cpu/sdf.h>
-#include <Core/debug.h>
+#include <FluidSim/fluid-types.h>
+#include <Core/error.h>
 #include <array>
 #include <memory>
-
-#include <FluidSim/fluid-simulator.h>
 
 namespace fluid::cpu {
 using spatify::Array3D;
@@ -115,9 +114,9 @@ public:
       preconditioner = std::make_unique<ModifiedIncompleteCholesky3D>(
           r.width(), r.height(), r.depth());
     } else if (precond_method == PreconditionerMethod::Multigrid) {
-      ERROR("Not supported yet!");
+      SIM_THROW("Multigrid preconditioner not supported yet");
     } else
-      ERROR("Unknown preconditioner type");
+      SIM_THROW("Unknown preconditioner type");
   }
 
   ~CgSolver3D() override = default;
@@ -168,7 +167,7 @@ public:
       cg_solver->setPreconditioner(precond_method);
       solver = std::move(cg_solver);
     } else
-      ERROR("Unknown solver type");
+      SIM_THROW("Unknown solver type");
   }
 
   ~FvmSolver3D() override = default;

@@ -38,13 +38,6 @@ public:
   BlockSparseMatrix(int blockRows, int blockCols)
       : m_blockRows(blockRows), m_blockCols(blockCols) {}
 
-  // --- Symmetric mode ---
-  /// Enable symmetric storage: only upper triangle (i <= j) is stored.
-  /// In apply(), off-diagonal blocks contribute to both y[i] and y[j].
-  /// This halves memory and SpMV work for symmetric matrices (e.g., Hessians).
-  void setSymmetric(bool sym) { m_symmetric = sym; }
-  [[nodiscard]] bool isSymmetric() const { return m_symmetric; }
-
   // --- Dimensions ---
   [[nodiscard]] int blockRows() const { return m_blockRows; }
   [[nodiscard]] int blockCols() const { return m_blockCols; }
@@ -67,26 +60,9 @@ public:
   void addBlock(int blockRow, int blockCol, const Block &value) {
     assert(blockRow >= 0 && blockRow < m_blockRows);
     assert(blockCol >= 0 && blockCol < m_blockCols);
-    // Debug: check diagonal blocks are PSD — set breakpoint on the spdlog line
-  /*  if (blockRow == blockCol) {
-      Real d11 = value[0][0], d22 = value[1][1], d33 = value[2][2];
-      Real minor2 = d11 * value[1][1] - value[0][1] * value[1][0];
-      Real det = glm::determinant(value);
-      if (d11 < -1e-3 || minor2 < -1e-3 || det < -1e-3) {
-        std::cout << std::format("Non-PSD diagonal block at ({},{}): d11={}, minor2={}, det={}",
-                      blockRow, blockCol, d11, minor2, det);  // <-- breakpoint here
-      }
-    }*/
-    if (m_symmetric && blockRow > blockCol) {
-      // Symmetric mode: canonicalize to upper triangle, transpose the block
-      m_blocks.push_back(glm::transpose(value));
-      m_rowIdx.push_back(blockCol);
-      m_colIdx.push_back(blockRow);
-    } else {
-      m_blocks.push_back(value);
-      m_rowIdx.push_back(blockRow);
-      m_colIdx.push_back(blockCol);
-    }
+    m_blocks.push_back(value);
+    m_rowIdx.push_back(blockRow);
+    m_colIdx.push_back(blockCol);
   }
 
   void clear() {
@@ -117,27 +93,20 @@ public:
 
   /// y += A * x (accumulate, does not zero y)
   /// Uses parallel row-segmented approach when matrix is sorted by row.
-  /// In symmetric mode, off-diagonal entries contribute to both y[row] and y[col].
   void applyAdd(const BlockVector<N> &x, BlockVector<N> &y) const {
     assert(x.numBlocks() == m_blockCols);
     assert(y.numBlocks() == m_blockRows);
     const int n = numEntries();
 
-    // For small matrices, unsorted data, or symmetric mode, use serial scatter.
-    // (Symmetric mode writes to both y[row] and y[col], so row-segmented parallel
-    //  path would have write conflicts on y[col]. Keep serial for correctness.)
-    if (n < 20000 || m_rowSegments.empty() || m_symmetric) {
+    // For small matrices or unsorted data, use serial scatter.
+    if (n < 20000 || m_rowSegments.empty()) {
       for (int k = 0; k < n; k++) {
-        int i = m_rowIdx[k], j = m_colIdx[k];
-        y[i] += m_blocks[k] * x[j];
-        if (m_symmetric && i != j)
-          y[j] += glm::transpose(m_blocks[k]) * x[i];
+        y[m_rowIdx[k]] += m_blocks[k] * x[m_colIdx[k]];
       }
       return;
     }
 
-    // Parallel path: each row-segment can be processed independently
-    // (entries within the same row scatter to the same y[row], no conflict between rows)
+    // Parallel path: each row-segment writes only to y[row], no conflict between rows.
     const int numSegments = static_cast<int>(m_rowSegments.size());
     tbb::parallel_for(0, numSegments, [&](int seg) {
       int segStart = m_rowSegments[seg];
@@ -154,7 +123,7 @@ public:
   // --- Eigen bridge (copies data) ---
   [[nodiscard, deprecated("Use block operations directly")]] SparseMatrix<Real> toEigen() const {
     std::vector<Eigen::Triplet<Real>> triplets;
-    triplets.reserve(numEntries() * N * N * (m_symmetric ? 2 : 1));
+    triplets.reserve(numEntries() * N * N);
     const int n = numEntries();
     for (int k = 0; k < n; k++) {
       const int bRow = m_rowIdx[k];
@@ -163,12 +132,6 @@ public:
       for (int j = 0; j < N; j++)        // glm column
         for (int i = 0; i < N; i++)      // glm row
           triplets.emplace_back(bRow * N + i, bCol * N + j, block[j][i]);
-      // Symmetric: also emit the transposed block for off-diagonal entries
-      if (m_symmetric && bRow != bCol) {
-        for (int j = 0; j < N; j++)
-          for (int i = 0; i < N; i++)
-            triplets.emplace_back(bCol * N + i, bRow * N + j, block[i][j]);  // transposed
-      }
     }
     SparseMatrix<Real> mat(scalarRows(), scalarCols());
     mat.setFromTriplets(triplets.begin(), triplets.end());
@@ -214,15 +177,11 @@ public:
 
   /// Assemble a local matrix (e.g., 12×12 = 4 blocks × 3 dof) into global matrix
   /// localMat is in Eigen row-major format, will be converted to glm column-major
-  /// In symmetric mode, only upper-triangle blocks (blockIndices[i] <= blockIndices[j])
-  /// are assembled — the rest are reconstructed during apply().
   template <int LocalBlocks>
   void assembleBlock(const Eigen::Matrix<Real, LocalBlocks * 3, LocalBlocks * 3> &localMat,
                      const std::array<int, LocalBlocks> &blockIndices) {
     for (int i = 0; i < LocalBlocks; i++) {
       for (int j = 0; j < LocalBlocks; j++) {
-        if (m_symmetric && blockIndices[i] > blockIndices[j])
-          continue;  // Skip lower triangle; symmetric apply() handles it
         Block b;
         for (int c = 0; c < N; c++)       // col (glm column-major)
           for (int r = 0; r < N; r++)     // row
@@ -274,7 +233,6 @@ public:
 private:
   int m_blockRows = 0;
   int m_blockCols = 0;
-  bool m_symmetric = false;
   std::vector<Block> m_blocks;
   std::vector<int> m_rowIdx;
   std::vector<int> m_colIdx;

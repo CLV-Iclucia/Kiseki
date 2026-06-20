@@ -7,7 +7,6 @@
 
 namespace sim::renderer {
 
-/// 单个可渲染网格的数据快照 (拥有数据所有权)
 struct MeshProxy {
   std::string name;
   std::vector<core::Vec3f> positions;    // 顶点位置 (float, 渲染精度足够)
@@ -17,7 +16,6 @@ struct MeshProxy {
   core::Vec3f objectColor{-1.0f};        // Per-object 颜色; 负值 = 使用全局默认色
 };
 
-/// 单个可渲染线框/边集
 struct WireframeProxy {
   std::string name;
   std::vector<core::Vec3f> positions;
@@ -25,7 +23,6 @@ struct WireframeProxy {
   core::Vec3f color{1.0f, 1.0f, 1.0f};
 };
 
-/// 粒子系统快照
 struct ParticleProxy {
   std::string name;
   std::vector<core::Vec3f> positions;
@@ -33,7 +30,6 @@ struct ParticleProxy {
   core::Vec3f color{0.2f, 0.5f, 1.0f};
 };
 
-/// 相机参数
 struct CameraState {
   glm::vec3 position{0, 2, 5};
   glm::vec3 target{0, 0, 0};
@@ -43,7 +39,6 @@ struct CameraState {
   float farPlane = 100.0f;
 };
 
-/// 一帧的完整场景快照
 struct SceneProxy {
   std::vector<MeshProxy> meshes;
   std::vector<WireframeProxy> wireframes;
@@ -52,5 +47,26 @@ struct SceneProxy {
   float simulationTime = 0.0f;
   int frameIndex = 0;
 };
+
+inline void computeSmoothNormals(MeshProxy& mesh) {
+  const auto& pos = mesh.positions;
+  const auto& tris = mesh.triangles;
+
+  mesh.normals.assign(pos.size(), core::Vec3f(0.0f));
+
+  for (const auto& tri : tris) {
+    core::Vec3f e1 = pos[tri.y] - pos[tri.x];
+    core::Vec3f e2 = pos[tri.z] - pos[tri.x];
+    core::Vec3f fn = glm::cross(e1, e2);  // area-weighted
+    mesh.normals[tri.x] += fn;
+    mesh.normals[tri.y] += fn;
+    mesh.normals[tri.z] += fn;
+  }
+
+  for (auto& n : mesh.normals) {
+    float len = glm::length(n);
+    n = (len > 1e-8f) ? n / len : core::Vec3f(0.0f, 1.0f, 0.0f);
+  }
+}
 
 } // namespace sim::renderer

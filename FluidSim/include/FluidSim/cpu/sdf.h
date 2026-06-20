@@ -4,7 +4,7 @@
 
 #ifndef JEOCRAFT_IMPLICITSURFACE_INCLUDE_IMPLICITSURFACE_SDF_H_
 #define JEOCRAFT_IMPLICITSURFACE_INCLUDE_IMPLICITSURFACE_SDF_H_
-#include <FluidSim/fluid-sim.h>
+#include <FluidSim/fluid-types.h>
 #include <Spatify/grids.h>
 #include <Spatify/arrays.h>
 #include <Spatify/ns-util.h>
@@ -225,7 +225,7 @@ class NaiveReconstructor<T, 3> final : public ParticleSystemReconstructor<T, 3> 
     }
 
   private:
-    spatify::NeighbourSearcher<T, 3> ns;
+    spatify::ParticleNeighbourSearcher<T, 3> ns;
 };
 
 void manifold2SDF(int exact_band, spatify::Array3D<int>& closest,

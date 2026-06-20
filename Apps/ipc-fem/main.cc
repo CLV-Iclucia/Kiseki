@@ -4,7 +4,7 @@
 #include <cxxopts.hpp>
 #include <fem/fem-simulation.h>
 #include <Renderer/simulation-app.h>
-#include <Renderer/fem-scene-proxy.h>
+#include <fem/scene-proxy.h>
 #include <iostream>
 #include <format>
 

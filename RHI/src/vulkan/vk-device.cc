@@ -7,6 +7,7 @@
 
 #define VMA_IMPLEMENTATION
 #include "vk-device.h"
+#include <RHI/shader-compiler.h>
 
 #include "vk-buffer.h"
 #include "vk-commands.h"

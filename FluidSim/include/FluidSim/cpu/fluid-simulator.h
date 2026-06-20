@@ -5,16 +5,17 @@
 #ifndef SIMCRAFT_FLUIDSIM_INCLUDE_FLUIDSIM_FLUID_SIMULATOR_H_
 #define SIMCRAFT_FLUIDSIM_INCLUDE_FLUIDSIM_FLUID_SIMULATOR_H_
 #include <Core/animation.h>
+#include <Core/error.h>
 #include <Core/timer.h>
 #include <Core/rand-gen.h>
 #include <Spatify/grids.h>
 #include <Spatify/arrays.h>
-#include <FluidSim/fluid-sim.h>
+#include <FluidSim/fluid-types.h>
+#include <FluidSim/fluid-legacy.h>
 #include <FluidSim/cpu/sdf.h>
 #include <FluidSim/cpu/advect-solver.h>
 #include <FluidSim/cpu/project-solver.h>
 #include <memory>
-#include <FluidSim/fluid-simulator.h>
 
 namespace fluid::cpu {
 using spatify::Grid;
@@ -94,7 +95,7 @@ class FluidSimulator final : public FluidComputeBackend {
                                                          pg.height() * ug->gridSpacing().y,
                                                          pg.depth() * ug->gridSpacing().z);
     } else
-      ERROR("Unknown advection solver");
+      SIM_THROW("Unknown advection solver");
   }
 
   void setProjector(ProjectSolver project_solver) override {
@@ -103,7 +104,7 @@ class FluidSimulator final : public FluidComputeBackend {
                                                 pg.depth());
       return;
     }
-    ERROR("Unknown projection solver");
+    SIM_THROW("Unknown projection solver");
   }
 
   void setCompressedSolver(CompressedSolverMethod solver_method,

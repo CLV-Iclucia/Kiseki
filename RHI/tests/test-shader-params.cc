@@ -90,9 +90,9 @@ TEST(ShaderParamsSchema, BuiltPerInstanceInDeclarationOrder) {
   EXPECT_EQ(a._schema[2].kind, detail::FieldKind::Scalar);
   EXPECT_EQ(a._schema[2].valueSize, sizeof(float));
 
-  // Per-instance offsets are identical across instances (offsetof is per-
-  // type), but each vector is its own allocation.
-  EXPECT_EQ(a._schema[0].offset, b._schema[0].offset);
+  // Per-instance slot indices are identical across instances (registration
+  // order is deterministic), but each vector is its own allocation.
+  EXPECT_EQ(a._schema[0].slotIndex, b._schema[0].slotIndex);
   EXPECT_NE(static_cast<const void*>(a._schema.data()),
             static_cast<const void*>(b._schema.data()));
 }

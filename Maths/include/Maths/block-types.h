@@ -116,7 +116,6 @@ void assembleLocalGrad(BlockVector<3>& out,
 
 /// 将 LocalHessian 组装到 BlockSparseMatrix<3>
 /// H_barrier[i][j] = kappa * (bHess * outerProduct(grad[i], grad[j]) + bGrad * hess[i][j])
-/// In symmetric mode, only upper-triangle blocks (globalIdx[i] <= globalIdx[j]) are assembled.
 template <int N>
 void assembleLocalHessian(BlockSparseMatrix<3>& out,
                           const std::array<int, N>& globalIdx,
@@ -127,8 +126,6 @@ void assembleLocalHessian(BlockSparseMatrix<3>& out,
                           Real kappa = 1.0) {
   for (int i = 0; i < N; i++) {
     for (int j = 0; j < N; j++) {
-      if (out.isSymmetric() && globalIdx[i] > globalIdx[j])
-        continue;  // Skip lower triangle; symmetric apply() handles it
       // outerProduct: grad[i] ⊗ grad[j] → dmat3
       glm::dmat3 outerGG = glm::outerProduct(grad[i], grad[j]);
       glm::dmat3 block = kappa * (bHess * outerGG + bGrad * hess[i][j]);
@@ -138,7 +135,6 @@ void assembleLocalHessian(BlockSparseMatrix<3>& out,
 }
 
 /// 将 LocalHessian 组装到 BlockSparseMatrix<3> (无 barrier 的简化版本)
-/// In symmetric mode, only upper-triangle blocks are assembled.
 template <int N>
 void assembleLocalHessian(BlockSparseMatrix<3>& out,
                           const std::array<int, N>& globalIdx,
@@ -146,8 +142,6 @@ void assembleLocalHessian(BlockSparseMatrix<3>& out,
                           Real scale = 1.0) {
   for (int i = 0; i < N; i++) {
     for (int j = 0; j < N; j++) {
-      if (out.isSymmetric() && globalIdx[i] > globalIdx[j])
-        continue;  // Skip lower triangle; symmetric apply() handles it
       out.addBlock(globalIdx[i], globalIdx[j], hess[i][j] * scale);
     }
   }

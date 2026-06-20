@@ -23,7 +23,7 @@
 #include <Maths/block-solvers/block-pcg.h>
 #include <Deform/strain-energy-density.h>
 #include <Renderer/simulation-app.h>
-#include <Renderer/fem-scene-proxy.h>
+#include <fem/scene-proxy.h>
 #include <iostream>
 #include <cmath>
 #include <format>

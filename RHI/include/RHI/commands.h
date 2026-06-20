@@ -233,6 +233,17 @@ class CommandList : public sim::core::NonCopyable {
   // ============ Sync (R0–R2) ============
   virtual void barrier(const BarrierDesc& desc) = 0;
 
+  // Convenience: global memory barrier without image layout transitions.
+  // Default access flags cover the most common case (shader write → shader
+  // read+write), override via the last two parameters when needed.
+  void memoryBarrier(uint32_t srcStage, uint32_t dstStage,
+                     uint32_t srcAccess = BarrierDesc::AccessShaderWrite,
+                     uint32_t dstAccess = BarrierDesc::AccessShaderRead |
+                                          BarrierDesc::AccessShaderWrite) {
+    barrier({.srcStage = srcStage, .dstStage = dstStage,
+             .srcAccess = srcAccess, .dstAccess = dstAccess});
+  }
+
   // ============ Debug markers ============
   virtual void debugMarkerBegin(std::string_view name) = 0;
   virtual void debugMarkerEnd() = 0;
@@ -320,41 +331,40 @@ class CommandList : public sim::core::NonCopyable {
 //      function is non-template, marked inline to allow the definition to
 //      appear in multiple TUs without ODR conflict.
 //
-// Layout invariant: ParamSlot<T> has its T member at offset 0, so reading
-// `*reinterpret_cast<const T*>(this + fieldOffset)` returns the underlying T
-// value. See shader-params.h §1 for why this holds.
+// Values are read from centralised storage (_refSlots / _scalarData) by
+// slot index. No pointer arithmetic, no reinterpret_cast, no offsetof.
 inline void ShaderParamsBase::_apply(CommandList& cmd) const {
-  const auto* base = reinterpret_cast<const std::byte*>(this);
-
   for (const auto& e : _bindings) {
     switch (e.kind) {
       case detail::FieldKind::UAVBuffer:
       case detail::FieldKind::SRVBuffer: {
-        const BufferRef& buf =
-            *reinterpret_cast<const BufferRef*>(base + e.fieldOffset);
+        const auto& buf = std::get<BufferRef>(
+            _refSlots[e.slotIndex].value);
         cmd.bindBufferAt(e.set, e.binding, buf);
         break;
       }
       case detail::FieldKind::UAVImage: {
-        const ImageRef& img =
-            *reinterpret_cast<const ImageRef*>(base + e.fieldOffset);
+        const auto& img = std::get<ImageRef>(
+            _refSlots[e.slotIndex].value);
         cmd.bindImageAt(e.set, e.binding, img, /*sampler=*/SamplerRef{});
         break;
       }
       case detail::FieldKind::SampledImage: {
-        const ImageBinding& ib =
-            *reinterpret_cast<const ImageBinding*>(base + e.fieldOffset);
+        const auto& ib = std::get<ImageBinding>(
+            _refSlots[e.slotIndex].value);
         cmd.bindImageAt(e.set, e.binding, ib.image, ib.sampler);
         break;
       }
       case detail::FieldKind::Sampler: {
-        const SamplerRef& smp =
-            *reinterpret_cast<const SamplerRef*>(base + e.fieldOffset);
+        const auto& smp = std::get<SamplerRef>(
+            _refSlots[e.slotIndex].value);
         cmd.bindSamplerAt(e.set, e.binding, smp);
         break;
       }
       case detail::FieldKind::Scalar: {
-        cmd.pushAt(e.pcOffset, base + e.fieldOffset, e.pcSize);
+        cmd.pushAt(e.pcOffset,
+                   _scalarData.data() + e.slotIndex,
+                   e.pcSize);
         break;
       }
     }

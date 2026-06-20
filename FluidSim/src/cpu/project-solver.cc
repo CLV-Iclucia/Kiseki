@@ -161,10 +161,8 @@ void FvmSolver3D::buildSystem(const FaceCentredGrid<Real, Real, 3, 0>& ug,
             signed_dist / (signed_dist - fluidSdf(i + 1, j, k)), 0.01);
         Adiag(i, j, k) += uWeights(i + 1, j, k) * factor / theta;
       } else {
-        if (i < fluidSdf.width() - 1) {
-          Adiag(i, j, k) += uWeights(i + 1, j, k) * factor;
-          Aneighbour[Right](i, j, k) -= uWeights(i + 1, j, k) * factor;
-        }
+        Adiag(i, j, k) += uWeights(i + 1, j, k) * factor;
+        Aneighbour[Right](i, j, k) -= uWeights(i + 1, j, k) * factor;
       }
       rhs(i, j, k) -= uWeights(i + 1, j, k) * ug(i + 1, j, k);
     }
@@ -183,7 +181,7 @@ void FvmSolver3D::buildSystem(const FaceCentredGrid<Real, Real, 3, 0>& ug,
       rhs(i, j, k) += vWeights(i, j, k) * vg(i, j, k);
     }
     // up
-    if (j < fluidSdf.width() - 1) {
+    if (j < fluidSdf.height() - 1) {
       if (fluidSdf(i, j + 1, k) > 0.0) {
         Real theta = std::max(
             signed_dist / (signed_dist - fluidSdf(i, j + 1, k)), 0.01);

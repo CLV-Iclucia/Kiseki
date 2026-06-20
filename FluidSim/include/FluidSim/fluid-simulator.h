@@ -1,94 +1,47 @@
-//
-// Created by creeper on 24-3-20.
-//
+// ============================================================================
+// include/FluidSim/fluid-simulator.h
+// FluidSimulator: 薄编排器，构造即就绪
+// ============================================================================
+#pragma once
 
-#ifndef FLUID_SIMULATOR_H
-#define FLUID_SIMULATOR_H
-
-#include <FluidSim/fluid-sim.h>
-#include <Core/debug.h>
+#include <FluidSim/fluid-context.h>
+#include <FluidSim/fluid-solver.h>
+#include <Core/animation.h>
 #include <memory>
-#include <utility>
+#include <vector>
 
 namespace fluid {
-enum class AdvectionMethod {
-  PIC,
-  FLIP,
-  APIC
-};
 
-enum class ProjectSolver {
-  FVM,
-  FDM
-};
+class FluidSimulator : public core::Animation {
+public:
+    /// 构造即就绪：传入 Context 和完整的 Solver 列表
+    FluidSimulator(std::unique_ptr<FluidContext> ctx,
+                   std::vector<std::shared_ptr<FluidModularSolver>> solvers);
 
-enum class Backend {
-  CPU,
-  CUDA
-};
+    // ---- 运行 ----
+    void step(core::Frame& frame) override;
 
-enum class PreconditionerMethod {
-  Multigrid,
-  ModifiedIncompleteCholesky
-};
+    // ---- 访问 ----
+    FluidContext& context() { return *ctx_; }
+    const FluidContext& context() const { return *ctx_; }
 
-enum class CompressedSolverMethod {
-  CG
-};
+    /// 按名称查找 Solver（用于运行时配置更新）
+    FluidModularSolver* findSolver(std::string_view name);
 
-enum class ReconstructorMethod {
-  Naive
-};
-
-struct FluidComputeBackend : NonCopyable {
-  virtual void setCollider(const Mesh& collider_mesh) const = 0;
-  virtual void setInitialFluid(const Mesh& fluid_mesh) = 0;
-  virtual void setAdvector(AdvectionMethod advection_method) = 0;
-  virtual void setProjector(ProjectSolver project_solver) = 0;
-  virtual void setCompressedSolver(CompressedSolverMethod solver_method,
-                                   PreconditionerMethod preconditioner_method) =
-  0;
-  virtual void setReconstructor(ReconstructorMethod reconstructor_method) = 0;
-  virtual ~FluidComputeBackend() = default;
-};
-
-struct Scene {
-  Mesh collider_mesh;
-  Mesh fluid_init_mesh;
-};
-
-
-struct SimConfig {
-  int nParticles = 0;
-  Vec3d size;
-  Vec3d orig;
-  Vec3i resolution;
-};
-
-struct FluidSimulator final : core::Animation {
-  explicit FluidSimulator(SimConfig config) : config(std::move(config)) {
-  }
-
-  SimConfig config;
-  std::unique_ptr<Scene> scene{};
-  std::unique_ptr<FluidComputeBackend> backend{};
-
-  void loadScene(const std::string& collider_path,
-                 const std::string& fluid_path) {
-    if (!scene)
-      scene = std::make_unique<Scene>();
-    if (!myLoadObj(collider_path, &scene->collider_mesh)) {
-      ERROR("Failed to load collider mesh");
+    template<typename T>
+    T* findSolver(std::string_view name) {
+        return dynamic_cast<T*>(findSolver(name));
     }
-    if (!myLoadObj(fluid_path, &scene->fluid_init_mesh)) {
-      ERROR("Failed to load fluid mesh");
+
+    const std::vector<std::shared_ptr<FluidModularSolver>>& solvers() const {
+        return solvers_;
     }
-  }
 
-  void step(core::Frame& frame) override {
-  }
+private:
+    std::unique_ptr<FluidContext> ctx_;
+    std::vector<std::shared_ptr<FluidModularSolver>> solvers_;
 
-  void setBackend(Backend backend);
+    Real computeCFL() const;
 };
-}
-#endif //FLUID_SIMULATOR_H
+
+} // namespace fluid

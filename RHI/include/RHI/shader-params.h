@@ -12,8 +12,8 @@
 //
 //   SaxpyParams params;
 //   params.g_y   = y;       // looks like assignment — IS assignment, but
-//   params.count = N;       // each field is a thin ParamSlot<T> wrapper that
-//   params.alpha = 2.5f;    // forwards the value into m_value.
+//   params.count = N;       // each field is a ParamSlot<T> wrapper that
+//   params.alpha = 2.5f;    // pushes the value into centralised storage.
 //   cmd->dispatch(pso, params, divRoundUp(N, 256), 1, 1);
 //
 // ===== Design intent (the contract this file enforces) =====================
@@ -23,49 +23,37 @@
 //   1. Each field is a wrapper type with an overloaded operator= so users
 //      see plain "params.g_y = buf" syntax, but the framework can hook the
 //      assignment if it ever needs to (validation, change-tracking, etc.).
-//      The wrapper is `ParamSlot<T>` below — a single-T-member struct with
-//      assignment overloads + transparent read access.
+//      The wrapper is `ParamSlot<T>` below — it stores the value locally
+//      AND pushes it into centralised storage on every assignment.
 //
-//   2. ZERO static accumulator variables per field. The previous design
-//      (now reverted) emitted an `inline static const int _<field>_reg =
-//      registerField<_Self>(...)` per SHADER_PARAM_*; that produced one
-//      ODR-merged global per field and a function-local-static schema vector
-//      per `Self`. Both were avoidable. The new design builds the per-class
-//      `_schema` lazily inside the ParamSlot ctor via DMI side effects, so
-//      static-storage cost across all SHADER_PARAMS classes is zero.
+//   2. ZERO static accumulator variables per field. The schema is built
+//      per-instance via DMI side effects at construction time.
 //
 // ===== Internal mechanics ==================================================
 //
-//   1. SHADER_PARAM_*(Type, FieldName) emits TWO things into the class body:
+//   1. SHADER_PARAM_*(Type, FieldName) expands into the class body:
 //        a. A field declaration: `ParamSlot<Type> FieldName = (...);`
 //        b. The `(...)` is a comma expression whose left operand calls
-//           `this->_registerField(name, kind, offset, valueSize)` on the
-//           partially-constructed leaf — populating `_schema` — and whose
-//           right operand is a default-constructed `ParamSlot<Type>{}` used
-//           to copy/move-initialise the field (mandatory copy-elision in
-//           C++17+, so no actual copy).
-//      Result: every SaxpyParams instance, on construction, walks its
-//      declared fields once and pushes one FieldInfo per field into _schema.
+//           `this->_registerField(name, kind, valueSize)` — populating
+//           `_schema` and allocating a slot in _refSlots or _scalarData —
+//           and whose right operand constructs the ParamSlot with the
+//           base pointer and slot index.
+//      Result: every instance, on construction, registers its fields.
 //
-//   2. CommandList::dispatch(pso, params, ...) checks the sentinel
+//   2. ParamSlot<T>::operator= pushes the assigned value into the base
+//      class's centralised storage (_refSlots for Ref types, _scalarData
+//      for trivially-copyable scalars). No offset arithmetic, no
+//      reinterpret_cast, no layout assumptions.
+//
+//   3. CommandList::dispatch(pso, params, ...) checks the sentinel
 //      `params._resolvedFor != pso.get()`; on mismatch it calls
 //      `params._resolve(pso->reflection())` to map field names →
-//      (set, binding) via the schema. ONE unordered_map lookup per field
-//      at first dispatch (typical kernels have <20 fields). Steady state
-//      is zero string ops.
+//      (set, binding) via the schema.
 //
-//   3. `params._apply(cmd)` walks `_bindings` (vector<ResolvedEntry>) once
+//   4. `params._apply(cmd)` walks `_bindings` (vector<ResolvedEntry>) once
 //      and issues `cmd.bindBufferAt / bindImageAt / bindSamplerAt / pushAt`.
-//      No virtual calls in the loop, no string compares, no heap allocs.
-//      Field reads are `*reinterpret_cast<const T*>(base + offset)` — safe
-//      because `ParamSlot<T>` has T as its single member at offset 0.
-//
-// ===== Layout invariant ====================================================
-//
-//   ParamSlot<T> is required to have its T member at offset 0 (asserted via
-//   static_assert when std::is_standard_layout_v<T>; relied upon for all T).
-//   This means: given the address of a ParamSlot<T>, reinterpret_cast to T*
-//   gives the underlying value's address. The `_apply` path uses this trick.
+//      No reinterpret_cast, no pointer arithmetic — values are read
+//      directly from typed centralised storage by slot index.
 //
 // ===== Push-constant offset strategy (plan §13.2 R23) ======================
 //
@@ -94,12 +82,14 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
+#include <variant>
 #include <vector>
 
 namespace sim::rhi {
@@ -108,65 +98,11 @@ namespace sim::rhi {
 // in commands.h.
 class CommandList;
 
-// ============================================================================
-// 1. ParamSlot<T> — field wrapper with transparent operator=
-// ============================================================================
-//
-// Layout invariant: ParamSlot<T>'s only data member is `T m_value`, at offset
-// 0 of the wrapper. This lets the framework recover the underlying T from a
-// ParamSlot address via reinterpret_cast.
-//
-// Usage by SHADER_PARAMS users is mostly transparent:
-//   ParamSlot<BufferRef> g_y;
-//   g_y = someBuffer;           // operator=(const T&)
-//   BufferRef ref = g_y;        // implicit conversion via operator const T&
-//   if (g_y.get())              // explicit access for places where conversion
-//                               // is awkward (e.g. operator-> on RcPtr-likes)
-//
-template <class T>
-class ParamSlot {
- public:
-  ParamSlot() = default;
-  ParamSlot(const ParamSlot&) = default;
-  ParamSlot(ParamSlot&&) noexcept = default;
-  ParamSlot& operator=(const ParamSlot&) = default;
-  ParamSlot& operator=(ParamSlot&&) noexcept = default;
-
-  // ---- The user-facing assignments ----
-  ParamSlot& operator=(const T& v) {
-    m_value = v;
-    return *this;
-  }
-  ParamSlot& operator=(T&& v) noexcept(
-      std::is_nothrow_move_assignable_v<T>) {
-    m_value = std::move(v);
-    return *this;
-  }
-
-  // ---- Read access ----
-  // Implicit conversion so most "uses" of the slot (function args, return
-  // statements, ternaries) Just Work without the user thinking about the
-  // wrapper.
-  operator const T&() const noexcept { return m_value; }
-
-  // Explicit getters when implicit conversion is ambiguous (e.g. you want
-  // to call a member function on the underlying T).
-  const T& get() const noexcept { return m_value; }
-  T& get() noexcept { return m_value; }
-
- private:
-  T m_value{};
-};
-
-// Layout sanity: standard-layout T → ParamSlot<T> guaranteed standard-layout
-// with m_value at offset 0. Non-standard-layout T (with vptr / non-empty
-// virtual base / mixed access specifiers) loses standard-layout, but the
-// single-member-offset-0 invariant still holds in practice on all major
-// compilers — we don't assert it generically because static_assert with
-// offsetof on non-standard-layout is conditionally supported.
+// Forward decl — ShaderParamsBase needed by ParamSlot.
+class ShaderParamsBase;
 
 // ============================================================================
-// 2. detail:: schema types + kind helpers
+// 1. detail:: schema types + kind helpers
 // ============================================================================
 namespace detail {
 
@@ -180,19 +116,20 @@ enum class FieldKind : uint8_t {
 };
 
 // Per-field metadata, accumulated into ShaderParamsBase::_schema by the
-// ParamSlot DMI side effect.
+// SHADER_PARAM_* macro's DMI side effect.
 struct FieldInfo {
-  const char* name;   // string literal — no ownership
+  const char* name;       // string literal — no ownership
   FieldKind kind;
-  uint32_t offset;    // offsetof(_Self, field) — within the leaf class
-  uint32_t valueSize; // sizeof of the underlying T (for Scalar push consts)
+  uint32_t slotIndex;     // index into _refSlots (for Ref kinds) or byte
+                          // offset into _scalarData (for Scalar)
+  uint32_t valueSize;     // sizeof of the underlying T (for Scalar push consts)
 };
 
 // Per-instance resolved record. Built once on first dispatch (or on
 // shader-switch). The hot path consumes this directly, no string ops.
 struct ResolvedEntry {
   FieldKind kind = FieldKind::UAVBuffer;
-  uint32_t fieldOffset = 0;  // offset of the ParamSlot within the leaf
+  uint32_t slotIndex = 0;  // index into _refSlots or byte offset in _scalarData
 
   // For descriptor kinds:
   uint32_t set = 0;
@@ -201,6 +138,14 @@ struct ResolvedEntry {
   // For Scalar:
   uint32_t pcOffset = 0;
   uint32_t pcSize = 0;
+};
+
+// ---- Centralised Ref storage ----
+// A type-erased slot that can hold any of the Ref/Image binding types.
+// Using std::variant gives us type safety without reinterpret_cast.
+struct RefSlot {
+  std::variant<std::monostate, BufferRef, ImageRef, SamplerRef, ImageBinding>
+      value;
 };
 
 // Per-macro kind traits — same C++ type can mean different kinds depending
@@ -284,15 +229,16 @@ inline const char* descriptorTypeToString(DescriptorBindingInfo::Type t) {
 }  // namespace detail
 
 // ============================================================================
-// 3. ShaderParamsBase — non-template; holds per-instance state
+// 2. ShaderParamsBase — non-template; holds per-instance state + storage
 // ============================================================================
 //
 // This is the only base class for SHADER_PARAMS-generated structs. It carries:
 //   - _schema:       per-instance vector of FieldInfo, populated by the
 //                    SHADER_PARAM_* macro's DMI side effect at construction.
 //   - _bindings:     per-instance resolved bindings, built on first dispatch.
-//   - _resolvedFor:  sentinel — which Shader* did we resolve against? Compared
-//                    by raw pointer; cheap.
+//   - _resolvedFor:  sentinel — which Shader* did we resolve against?
+//   - _refSlots:     centralised Ref storage (variant-based, type-safe).
+//   - _scalarData:   centralised scalar storage (byte buffer, memcpy'd).
 //
 // All public members are intentionally `_`-prefixed to mark them as
 // framework-managed; SHADER_PARAMS users don't touch them directly.
@@ -302,6 +248,11 @@ class ShaderParamsBase {
   std::vector<detail::FieldInfo> _schema;
   std::vector<detail::ResolvedEntry> _bindings;
   const void* _resolvedFor = nullptr;
+
+  // Centralised value storage — written by ParamSlot::operator=,
+  // read by _apply. No pointer arithmetic or reinterpret_cast needed.
+  std::vector<detail::RefSlot> _refSlots;
+  std::vector<std::byte> _scalarData;
 
   // Walk _schema + reflection, build _bindings. Throws std::runtime_error on
   // mismatch (missing binding, kind/type incompatible, PC overflow). Inline
@@ -317,22 +268,185 @@ class ShaderParamsBase {
     _bindings.clear();
   }
 
+  // ---- Storage update API (called by ParamSlot::operator=) ----
+  void _setRef(uint32_t slotIndex, const BufferRef& v) {
+    _refSlots[slotIndex].value = v;
+  }
+  void _setRef(uint32_t slotIndex, const ImageRef& v) {
+    _refSlots[slotIndex].value = v;
+  }
+  void _setRef(uint32_t slotIndex, const SamplerRef& v) {
+    _refSlots[slotIndex].value = v;
+  }
+  void _setRef(uint32_t slotIndex, const ImageBinding& v) {
+    _refSlots[slotIndex].value = v;
+  }
+  void _setScalar(uint32_t byteOffset, const void* data, uint32_t size) {
+    std::memcpy(_scalarData.data() + byteOffset, data, size);
+  }
+
  protected:
   ShaderParamsBase() = default;
   ~ShaderParamsBase() = default;  // non-virtual; SHADER_PARAMS structs are
                                    // never destroyed via base pointer
 
-  // Called from the SHADER_PARAM_* macro's DMI side effect. Pushes one
-  // FieldInfo per declared slot. Schema entries appear in declaration order
-  // because C++ guarantees data-member initialisation in declaration order.
-  //
-  // Returns void; the macro uses comma expression `(_registerField(...), T{})`
-  // so the void result is discarded and `T{}` becomes the slot value.
-  void _registerField(const char* name, detail::FieldKind k, uint32_t offset,
-                      uint32_t valueSize) {
-    _schema.push_back({name, k, offset, valueSize});
+  // Called from the SHADER_PARAM_* macro's DMI side effect for Ref fields.
+  // Allocates a RefSlot and returns the slot index.
+  uint32_t _registerRefField(const char* name, detail::FieldKind k,
+                             uint32_t valueSize) {
+    uint32_t idx = static_cast<uint32_t>(_refSlots.size());
+    _refSlots.emplace_back();
+    _schema.push_back({name, k, idx, valueSize});
+    return idx;
+  }
+
+  // Called from the SHADER_PARAM_* macro's DMI side effect for Scalar fields.
+  // Allocates bytes in _scalarData and returns the byte offset.
+  uint32_t _registerScalarField(const char* name, uint32_t valueSize) {
+    uint32_t offset = static_cast<uint32_t>(_scalarData.size());
+    _scalarData.resize(_scalarData.size() + valueSize, std::byte{0});
+    _schema.push_back({name, detail::FieldKind::Scalar, offset, valueSize});
+    return offset;
   }
 };
+
+// ============================================================================
+// 3. ParamSlot<T> — field wrapper with transparent operator=
+// ============================================================================
+//
+// ParamSlot holds a local copy of the value AND pushes updates into the
+// base class's centralised storage on every assignment. This eliminates
+// all offsetof / reinterpret_cast / pointer-arithmetic tricks.
+//
+// Usage by SHADER_PARAMS users is transparent:
+//   ParamSlot<BufferRef> g_y;
+//   g_y = someBuffer;           // operator=(const T&)
+//   BufferRef ref = g_y;        // implicit conversion via operator const T&
+//   if (g_y.get())              // explicit access
+//
+
+// ---- RefParamSlot: for Ref types (BufferRef, ImageRef, SamplerRef, ImageBinding)
+template <class T>
+class RefParamSlot {
+ public:
+  RefParamSlot() = default;
+
+  // Constructed by macro with base pointer and slot index.
+  RefParamSlot(ShaderParamsBase* base, uint32_t slotIndex)
+      : m_base(base), m_slotIndex(slotIndex) {}
+
+  RefParamSlot(const RefParamSlot&) = default;
+  RefParamSlot(RefParamSlot&&) noexcept = default;
+  RefParamSlot& operator=(const RefParamSlot& o) {
+    if (this != &o) {
+      m_value = o.m_value;
+      if (m_base) m_base->_setRef(m_slotIndex, m_value);
+    }
+    return *this;
+  }
+  RefParamSlot& operator=(RefParamSlot&& o) noexcept {
+    if (this != &o) {
+      m_value = std::move(o.m_value);
+      if (m_base) m_base->_setRef(m_slotIndex, m_value);
+    }
+    return *this;
+  }
+
+  // ---- The user-facing assignments ----
+  RefParamSlot& operator=(const T& v) {
+    m_value = v;
+    if (m_base) m_base->_setRef(m_slotIndex, m_value);
+    return *this;
+  }
+  RefParamSlot& operator=(T&& v) noexcept(
+      std::is_nothrow_move_assignable_v<T>) {
+    m_value = std::move(v);
+    if (m_base) m_base->_setRef(m_slotIndex, m_value);
+    return *this;
+  }
+
+  // ---- Read access ----
+  operator const T&() const noexcept { return m_value; }
+  const T& get() const noexcept { return m_value; }
+  T& get() noexcept { return m_value; }
+
+ private:
+  T m_value{};
+  ShaderParamsBase* m_base = nullptr;
+  uint32_t m_slotIndex = 0;
+};
+
+// ---- ScalarParamSlot: for trivially-copyable types (uint32_t, float, etc.)
+template <class T>
+class ScalarParamSlot {
+ public:
+  ScalarParamSlot() = default;
+
+  // Constructed by macro with base pointer and byte offset.
+  ScalarParamSlot(ShaderParamsBase* base, uint32_t byteOffset)
+      : m_base(base), m_byteOffset(byteOffset) {}
+
+  ScalarParamSlot(const ScalarParamSlot&) = default;
+  ScalarParamSlot(ScalarParamSlot&&) noexcept = default;
+  ScalarParamSlot& operator=(const ScalarParamSlot& o) {
+    if (this != &o) {
+      m_value = o.m_value;
+      if (m_base) m_base->_setScalar(m_byteOffset, &m_value, sizeof(T));
+    }
+    return *this;
+  }
+  ScalarParamSlot& operator=(ScalarParamSlot&& o) noexcept {
+    if (this != &o) {
+      m_value = std::move(o.m_value);
+      if (m_base) m_base->_setScalar(m_byteOffset, &m_value, sizeof(T));
+    }
+    return *this;
+  }
+
+  // ---- The user-facing assignments ----
+  ScalarParamSlot& operator=(const T& v) {
+    m_value = v;
+    if (m_base) m_base->_setScalar(m_byteOffset, &m_value, sizeof(T));
+    return *this;
+  }
+  ScalarParamSlot& operator=(T&& v) noexcept(
+      std::is_nothrow_move_assignable_v<T>) {
+    m_value = std::move(v);
+    if (m_base) m_base->_setScalar(m_byteOffset, &m_value, sizeof(T));
+    return *this;
+  }
+
+  // ---- Read access ----
+  operator const T&() const noexcept { return m_value; }
+  const T& get() const noexcept { return m_value; }
+  T& get() noexcept { return m_value; }
+
+ private:
+  T m_value{};
+  ShaderParamsBase* m_base = nullptr;
+  uint32_t m_byteOffset = 0;
+};
+
+// ---- ParamSlot type alias: selects RefParamSlot or ScalarParamSlot ----
+// Ref types: BufferRef, ImageRef, SamplerRef, ImageBinding
+// Scalar types: everything else (trivially copyable)
+namespace detail {
+template <class T>
+struct IsRefType : std::false_type {};
+template <>
+struct IsRefType<BufferRef> : std::true_type {};
+template <>
+struct IsRefType<ImageRef> : std::true_type {};
+template <>
+struct IsRefType<SamplerRef> : std::true_type {};
+template <>
+struct IsRefType<ImageBinding> : std::true_type {};
+}  // namespace detail
+
+template <class T>
+using ParamSlot = std::conditional_t<detail::IsRefType<T>::value,
+                                     RefParamSlot<T>,
+                                     ScalarParamSlot<T>>;
 
 // ============================================================================
 // 4. ShaderParamsBase::_resolve — non-template, inline definition
@@ -357,7 +471,7 @@ inline void ShaderParamsBase::_resolve(const ReflectionInfo& ri) {
   for (const auto& f : _schema) {
     detail::ResolvedEntry e{};
     e.kind = f.kind;
-    e.fieldOffset = f.offset;
+    e.slotIndex = f.slotIndex;
 
     if (f.kind == detail::FieldKind::Scalar) {
       if (pcRunning + f.valueSize > pcBlockSize) {
@@ -410,76 +524,66 @@ inline void ShaderParamsBase::_resolve(const ReflectionInfo& ri) {
 // MSVC needs /Zc:preprocessor to expand `#FieldName` consistently — the
 // project already enables this in RHI/CMakeLists.txt.
 //
-// Each SHADER_PARAM_* expands to:
+// Each SHADER_PARAM_REF expands to:
 //   ParamSlot<Type> FieldName =
-//       (this->_registerField("FieldName", kind, offsetof(_Self, FieldName),
-//                             sizeof(Type)),
-//        ::sim::rhi::ParamSlot<Type>{});
+//       ::sim::rhi::ParamSlot<Type>(this, this->_registerRefField(...));
 //
-// The default-member-initialiser uses the comma operator:
-//   - Left operand: side-effect call to _registerField on the partially-
-//     constructed leaf (the base sub-object is fully constructed by the
-//     time members are initialised, so _schema's vector is live).
-//   - Right operand: a default-constructed ParamSlot<Type>{} that becomes
-//     the field's initial value (mandatory copy elision in C++17+, so no
-//     copy actually happens).
+// Each SHADER_PARAM_SCALAR expands to:
+//   ParamSlot<Type> FieldName =
+//       ::sim::rhi::ParamSlot<Type>(this, this->_registerScalarField(...));
 //
-// `offsetof(_Self, FieldName)` inside the still-incomplete class body is
-// the same gray-area pattern as before (Unreal SHADER_PARAMETER, Filament
-// ParamBlock, etc. all rely on it). MSVC / Clang / GCC all accept it under
-// /Zc:preprocessor.
+// The DMI calls _registerRefField/_registerScalarField on the partially-
+// constructed leaf. The base sub-object is fully constructed by the time
+// members are initialised, so _refSlots/_scalarData vectors are live.
+//
+// NO offsetof. NO reinterpret_cast. NO pointer arithmetic for field access.
+//
 
 #define SHADER_PARAMS_BEGIN(Name)                                              \
   struct Name : public ::sim::rhi::ShaderParamsBase {                          \
     using _Self = Name;
 
 #define SHADER_PARAM_UAV(Type, FieldName)                                      \
-  ::sim::rhi::ParamSlot<Type> FieldName =                                      \
-      (this->_registerField(                                                   \
-           #FieldName,                                                         \
-           ::sim::rhi::detail::UAVKindOf<Type>::kind,                          \
-           static_cast<uint32_t>(offsetof(_Self, FieldName)),                  \
-           static_cast<uint32_t>(sizeof(Type))),                               \
-       ::sim::rhi::ParamSlot<Type>{})
+  ::sim::rhi::ParamSlot<Type> FieldName{                                       \
+      this,                                                                    \
+      this->_registerRefField(                                                 \
+          #FieldName,                                                          \
+          ::sim::rhi::detail::UAVKindOf<Type>::kind,                           \
+          static_cast<uint32_t>(sizeof(Type)))}
 
 #define SHADER_PARAM_SRV(Type, FieldName)                                      \
-  ::sim::rhi::ParamSlot<Type> FieldName =                                      \
-      (this->_registerField(                                                   \
-           #FieldName,                                                         \
-           ::sim::rhi::detail::SRVKindOf<Type>::kind,                          \
-           static_cast<uint32_t>(offsetof(_Self, FieldName)),                  \
-           static_cast<uint32_t>(sizeof(Type))),                               \
-       ::sim::rhi::ParamSlot<Type>{})
+  ::sim::rhi::ParamSlot<Type> FieldName{                                       \
+      this,                                                                    \
+      this->_registerRefField(                                                 \
+          #FieldName,                                                          \
+          ::sim::rhi::detail::SRVKindOf<Type>::kind,                           \
+          static_cast<uint32_t>(sizeof(Type)))}
 
 #define SHADER_PARAM_IMAGE(Type, FieldName)                                    \
-  ::sim::rhi::ParamSlot<Type> FieldName =                                      \
-      (this->_registerField(                                                   \
-           #FieldName,                                                         \
-           ::sim::rhi::detail::ImageKindOf<Type>::kind,                        \
-           static_cast<uint32_t>(offsetof(_Self, FieldName)),                  \
-           static_cast<uint32_t>(sizeof(Type))),                               \
-       ::sim::rhi::ParamSlot<Type>{})
+  ::sim::rhi::ParamSlot<Type> FieldName{                                       \
+      this,                                                                    \
+      this->_registerRefField(                                                 \
+          #FieldName,                                                          \
+          ::sim::rhi::detail::ImageKindOf<Type>::kind,                         \
+          static_cast<uint32_t>(sizeof(Type)))}
 
 #define SHADER_PARAM_SAMPLER(Type, FieldName)                                  \
-  ::sim::rhi::ParamSlot<Type> FieldName =                                      \
-      (this->_registerField(                                                   \
-           #FieldName,                                                         \
-           ::sim::rhi::detail::SamplerKindOf<Type>::kind,                      \
-           static_cast<uint32_t>(offsetof(_Self, FieldName)),                  \
-           static_cast<uint32_t>(sizeof(Type))),                               \
-       ::sim::rhi::ParamSlot<Type>{})
+  ::sim::rhi::ParamSlot<Type> FieldName{                                       \
+      this,                                                                    \
+      this->_registerRefField(                                                 \
+          #FieldName,                                                          \
+          ::sim::rhi::detail::SamplerKindOf<Type>::kind,                       \
+          static_cast<uint32_t>(sizeof(Type)))}
 
 #define SHADER_PARAM_SCALAR(Type, FieldName)                                   \
   static_assert(::std::is_trivially_copyable_v<Type>,                          \
                 "SHADER_PARAM_SCALAR(" #Type ", " #FieldName                   \
                 "): Type must be trivially copyable");                         \
-  ::sim::rhi::ParamSlot<Type> FieldName =                                      \
-      (this->_registerField(                                                   \
-           #FieldName,                                                         \
-           ::sim::rhi::detail::FieldKind::Scalar,                              \
-           static_cast<uint32_t>(offsetof(_Self, FieldName)),                  \
-           static_cast<uint32_t>(sizeof(Type))),                               \
-       ::sim::rhi::ParamSlot<Type>{})
+  ::sim::rhi::ParamSlot<Type> FieldName{                                       \
+      this,                                                                    \
+      this->_registerScalarField(                                              \
+          #FieldName,                                                          \
+          static_cast<uint32_t>(sizeof(Type)))}
 
 #define SHADER_PARAMS_END()                                                    \
   }

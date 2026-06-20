@@ -2,7 +2,7 @@
 #ifndef FLUIDSIM_COMMON_ADVECT_SOLVER_H_
 #define FLUIDSIM_COMMON_ADVECT_SOLVER_H_
 
-#include <FluidSim/fluid-sim.h>
+#include <FluidSim/fluid-types.h>
 #include <Spatify/grids.h>
 #include <Core/utils.h>
 #include <Spatify/arrays.h>

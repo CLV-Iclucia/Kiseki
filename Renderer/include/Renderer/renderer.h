@@ -13,7 +13,7 @@ struct RendererConfig {
   int windowHeight = 720;
   std::string windowTitle = "SimCraft";
   bool vsync = true;
-  bool headless = false; // true = 不开窗口，仅离屏渲染/导出帧
+  bool headless = false;
 };
 
 class Renderer {

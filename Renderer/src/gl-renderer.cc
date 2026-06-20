@@ -108,6 +108,43 @@ static const char* fragmentShaderSource = R"(
     }
 )";
 
+// Particle shader — simple point sprites with depth
+static const char* particleVertexShaderSource = R"(
+    #version 330 core
+    layout (location = 0) in vec3 aPos;
+
+    uniform mat4 view;
+    uniform mat4 projection;
+    uniform float pointSize;      // world-space radius
+    uniform float viewportHeight;
+
+    void main() {
+        vec4 viewPos = view * vec4(aPos, 1.0);
+        gl_Position = projection * viewPos;
+        // Physically-correct perspective point size:
+        // projection[1][1] = 1/tan(fov/2), so screen pixels = radius * proj[1][1] * viewportHeight / dist
+        float dist = -viewPos.z;  // view-space depth (positive towards camera)
+        gl_PointSize = max(1.0, pointSize * projection[1][1] * viewportHeight / dist);
+    }
+)";
+
+static const char* particleFragmentShaderSource = R"(
+    #version 330 core
+    out vec4 FragColor;
+    uniform vec3 particleColor;
+
+    void main() {
+        // Discard corners to make a circle
+        vec2 coord = gl_PointCoord * 2.0 - 1.0;
+        float r2 = dot(coord, coord);
+        if (r2 > 1.0) discard;
+
+        // Simple fake sphere shading
+        float shade = 1.0 - r2 * 0.5;
+        FragColor = vec4(particleColor * shade, 1.0);
+    }
+)";
+
 // Wireframe shader
 static const char* wireVertexShaderSource = R"(
     #version 330 core
@@ -208,10 +245,12 @@ void GLRenderer::initialize(const RendererConfig& config) {
     // Compile shaders
     m_meshShader = createShaderProgram(vertexShaderSource, fragmentShaderSource);
     m_wireShader = createShaderProgram(wireVertexShaderSource, wireFragmentShaderSource);
+    m_particleShader = createShaderProgram(particleVertexShaderSource, particleFragmentShaderSource);
 
     // Set up OpenGL state
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_MULTISAMPLE);
+    glEnable(GL_PROGRAM_POINT_SIZE);
     // 浅灰白背景（专业软件风，干净中性）
     glClearColor(0.92f, 0.92f, 0.94f, 1.0f);
 
@@ -222,40 +261,22 @@ void GLRenderer::initialize(const RendererConfig& config) {
 }
 
 void GLRenderer::drawFrame(const SceneProxy& scene) {
-    // === 相机自适应与跟踪 ===
-    auto bounds = computeSceneBounds(scene);
-
+    // === 首帧自适应初始化（之后完全由用户控制）===
     if (!m_cameraInitialized) {
-        // 首帧：根据包围球和 FOV 计算安全观察距离
+        auto bounds = computeSceneBounds(scene);
         m_camera.target = bounds.center;
 
-        // 正确公式：distance = radius / tan(fov/2) * margin
-        // 保证物体完整在视锥内，带 60% 呼吸空间
+        // 根据包围球和 FOV 计算初始观察距离
         float halfFovTan = std::tan(glm::radians(m_camera.fov * 0.5f));
         m_distance = (bounds.radius / halfFovTan) * 1.6f;
-        // 保底：至少是包围球半径的 4 倍
         m_distance = std::max(m_distance, bounds.radius * 4.0f);
 
-        m_pitch = 25.0f;   // 稍微俯视
-        m_yaw = -60.0f;    // 略偏，增加立体感
+        m_pitch = 25.0f;
+        m_yaw = -60.0f;
         m_cameraInitialized = true;
 
-        // 立即重算相机位置，确保本帧就用正确的视角渲染
         updateCameraFromInput();
-
-        std::cout << "[Camera] Auto-fit: center=(" << bounds.center.x << ","
-                  << bounds.center.y << "," << bounds.center.z
-                  << "), radius=" << bounds.radius
-                  << ", distance=" << m_distance << std::endl;
-    } else if (m_autoTrack) {
-        // 后续帧：平滑跟踪场景质心
-        float trackSpeed = 0.08f;
-        m_camera.target = glm::mix(m_camera.target, bounds.center, trackSpeed);
     }
-
-    // 动态调整近远平面 — 防止大场景被裁剪
-    m_camera.nearPlane = std::max(0.01f, m_distance * 0.01f);
-    m_camera.farPlane = std::max(100.0f, m_distance * 5.0f);
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -271,8 +292,8 @@ void GLRenderer::drawFrame(const SceneProxy& scene) {
     glUniformMatrix4fv(glGetUniformLocation(m_meshShader, "view"), 1, GL_FALSE, glm::value_ptr(view));
     glUniformMatrix4fv(glGetUniformLocation(m_meshShader, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
 
-    // 光照 — 光源位置随场景大小缩放（确保光在网格外部）
-    float lightScale = std::max(bounds.radius * 2.0f, 3.0f);
+    // 光照 — 光源位置基于相机距离缩放
+    float lightScale = std::max(m_distance * 0.6f, 3.0f);
     glm::vec3 lightPos = m_camera.target + glm::vec3(lightScale * 0.6f, lightScale, lightScale * 0.8f);
     glUniform3fv(glGetUniformLocation(m_meshShader, "lightPos"), 1, glm::value_ptr(lightPos));
 
@@ -402,8 +423,55 @@ void GLRenderer::drawWireframe(const WireframeProxy& wf) {
 }
 
 void GLRenderer::drawParticles(const ParticleProxy& particles) {
-    // Simple particle rendering - would use point sprites or instanced spheres
-    // For now, just placeholder
+    if (particles.positions.empty() || !m_particleShader) return;
+
+    // Lazily create / update particle GPU buffer (keyed by name, same pattern as meshes)
+    auto it = m_meshCache.find(particles.name);
+    bool needCreate = (it == m_meshCache.end());
+
+    GLMeshState state{};
+    if (!needCreate) {
+        state = it->second;
+        if (state.vertexCount != particles.positions.size()) {
+            glDeleteVertexArrays(1, &state.vao);
+            glDeleteBuffers(1, &state.vbo);
+            needCreate = true;
+        }
+    }
+    if (needCreate) {
+        glGenVertexArrays(1, &state.vao);
+        glGenBuffers(1, &state.vbo);
+        state.vertexCount = particles.positions.size();
+    }
+
+    glBindVertexArray(state.vao);
+    glBindBuffer(GL_ARRAY_BUFFER, state.vbo);
+    glBufferData(GL_ARRAY_BUFFER,
+                 static_cast<GLsizeiptr>(particles.positions.size() * sizeof(core::Vec3f)),
+                 particles.positions.data(), GL_DYNAMIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(core::Vec3f), nullptr);
+    glEnableVertexAttribArray(0);
+    glBindVertexArray(0);
+
+    m_meshCache[particles.name] = state;
+
+    // Draw
+    glUseProgram(m_particleShader);
+
+    glm::mat4 view       = computeViewMatrix();
+    glm::mat4 projection = computeProjectionMatrix();
+    glUniformMatrix4fv(glGetUniformLocation(m_particleShader, "view"),       1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(glGetUniformLocation(m_particleShader, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+
+    int width, height;
+    glfwGetWindowSize(m_window, &width, &height);
+    glUniform1f(glGetUniformLocation(m_particleShader, "pointSize"),      particles.radius);
+    glUniform1f(glGetUniformLocation(m_particleShader, "viewportHeight"), static_cast<float>(height));
+    glUniform3fv(glGetUniformLocation(m_particleShader, "particleColor"), 1, &particles.color.x);
+
+    glBindVertexArray(state.vao);
+    glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(particles.positions.size()));
+    glBindVertexArray(0);
 }
 
 glm::mat4 GLRenderer::computeViewMatrix() const {
@@ -467,10 +535,7 @@ void GLRenderer::setupInputCallbacks() {
             case GLFW_KEY_R:  // Reset camera
                 renderer->m_cameraInitialized = false;
                 break;
-            case GLFW_KEY_T:  // Toggle auto-track
-                renderer->m_autoTrack = !renderer->m_autoTrack;
-                std::cout << "[Camera] auto-track " << (renderer->m_autoTrack ? "ON" : "OFF") << std::endl;
-                break;
+
             case GLFW_KEY_ESCAPE:
                 glfwSetWindowShouldClose(window, GLFW_TRUE);
                 break;
@@ -533,7 +598,7 @@ void GLRenderer::updateCameraFromInput() {
 SceneBounds GLRenderer::computeSceneBounds(const SceneProxy& scene) const {
     SceneBounds bounds;
 
-    if (scene.meshes.empty()) return bounds;
+    if (scene.meshes.empty() && scene.particles.empty()) return bounds;
 
     glm::vec3 minP(std::numeric_limits<float>::max());
     glm::vec3 maxP(std::numeric_limits<float>::lowest());
@@ -546,15 +611,18 @@ SceneBounds GLRenderer::computeSceneBounds(const SceneProxy& scene) const {
         }
     }
 
+    for (const auto& ps : scene.particles) {
+        for (const auto& p : ps.positions) {
+            glm::vec3 pos(p.x, p.y, p.z);
+            minP = glm::min(minP, pos);
+            maxP = glm::max(maxP, pos);
+        }
+    }
+
     if (minP.x > maxP.x) return bounds; // 无有效顶点
 
-    // 使用 AABB 中心（而非顶点质心）— 与 radius 计算一致
     bounds.center = (minP + maxP) * 0.5f;
-
-    // radius = 从 AABB 中心到最远角的距离（即包围球半径）
     bounds.radius = glm::length(maxP - bounds.center);
-
-    // 保证最小半径
     bounds.radius = std::max(bounds.radius, 0.1f);
 
     return bounds;

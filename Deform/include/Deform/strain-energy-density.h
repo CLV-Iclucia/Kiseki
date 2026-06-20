@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <Core/profiler.h>
 #include <memory>
 #include <Deform/types.h>
 #include <Deform/invariants.h>
@@ -63,14 +64,20 @@ struct StableNeoHookean final : StrainEnergyDensity<T> {
         + ((I(2) - 1.0) * lambda - mu) * hessianIiii<T>(dg);
   }
   Matrix<T, 9, 9> filteredEnergyHessian(const DeformationGradient<T, 3> &dg) const override {
+    SIM_PROFILE_SCOPE("filteredSNHessian");
     auto I = isotropicInvariants(dg);
     Vector<T, 9> vec_giii = maths::vectorize(gradientIiii<T>(dg));
     Matrix<T, 9, 9> H = lambda * vec_giii * vec_giii.transpose() + 0.5 * mu * hessianIii<T>()
         + ((I(2) - 1.0) * lambda - mu) * hessianIiii<T>(dg);
     // compute eigenvalues
-    Eigen::SelfAdjointEigenSolver<Matrix<T, 9, 9>> es(H);
-    Vector<T, 9> eigenvalues = es.eigenvalues();
-    Matrix<T, 9, 9> eigenvectors = es.eigenvectors();
+    Vector<T, 9> eigenvalues;
+    Matrix<T, 9, 9> eigenvectors;
+    {
+      SIM_PROFILE_SCOPE("SNH_EigenSolve");
+      Eigen::SelfAdjointEigenSolver<Matrix<T, 9, 9>> es(H);
+      eigenvalues = es.eigenvalues();
+      eigenvectors = es.eigenvectors();
+    }
     for (int i = 0; i < 9; i++)
       eigenvalues(i) = std::abs(eigenvalues(i));
     return eigenvectors * eigenvalues.asDiagonal() * eigenvectors.transpose();
@@ -93,10 +100,16 @@ struct ARAP final : StrainEnergyDensity<T> {
     return hessianIii<T>() - 2 * hessianIi(dg);
   }
   Matrix<T, 9, 9> filteredEnergyHessian(const DeformationGradient<T, 3> &dg) const override {
+    SIM_PROFILE_SCOPE("filteredARAPHessian");
     auto H = hessianIii<T>() - 2 * hessianIi(dg);
-    Eigen::SelfAdjointEigenSolver<Matrix<T, 9, 9>> es(H);
-    Vector<T, 9> eigenvalues = es.eigenvalues();
-    Matrix<T, 9, 9> eigenvectors = es.eigenvectors();
+    Vector<T, 9> eigenvalues;
+    Matrix<T, 9, 9> eigenvectors;
+    {
+      SIM_PROFILE_SCOPE("ARAP_EigenSolve");
+      Eigen::SelfAdjointEigenSolver<Matrix<T, 9, 9>> es(H);
+      eigenvalues = es.eigenvalues();
+      eigenvectors = es.eigenvectors();
+    }
     for (int i = 0; i < 9; i++)
       eigenvalues(i) = std::abs(eigenvalues(i));
     return eigenvectors * eigenvalues.asDiagonal() * eigenvectors.transpose();

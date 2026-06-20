@@ -25,7 +25,12 @@ add_executable(energy-check energy-check/main.cc)
 target_link_libraries(energy-check PUBLIC FEM cxxopts Renderer)
 target_compile_features(energy-check PUBLIC cxx_std_20)
 
-message(STATUS "Apps configured: ipc-fem, cube-drop, multi-body, prescribed-motion, energy-check")
+# Fluid Dam Break simulation
+add_executable(fluid-sim fluid-sim/main.cc)
+target_link_libraries(fluid-sim PUBLIC FluidSim cxxopts Renderer)
+target_compile_features(fluid-sim PUBLIC cxx_std_20)
+
+message(STATUS "Apps configured: ipc-fem, cube-drop, multi-body, prescribed-motion, energy-check, fluid-sim")
 
 # ---- RHI demo apps (require Vulkan + GLFW, no OpenGL Renderer) ----
 if(SIMCRAFT_BUILD_RHI)

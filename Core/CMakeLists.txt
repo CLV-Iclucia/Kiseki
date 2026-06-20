@@ -15,6 +15,10 @@ target_include_directories(Core PUBLIC include)
 target_include_directories(Core PUBLIC ${EXTERNAL_PATH}/glm)
 target_link_libraries(Core PUBLIC spdlog)
 
+if(SIMCRAFT_PROFILE)
+  target_link_libraries(Core PUBLIC Tracy::TracyClient)
+endif()
+
 enable_testing()
 file(GLOB_RECURSE test_srcs CONFIGURE_DEPENDS tests/*.cc)
 foreach(test_src ${test_srcs})

@@ -22,6 +22,8 @@
 
 namespace sim::rhi {
 
+class ShaderCompiler;  // forward decl (defined in shader-compiler.h)
+
 class Device : public sim::core::NonCopyable {
  public:
   // Returns nullptr if no compatible Vulkan device is available
