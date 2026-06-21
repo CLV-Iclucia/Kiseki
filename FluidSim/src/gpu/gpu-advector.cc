@@ -67,7 +67,6 @@ SHADER_PARAMS_BEGIN(G2PGatherParams)
     SHADER_PARAM_SCALAR(float,     originY);
     SHADER_PARAM_SCALAR(float,     originZ);
     SHADER_PARAM_SCALAR(uint32_t,  numParticles);
-    SHADER_PARAM_SCALAR(float,     flipBlend);
 SHADER_PARAMS_END();
 
 // Advect params (RK2 semi-Lagrangian with grid velocity sampling, SOA)
@@ -142,9 +141,9 @@ GPUAdvector::GPUAdvector(Device& device, ShaderCompiler& compiler,
 void GPUAdvector::scatterP2G(CommandList& cmd, GPUGridState& grid, Real dt) {
     int nx = grid.gridSize.x, ny = grid.gridSize.y, nz = grid.gridSize.z;
     uint32_t particleGroups = (grid.numParticles + 255) / 256;
-    uint32_t maxFaces = static_cast<uint32_t>(
-        std::max({(nx+1)*ny*nz, nx*(ny+1)*nz, nx*ny*(nz+1)}));
-    uint32_t faceGroups = (maxFaces + 255) / 256;
+    uint32_t totalFaces = static_cast<uint32_t>(
+        (nx+1)*ny*nz + nx*(ny+1)*nz + nx*ny*(nz+1));
+    uint32_t faceGroups = (totalFaces + 255) / 256;
 
     // Step 1: Clear velocity faces + weights + valid flags
     cmd.fillBuffer(grid.uGrid, 0u);
@@ -198,7 +197,7 @@ void GPUAdvector::scatterP2G(CommandList& cmd, GPUGridState& grid, Real dt) {
         params.gridSizeX = static_cast<uint32_t>(nx);
         params.gridSizeY = static_cast<uint32_t>(ny);
         params.gridSizeZ = static_cast<uint32_t>(nz);
-        params.maxFaces  = maxFaces;
+        params.maxFaces  = totalFaces;
         cmd.dispatch(psoNormalize_, params, faceGroups, 1, 1);
     }
     cmd.memoryBarrier(BarrierDesc::StageComputeShader, BarrierDesc::StageComputeShader,
@@ -212,7 +211,7 @@ void GPUAdvector::gatherAndAdvect(CommandList& cmd, GPUGridState& grid, Real dt)
     int nx = grid.gridSize.x, ny = grid.gridSize.y, nz = grid.gridSize.z;
     uint32_t particleGroups = (grid.numParticles + 255) / 256;
 
-    // Step 1: G2P
+    // Step 1: G2P (pure PIC: particle velocity = grid velocity)
     if (psoG2P_.valid()) {
         G2PGatherParams params;
         params.positions   = grid.particlePositions;
@@ -228,7 +227,6 @@ void GPUAdvector::gatherAndAdvect(CommandList& cmd, GPUGridState& grid, Real dt)
         params.originY     = grid.originY;
         params.originZ     = grid.originZ;
         params.numParticles = grid.numParticles;
-        params.flipBlend    = 0.97f;  // from config
         cmd.dispatch(psoG2P_, params, particleGroups, 1, 1);
     }
     cmd.memoryBarrier(BarrierDesc::StageComputeShader, BarrierDesc::StageComputeShader,

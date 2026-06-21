@@ -16,6 +16,8 @@ namespace fluid::gpu {
 struct GPUGridState {
     // Staggered velocity faces (SSBO, R32_FLOAT per element)
     sim::rhi::BufferRef uGrid, vGrid, wGrid;
+    // Saved velocity after P2G (before forces/projection), for FLIP delta
+    sim::rhi::BufferRef uGridOld, vGridOld, wGridOld;
     // Ping-pong buffers for extrapolation
     sim::rhi::BufferRef uGridBuf, vGridBuf, wGridBuf;
     // Validity flags (SSBO, uint32 per element)
@@ -77,6 +79,14 @@ private:
     sim::rhi::PipelineRef psoBodyForce_;
     sim::rhi::PipelineRef psoCollider_;
 
+    // ===== CFL reduction =====
+    sim::rhi::PipelineRef psoCflReduce_;
+    sim::rhi::PipelineRef psoCflReduceFinal_;
+    sim::rhi::BufferRef   cflPartialBuf_;
+    sim::rhi::BufferRef   cflResultBuf_;       // 1 float on device
+    sim::rhi::BufferRef   cflReadbackBuf_;     // 1 float, host-visible
+    float                 cachedMaxSpeed_ = 0.0f;
+
     // ===== Readback (SOA) =====
     sim::rhi::BufferRef readbackPos_;
     sim::rhi::BufferRef readbackVel_;
@@ -89,8 +99,8 @@ private:
     void createBoundaryPipelines();
     void uploadParticles(const FluidScene& scene);
     void uploadColliderToImage(const Mesh& mesh);
+    void computeCFL();
     void substep(sim::rhi::CommandList& cmd, Real dt);
-    [[nodiscard]] Real computeCFL() const;
 };
 
 } // namespace fluid::gpu

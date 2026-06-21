@@ -9,10 +9,12 @@
 #include <FluidSim/gpu/gpu-reconstructor.h>
 
 #include <Core/debug.h>
+#include <algorithm>
+#include <array>
 #include <cassert>
+#include <filesystem>
 #include <format>
 #include <iostream>
-#include <filesystem>
 
 namespace fluid::gpu {
 
@@ -22,6 +24,18 @@ namespace fs = std::filesystem;
 // ============================================================================
 // SHADER_PARAMS for boundary shaders (owned by GPUFluidBackend)
 // ============================================================================
+
+SHADER_PARAMS_BEGIN(CflReduceParams)
+    SHADER_PARAM_SRV   (BufferRef, velocities);
+    SHADER_PARAM_UAV   (BufferRef, partialMax);
+    SHADER_PARAM_SCALAR(uint32_t,  numParticles);
+SHADER_PARAMS_END();
+
+SHADER_PARAMS_BEGIN(CflReduceFinalParams)
+    SHADER_PARAM_SRV   (BufferRef, partialMax);
+    SHADER_PARAM_UAV   (BufferRef, scalarOut);
+    SHADER_PARAM_SCALAR(uint32_t,  numGroups);
+SHADER_PARAMS_END();
 
 SHADER_PARAMS_BEGIN(BodyForceParams)
     SHADER_PARAM_UAV   (BufferRef, vGrid);
@@ -101,7 +115,32 @@ void GPUFluidBackend::initialize(const FluidScene& scene) {
     // 6. Create boundary pipelines
     createBoundaryPipelines();
 
-    // 7. Allocate readback buffers (CPU-visible, SOA)
+    // 7. CFL reduction pipelines + buffers
+    psoCflReduce_      = sim::rhi::compileComputePipeline(device_, compiler_, shaderPath("cfl-reduce.hlsl"));
+    psoCflReduceFinal_ = sim::rhi::compileComputePipeline(device_, compiler_, shaderPath("cfl-reduce-final.hlsl"));
+    {
+        uint32_t cflGroups = (grid_.numParticles + 255) / 256;
+        cflPartialBuf_ = device_.createBuffer({
+            .sizeBytes  = sizeof(float) * cflGroups,
+            .visibility = BufferDesc::Visibility::DeviceLocal,
+            .usage      = BufferDesc::Storage | BufferDesc::TransferSrc,
+            .debugName  = "cfl-partial",
+        });
+        cflResultBuf_ = device_.createBuffer({
+            .sizeBytes  = sizeof(float),
+            .visibility = BufferDesc::Visibility::DeviceLocal,
+            .usage      = BufferDesc::Storage | BufferDesc::TransferSrc,
+            .debugName  = "cfl-result",
+        });
+        cflReadbackBuf_ = device_.createBuffer({
+            .sizeBytes  = sizeof(float),
+            .visibility = BufferDesc::Visibility::Readback,
+            .usage      = BufferDesc::TransferDst,
+            .debugName  = "cfl-readback",
+        });
+    }
+
+    // 8. Allocate readback buffers (CPU-visible, SOA)
     readbackPos_ = device_.createBuffer({
         .sizeBytes = particleBufferSize(grid_.numParticles),
         .visibility = BufferDesc::Visibility::Readback,
@@ -118,18 +157,63 @@ void GPUFluidBackend::initialize(const FluidScene& scene) {
     std::cout << "[GPU] Initialization complete.\n";
 }
 
+void GPUFluidBackend::computeCFL() {
+    // GPU two-pass reduction: compute max particle speed
+    uint32_t numGroups = (grid_.numParticles + 255) / 256;
+
+    auto cmd = device_.beginCommands(QueueType::Compute);
+
+    // Pass 1: per-workgroup max
+    if (psoCflReduce_.valid()) {
+        CflReduceParams p;
+        p.velocities   = grid_.particleVelocities;
+        p.partialMax   = cflPartialBuf_;
+        p.numParticles = grid_.numParticles;
+        cmd->dispatch(psoCflReduce_, p, numGroups, 1, 1);
+        cmd->memoryBarrier(BarrierDesc::StageComputeShader, BarrierDesc::StageComputeShader);
+    }
+
+    // Pass 2: final reduction
+    if (psoCflReduceFinal_.valid()) {
+        CflReduceFinalParams p;
+        p.partialMax = cflPartialBuf_;
+        p.scalarOut  = cflResultBuf_;
+        p.numGroups  = numGroups;
+        cmd->dispatch(psoCflReduceFinal_, p, 1, 1, 1);
+        cmd->memoryBarrier(BarrierDesc::StageComputeShader, BarrierDesc::StageTransfer);
+    }
+
+    // Copy to readback
+    std::array<BufferCopy, 1> region{{{0, 0, sizeof(float)}}};
+    cmd->copyBuffer(cflResultBuf_, cflReadbackBuf_, region);
+    cmd->end();
+    device_.submitAndWait(*cmd, QueueType::Compute);
+
+    // Readback
+    auto data = cflReadbackBuf_->mapTyped<float>();
+    cachedMaxSpeed_ = data[0];
+    cflReadbackBuf_->unmap();
+}
+
 void GPUFluidBackend::step(Real dt) {
+    // Compute dynamic CFL from particle velocities
+    computeCFL();
+    Real cflDt = (cachedMaxSpeed_ > 1e-6)
+        ? config_.maxCfl * static_cast<Real>(grid_.gridSpacing) / static_cast<Real>(cachedMaxSpeed_)
+        : dt;  // If no motion yet, use full frame dt
+
     auto cmd = device_.beginCommands(QueueType::Compute);
 
     Real t = 0.0;
     int substepCnt = 0;
     while (t < dt) {
-        Real subDt = std::min(computeCFL(), dt - t);
+        Real subDt = std::min(cflDt, dt - t);
         substepCnt++;
-        std::cout << std::format("[GPU] Substep {}, dt={}\n", substepCnt, subDt);
         substep(*cmd, subDt);
         t += subDt;
     }
+    std::cout << std::format("[GPU] {} substeps, cflDt={:.5f}, vmax={:.3f}\n",
+                             substepCnt, cflDt, cachedMaxSpeed_);
 
     // Optional: surface reconstruction
     if (reconstructor_) {
@@ -138,6 +222,8 @@ void GPUFluidBackend::step(Real dt) {
 
     cmd->end();
     device_.submitAndWait(*cmd, QueueType::Compute);
+
+
 }
 
 void GPUFluidBackend::readbackParticles(FluidFrame& out) {
@@ -197,21 +283,33 @@ void GPUFluidBackend::createSharedBuffers(const FluidScene& scene) {
     size_t nV = static_cast<size_t>(nx) * (ny + 1) * nz;
     size_t nW = static_cast<size_t>(nx) * ny * (nz + 1);
 
-    // Staggered velocity faces (float32)
-    grid_.uGrid    = makeStorage(sizeof(float) * nU, "uGrid");
-    grid_.vGrid    = makeStorage(sizeof(float) * nV, "vGrid");
-    grid_.wGrid    = makeStorage(sizeof(float) * nW, "wGrid");
-    grid_.uGridBuf = makeStorage(sizeof(float) * nU, "uGridBuf");
-    grid_.vGridBuf = makeStorage(sizeof(float) * nV, "vGridBuf");
-    grid_.wGridBuf = makeStorage(sizeof(float) * nW, "wGridBuf");
+    // Staggered velocity faces (float32) — need TransferSrc for copy to old buffers
+    auto makeVelocityGrid = [&](size_t sizeBytes, const char* name) {
+        return device_.createBuffer({
+            .sizeBytes  = sizeBytes,
+            .visibility = BufferDesc::Visibility::DeviceLocal,
+            .usage      = BufferDesc::Storage | BufferDesc::TransferSrc | BufferDesc::TransferDst,
+            .debugName  = name,
+        });
+    };
+    grid_.uGrid    = makeVelocityGrid(sizeof(float) * nU, "uGrid");
+    grid_.vGrid    = makeVelocityGrid(sizeof(float) * nV, "vGrid");
+    grid_.wGrid    = makeVelocityGrid(sizeof(float) * nW, "wGrid");
+    // Old velocity (saved after P2G, before forces/projection) for FLIP delta
+    grid_.uGridOld = makeStorage(sizeof(float) * nU, "uGridOld");
+    grid_.vGridOld = makeStorage(sizeof(float) * nV, "vGridOld");
+    grid_.wGridOld = makeStorage(sizeof(float) * nW, "wGridOld");
+    grid_.uGridBuf = makeVelocityGrid(sizeof(float) * nU, "uGridBuf");
+    grid_.vGridBuf = makeVelocityGrid(sizeof(float) * nV, "vGridBuf");
+    grid_.wGridBuf = makeVelocityGrid(sizeof(float) * nW, "wGridBuf");
 
     // Valid flags (uint32 per face)
     grid_.uValid    = makeStorage(sizeof(uint32_t) * nU, "uValid");
     grid_.vValid    = makeStorage(sizeof(uint32_t) * nV, "vValid");
     grid_.wValid    = makeStorage(sizeof(uint32_t) * nW, "wValid");
-    grid_.uValidBuf = makeStorage(sizeof(uint32_t) * nU, "uValidBuf");
-    grid_.vValidBuf = makeStorage(sizeof(uint32_t) * nV, "vValidBuf");
-    grid_.wValidBuf = makeStorage(sizeof(uint32_t) * nW, "wValidBuf");
+    grid_.uValidBuf = makeVelocityGrid(sizeof(uint32_t) * nU, "uValidBuf");
+    grid_.vValidBuf = makeVelocityGrid(sizeof(uint32_t) * nV, "vValidBuf");
+    grid_.wValidBuf = makeVelocityGrid(sizeof(uint32_t) * nW, "wValidBuf");
 
     // Particles (SOA: separate position and velocity buffers, tightly-packed float3)
     grid_.particlePositions = device_.createBuffer({
@@ -325,11 +423,6 @@ void GPUFluidBackend::createBoundaryPipelines() {
 // ============================================================================
 // Substep orchestration
 // ============================================================================
-Real GPUFluidBackend::computeCFL() const {
-    // GPU CFL: read back from CPU-side estimate
-    // Phase 1: return fixed safe value
-    return config_.maxCfl * 0.005;
-}
 
 void GPUFluidBackend::substep(CommandList& cmd, Real dt) {
     using B = BarrierDesc;
@@ -348,6 +441,9 @@ void GPUFluidBackend::substep(CommandList& cmd, Real dt) {
     advector_->scatterP2G(cmd, grid_, dt);
     // barrier already done inside scatterP2G
 
+
+
+
     // ---- 2. Body force (gravity on V faces) ----
     if (psoBodyForce_.valid()) {
         BodyForceParams p;
@@ -359,45 +455,58 @@ void GPUFluidBackend::substep(CommandList& cmd, Real dt) {
         barrier();
     }
 
-    // ---- 3. Extrapolate velocities (10 Jacobi steps, ping-pong per component) ----
+    // ---- 3. Extrapolate velocities (in-place: write result back to grid) ----
     if (psoExtrapolate_.valid()) {
-        for (int iter = 0; iter < 10; ++iter) {
-            // U component
-            {
-                ExtrapolateParams p;
-                p.gridIn   = grid_.uGrid;    p.gridOut  = grid_.uGridBuf;
-                p.validIn  = grid_.uValid;   p.validOut = grid_.uValidBuf;
-                p.faceResX = nx + 1; p.faceResY = ny; p.faceResZ = nz;
-                p.numFaces = nU;
-                cmd.dispatch(psoExtrapolate_, p, (nU + 255) / 256, 1, 1);
-            }
-            // V component
-            {
-                ExtrapolateParams p;
-                p.gridIn   = grid_.vGrid;    p.gridOut  = grid_.vGridBuf;
-                p.validIn  = grid_.vValid;   p.validOut = grid_.vValidBuf;
-                p.faceResX = nx; p.faceResY = ny + 1; p.faceResZ = nz;
-                p.numFaces = nV;
-                cmd.dispatch(psoExtrapolate_, p, (nV + 255) / 256, 1, 1);
-            }
-            // W component
-            {
-                ExtrapolateParams p;
-                p.gridIn   = grid_.wGrid;    p.gridOut  = grid_.wGridBuf;
-                p.validIn  = grid_.wValid;   p.validOut = grid_.wValidBuf;
-                p.faceResX = nx; p.faceResY = ny; p.faceResZ = nz + 1;
-                p.numFaces = nW;
-                cmd.dispatch(psoExtrapolate_, p, (nW + 255) / 256, 1, 1);
-            }
-            barrier();
-            // Swap: buf → grid
-            std::swap(grid_.uGrid, grid_.uGridBuf);
-            std::swap(grid_.vGrid, grid_.vGridBuf);
-            std::swap(grid_.wGrid, grid_.wGridBuf);
-            std::swap(grid_.uValid, grid_.uValidBuf);
-            std::swap(grid_.vValid, grid_.vValidBuf);
-            std::swap(grid_.wValid, grid_.wValidBuf);
+        // Pass 1: extrapolate into gridBuf
+        {
+            ExtrapolateParams p;
+            p.gridIn = grid_.uGrid; p.gridOut = grid_.uGridBuf;
+            p.validIn = grid_.uValid; p.validOut = grid_.uValidBuf;
+            p.faceResX = nx + 1; p.faceResY = ny; p.faceResZ = nz;
+            p.numFaces = nU;
+            cmd.dispatch(psoExtrapolate_, p, (nU + 255) / 256, 1, 1);
         }
+        {
+            ExtrapolateParams p;
+            p.gridIn = grid_.vGrid; p.gridOut = grid_.vGridBuf;
+            p.validIn = grid_.vValid; p.validOut = grid_.vValidBuf;
+            p.faceResX = nx; p.faceResY = ny + 1; p.faceResZ = nz;
+            p.numFaces = nV;
+            cmd.dispatch(psoExtrapolate_, p, (nV + 255) / 256, 1, 1);
+        }
+        {
+            ExtrapolateParams p;
+            p.gridIn = grid_.wGrid; p.gridOut = grid_.wGridBuf;
+            p.validIn = grid_.wValid; p.validOut = grid_.wValidBuf;
+            p.faceResX = nx; p.faceResY = ny; p.faceResZ = nz + 1;
+            p.numFaces = nW;
+            cmd.dispatch(psoExtrapolate_, p, (nW + 255) / 256, 1, 1);
+        }
+        barrier();
+        // Copy results back: gridBuf → grid (avoid swap to keep buffer handles stable)
+        {
+            size_t uBytes = sizeof(float) * static_cast<size_t>(nx + 1) * ny * nz;
+            size_t vBytes = sizeof(float) * static_cast<size_t>(nx) * (ny + 1) * nz;
+            size_t wBytes = sizeof(float) * static_cast<size_t>(nx) * ny * (nz + 1);
+            std::array<BufferCopy, 1> uReg{{{0, 0, uBytes}}};
+            std::array<BufferCopy, 1> vReg{{{0, 0, vBytes}}};
+            std::array<BufferCopy, 1> wReg{{{0, 0, wBytes}}};
+            cmd.copyBuffer(grid_.uGridBuf, grid_.uGrid, uReg);
+            cmd.copyBuffer(grid_.vGridBuf, grid_.vGrid, vReg);
+            cmd.copyBuffer(grid_.wGridBuf, grid_.wGrid, wReg);
+            size_t validUBytes = sizeof(uint32_t) * static_cast<size_t>(nx + 1) * ny * nz;
+            size_t validVBytes = sizeof(uint32_t) * static_cast<size_t>(nx) * (ny + 1) * nz;
+            size_t validWBytes = sizeof(uint32_t) * static_cast<size_t>(nx) * ny * (nz + 1);
+            std::array<BufferCopy, 1> vuReg{{{0, 0, validUBytes}}};
+            std::array<BufferCopy, 1> vvReg{{{0, 0, validVBytes}}};
+            std::array<BufferCopy, 1> vwReg{{{0, 0, validWBytes}}};
+            cmd.copyBuffer(grid_.uValidBuf, grid_.uValid, vuReg);
+            cmd.copyBuffer(grid_.vValidBuf, grid_.vValid, vvReg);
+            cmd.copyBuffer(grid_.wValidBuf, grid_.wValid, vwReg);
+        }
+        cmd.memoryBarrier(BarrierDesc::StageTransfer, BarrierDesc::StageComputeShader,
+                          BarrierDesc::AccessTransferWrite,
+                          BarrierDesc::AccessShaderRead | BarrierDesc::AccessShaderWrite);
     }
 
     // ---- 4. Pressure solve (build weights → build system → CG → project) ----

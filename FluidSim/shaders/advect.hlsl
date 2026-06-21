@@ -3,13 +3,13 @@
 // ============================================================================
 #include "fluid-common.hlsl"
 
-[[vk::binding(0, 0)]] RWStructuredBuffer<float3>   positions   : register(u0);
-[[vk::binding(1, 0)]] RWStructuredBuffer<float3>   velocities  : register(u1);
-[[vk::binding(2, 0)]] StructuredBuffer<float>      uGrid       : register(t0);
-[[vk::binding(3, 0)]] StructuredBuffer<float>      vGrid       : register(t1);
-[[vk::binding(4, 0)]] StructuredBuffer<float>      wGrid       : register(t2);
-[[vk::binding(5, 0)]] Texture3D<float>             colliderSdf : register(t3);
-[[vk::binding(6, 0)]] SamplerState                 sdfSampler  : register(s0);
+[[vk::binding(0, 0)]] RWStructuredBuffer<float>    positions;
+[[vk::binding(1, 0)]] RWStructuredBuffer<float>    velocities;
+[[vk::binding(2, 0)]] StructuredBuffer<float>      uGrid;
+[[vk::binding(3, 0)]] StructuredBuffer<float>      vGrid;
+[[vk::binding(4, 0)]] StructuredBuffer<float>      wGrid;
+[[vk::binding(5, 0)]] Texture3D<float>             colliderSdf;
+[[vk::binding(6, 0)]] SamplerState                 sdfSampler;
 
 struct PushParams {
     uint3  gridSize;
@@ -70,8 +70,9 @@ float3 clampToDomain(float3 pos) {
 [numthreads(256, 1, 1)]
 void main(uint3 tid : SV_DispatchThreadID) {
     if (tid.x >= pc.numParticles) return;
-    float3 pos = positions[tid.x];
-    float3 vel = velocities[tid.x];
+    uint base = tid.x * 3;
+    float3 pos = float3(positions[base], positions[base+1], positions[base+2]);
+    float3 vel = float3(velocities[base], velocities[base+1], velocities[base+2]);
 
     float dt = pc.dt;
 
@@ -99,6 +100,10 @@ void main(uint3 tid : SV_DispatchThreadID) {
         }
     }
 
-    positions[tid.x] = newPos;
-    velocities[tid.x] = vel;
+    positions[base]   = newPos.x;
+    positions[base+1] = newPos.y;
+    positions[base+2] = newPos.z;
+    velocities[base]   = vel.x;
+    velocities[base+1] = vel.y;
+    velocities[base+2] = vel.z;
 }

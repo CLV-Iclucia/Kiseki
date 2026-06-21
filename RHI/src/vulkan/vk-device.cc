@@ -374,6 +374,8 @@ void VulkanDevice::submit(CommandList& cmd,
 void VulkanDevice::submitAndWait(CommandList& cmd, QueueType queue) {
   submit(cmd, {}, {}, nullptr);
   waitQueueIdle(queue);
+  // GPU is now idle — safe to recycle all descriptor sets allocated since last reset.
+  m_descriptorAlloc->reset();
 }
 
 // ---- Internal accessors ----------------------------------------------------

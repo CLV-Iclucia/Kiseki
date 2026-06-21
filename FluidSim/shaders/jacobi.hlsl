@@ -14,7 +14,6 @@
 [[vk::binding(7,  0)]] StructuredBuffer<float>   Aneighbour4  : register(t6); // -Z
 [[vk::binding(8,  0)]] StructuredBuffer<float>   Aneighbour5  : register(t7); // +Z
 [[vk::binding(9,  0)]] StructuredBuffer<float>   rhs          : register(t8);
-[[vk::binding(10, 0)]] StructuredBuffer<uint>    active       : register(t9);
 
 struct PushParams {
     uint3 gridSize;
@@ -26,11 +25,6 @@ struct PushParams {
 void main(uint3 tid : SV_DispatchThreadID) {
     uint idx = tid.x;
     if (idx >= pc.numCells) return;
-
-    if (active[idx] == 0u) {
-        pressureOut[idx] = 0.0f;
-        return;
-    }
 
     uint3 gs = pc.gridSize;
     uint3 c;

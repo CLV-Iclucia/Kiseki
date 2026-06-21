@@ -11,8 +11,10 @@
 [[vk::binding(3, 0)]] RWStructuredBuffer<uint>  validOut  : register(u1);
 
 struct PushParams {
-    uint3 faceRes;   // resolution of this face array (e.g. nx+1, ny, nz for U)
-    uint  numFaces;
+    uint faceResX;
+    uint faceResY;
+    uint faceResZ;
+    uint numFaces;
 };
 [[vk::push_constant]] PushParams pc;
 
@@ -21,7 +23,7 @@ void main(uint3 tid : SV_DispatchThreadID) {
     uint idx = tid.x;
     if (idx >= pc.numFaces) return;
 
-    uint3 fr = pc.faceRes;
+    uint3 fr = uint3(pc.faceResX, pc.faceResY, pc.faceResZ);
 
     if (validIn[idx] != 0u) {
         // Already valid: copy through unchanged

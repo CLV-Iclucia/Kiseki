@@ -53,7 +53,9 @@ SHADER_PARAMS_BEGIN(BuildSystemParams)
     SHADER_PARAM_SRV   (sim::rhi::BufferRef,    faceWeightsU);
     SHADER_PARAM_SRV   (sim::rhi::BufferRef,    faceWeightsV);
     SHADER_PARAM_SRV   (sim::rhi::BufferRef,    faceWeightsW);
-    SHADER_PARAM_IMAGE (sim::rhi::ImageBinding, fluidSdf);
+    SHADER_PARAM_SRV   (sim::rhi::BufferRef,    uValid);
+    SHADER_PARAM_SRV   (sim::rhi::BufferRef,    vValid);
+    SHADER_PARAM_SRV   (sim::rhi::BufferRef,    wValid);
     SHADER_PARAM_SCALAR(uint32_t, gridSizeX);
     SHADER_PARAM_SCALAR(uint32_t, gridSizeY);
     SHADER_PARAM_SCALAR(uint32_t, gridSizeZ);

@@ -5,3 +5,5 @@ build/
 cmake-build-*/
 docs/
 dev_setup.py
+fast-cloc.bat
+fast-cloc.sh

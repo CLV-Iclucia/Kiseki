@@ -4,9 +4,10 @@
 
 // ---- Particle SOA helpers ----
 // Particles are stored as SOA (Structure of Arrays):
-//   positions:  StructuredBuffer<float3> or RWStructuredBuffer<float3>
-//   velocities: StructuredBuffer<float3> or RWStructuredBuffer<float3>
-// Each buffer has N entries of tightly-packed float3.
+//   positions:  StructuredBuffer<float> (tightly-packed, 3 floats per particle)
+//   velocities: StructuredBuffer<float> (tightly-packed, 3 floats per particle)
+// Access: float3 pos = float3(positions[idx*3], positions[idx*3+1], positions[idx*3+2])
+// NOTE: Do NOT use StructuredBuffer<float3> — its stride is 16 bytes, not 12!
 
 // ---- Staggered grid indexing ----
 uint idxCell(uint3 c, uint3 gs) {

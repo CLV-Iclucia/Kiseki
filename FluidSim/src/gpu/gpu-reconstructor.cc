@@ -65,12 +65,16 @@ GPUReconstructor::GPUReconstructor(Device& device, ShaderCompiler& compiler,
 }
 
 void GPUReconstructor::execute(CommandList& cmd, GPUGridState& grid) {
+    if (!grid.fluidSdfImg || !grid.particlePositions) return;
+    if (!psoReconstruct_.valid()) return;
+    if (grid.numParticles == 0) return;
+
     int nx = grid.gridSize.x, ny = grid.gridSize.y, nz = grid.gridSize.z;
     uint32_t nc = static_cast<uint32_t>(nx) * ny * nz;
     uint32_t cellGroups = (nc + 255) / 256;
 
     // Step 1: Reconstruct SDF
-    if (psoReconstruct_.valid()) {
+    {
         ReconstructSdfParams params;
         params.fluidSdf       = grid.fluidSdfImg;
         params.positions      = grid.particlePositions;
@@ -90,7 +94,7 @@ void GPUReconstructor::execute(CommandList& cmd, GPUGridState& grid) {
     if (psoSmooth_.valid()) {
         for (int i = 0; i < 3; ++i) {
             SmoothSdfParams params;
-            params.srcSdf   = ImageBinding{grid.fluidSdfImg, {}};
+            params.srcSdf   = ImageBinding{grid.fluidSdfImg, grid.sdfSampler};
             params.dstSdf   = sdfBuf_;
             params.gridSizeX = static_cast<uint32_t>(nx);
             params.gridSizeY = static_cast<uint32_t>(ny);

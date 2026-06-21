@@ -198,37 +198,7 @@ int main(int argc, char** argv) {
   };
 
   app.buildProxy = [&](int step) {
-    auto proxy = renderer::buildSceneProxyFromSystem(system, step);
-
-    // 将 collider mesh 也加入渲染（作为灰色静态网格）
-    for (int ci = 0; ci < static_cast<int>(system.colliders().size()); ++ci) {
-      const auto& collider = system.colliders()[ci];
-      auto* mg = std::get_if<Collider::MeshGeometry>(&collider.geometry);
-      if (!mg) continue;
-
-      renderer::MeshProxy meshProxy;
-      meshProxy.name = "collider_" + std::to_string(ci);
-      meshProxy.objectColor = {0.6f, 0.6f, 0.6f};  // 灰色
-
-      // 使用 currentVertices（已经过变换的世界坐标）
-      const auto& verts = collider.currentVertices;
-      meshProxy.positions.resize(verts.size());
-      for (size_t v = 0; v < verts.size(); ++v)
-        meshProxy.positions[v] = glm::vec3(verts[v]);  // dvec3 → vec3
-
-      const auto& tris = mg->mesh->triangles;
-      meshProxy.triangles.resize(tris.size());
-      for (size_t t = 0; t < tris.size(); ++t)
-        meshProxy.triangles[t] = {
-            static_cast<unsigned>(tris[t].x),
-            static_cast<unsigned>(tris[t].y),
-            static_cast<unsigned>(tris[t].z)};
-
-      renderer::computeSmoothNormals(meshProxy);
-      proxy->meshes.push_back(std::move(meshProxy));
-    }
-
-    return proxy;
+    return renderer::buildSceneProxyFromSystem(system, step);
   };
 
   app.logInterval = 50;

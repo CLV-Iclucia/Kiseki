@@ -20,7 +20,7 @@ GpuJacobiSolver::GpuJacobiSolver(Device& device, ShaderCompiler& compiler,
     pressurePing_ = device.createBuffer({
         .sizeBytes  = sizeof(float) * nc,
         .visibility = BufferDesc::Visibility::DeviceLocal,
-        .usage      = BufferDesc::Storage | BufferDesc::TransferDst,
+        .usage      = BufferDesc::Storage | BufferDesc::TransferDst | BufferDesc::TransferSrc,
         .debugName  = "jacobi-ping",
     });
 
@@ -58,7 +58,6 @@ void GpuJacobiSolver::solve(CommandList& cmd, const PressureSystem& system) {
         p.Aneighbour4  = system.Aneighbour[4];
         p.Aneighbour5  = system.Aneighbour[5];
         p.rhs          = system.rhs;
-        p.active       = system.active;
         p.gridSizeX    = static_cast<uint32_t>(system.gridSize.x);
         p.gridSizeY    = static_cast<uint32_t>(system.gridSize.y);
         p.gridSizeZ    = static_cast<uint32_t>(system.gridSize.z);

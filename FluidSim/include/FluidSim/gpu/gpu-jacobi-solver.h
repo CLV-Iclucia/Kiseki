@@ -25,7 +25,6 @@ SHADER_PARAMS_BEGIN(JacobiIterParams)
     SHADER_PARAM_SRV   (sim::rhi::BufferRef, Aneighbour4);
     SHADER_PARAM_SRV   (sim::rhi::BufferRef, Aneighbour5);
     SHADER_PARAM_SRV   (sim::rhi::BufferRef, rhs);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, active);
     SHADER_PARAM_SCALAR(uint32_t, gridSizeX);
     SHADER_PARAM_SCALAR(uint32_t, gridSizeY);
     SHADER_PARAM_SCALAR(uint32_t, gridSizeZ);

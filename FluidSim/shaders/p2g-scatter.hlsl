@@ -11,8 +11,8 @@
 [[vk::binding(3, 0)]] RWStructuredBuffer<uint> uWeights   : register(u3);
 [[vk::binding(4, 0)]] RWStructuredBuffer<uint> vWeights   : register(u4);
 [[vk::binding(5, 0)]] RWStructuredBuffer<uint> wWeights   : register(u5);
-[[vk::binding(6, 0)]] StructuredBuffer<float3> positions  : register(t0);
-[[vk::binding(7, 0)]] StructuredBuffer<float3> velocities : register(t1);
+[[vk::binding(6, 0)]] StructuredBuffer<float> positions  : register(t0);
+[[vk::binding(7, 0)]] StructuredBuffer<float> velocities : register(t1);
 
 struct PushParams {
     uint3 gridSize;
@@ -64,8 +64,9 @@ void splatFace(RWStructuredBuffer<uint> field,
 [numthreads(256, 1, 1)]
 void main(uint3 tid : SV_DispatchThreadID) {
     if (tid.x >= pc.numParticles) return;
-    float3 pos = positions[tid.x];
-    float3 vel = velocities[tid.x];
+    uint base = tid.x * 3;
+    float3 pos = float3(positions[base], positions[base+1], positions[base+2]);
+    float3 vel = float3(velocities[base], velocities[base+1], velocities[base+2]);
 
     float dx = pc.gridSpacing;
     uint3 gs = pc.gridSize;

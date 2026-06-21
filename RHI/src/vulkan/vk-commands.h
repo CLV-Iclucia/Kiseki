@@ -114,6 +114,9 @@ class VulkanCommandList final : public CommandList {
   void clearPending();
   void flushPending();
   VkDescriptorType lookupDescriptorType(uint32_t set, uint32_t binding) const;
+  static uint64_t computeDescriptorContentHash(const VulkanPipeline* pipeline,
+                                               uint32_t setIdx,
+                                               const std::vector<PendingWrite>& writes);
 
   VulkanDevice* m_device;
   QueueType m_queue;

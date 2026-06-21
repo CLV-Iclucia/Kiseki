@@ -64,7 +64,7 @@ GPUProjector::GPUProjector(Device& device, ShaderCompiler& compiler,
     auto ps = makePressureSystem(grid.gridSize);
     solver_ = GpuPressureSolver::create(device, compiler, ps, config, shaderDir);
 
-    std::cout << std::format("[GPUProjector] {}×{}×{} grid, solver={}\n",
+    std::cout << std::format("[GPUProjector] {}x{}x{} grid, solver={}\n",
         nx, ny, nz,
         config.preconditioner == PreconditionerMethod::None ? "Jacobi" : "PCG");
 }
@@ -108,10 +108,10 @@ void GPUProjector::buildWeightsAndSystem(CommandList& cmd,
                                          const GPUGridState& grid, Real dt)
 {
     int nx = grid.gridSize.x, ny = grid.gridSize.y, nz = grid.gridSize.z;
-    uint32_t nc       = static_cast<uint32_t>(nx) * ny * nz;
-    uint32_t maxFaces = static_cast<uint32_t>(
-        std::max({(nx+1)*ny*nz, nx*(ny+1)*nz, nx*ny*(nz+1)}));
-    uint32_t faceGroups = (maxFaces + 255) / 256;
+    uint32_t nc         = static_cast<uint32_t>(nx) * ny * nz;
+    uint32_t totalFaces = static_cast<uint32_t>(
+        (nx+1)*ny*nz + nx*(ny+1)*nz + nx*ny*(nz+1));
+    uint32_t faceGroups = (totalFaces + 255) / 256;
     uint32_t cellGroups = (nc + 255) / 256;
 
     auto barrier = [&]() { cmd.memoryBarrier(BarrierDesc::StageComputeShader, BarrierDesc::StageComputeShader); };
@@ -123,7 +123,7 @@ void GPUProjector::buildWeightsAndSystem(CommandList& cmd,
         p.gridSizeX = nx; p.gridSizeY = ny; p.gridSizeZ = nz;
         p.gridSpacing = grid.gridSpacing;
         p.originX = grid.originX; p.originY = grid.originY; p.originZ = grid.originZ;
-        p.maxFaces = maxFaces;
+        p.maxFaces = totalFaces;
         cmd.dispatch(psoBuildWeights_, p, faceGroups, 1, 1);
         barrier();
     }
@@ -137,7 +137,7 @@ void GPUProjector::buildWeightsAndSystem(CommandList& cmd,
         p.rhs = rhs_; p.active = active_;
         p.uGrid = grid.uGrid; p.vGrid = grid.vGrid; p.wGrid = grid.wGrid;
         p.faceWeightsU = faceWeightsU_; p.faceWeightsV = faceWeightsV_; p.faceWeightsW = faceWeightsW_;
-        p.fluidSdf = sim::rhi::ImageBinding{grid.fluidSdfImg, grid.sdfSampler};
+        p.uValid = grid.uValid; p.vValid = grid.vValid; p.wValid = grid.wValid;
         p.gridSizeX = nx; p.gridSizeY = ny; p.gridSizeZ = nz;
         p.gridSpacing = grid.gridSpacing;
         p.density = static_cast<float>(config_.density);
@@ -154,9 +154,9 @@ void GPUProjector::projectVelocities(CommandList& cmd,
                                      GPUGridState& grid, Real dt)
 {
     int nx = grid.gridSize.x, ny = grid.gridSize.y, nz = grid.gridSize.z;
-    uint32_t maxFaces = static_cast<uint32_t>(
-        std::max({(nx+1)*ny*nz, nx*(ny+1)*nz, nx*ny*(nz+1)}));
-    uint32_t faceGroups = (maxFaces + 255) / 256;
+    uint32_t totalFaces = static_cast<uint32_t>(
+        (nx+1)*ny*nz + nx*(ny+1)*nz + nx*ny*(nz+1));
+    uint32_t faceGroups = (totalFaces + 255) / 256;
 
     if (!psoProject_.valid()) return;
 
@@ -168,7 +168,7 @@ void GPUProjector::projectVelocities(CommandList& cmd,
     p.gridSpacing = grid.gridSpacing;
     p.density = static_cast<float>(config_.density);
     p.dt = static_cast<float>(dt);
-    p.maxFaces = maxFaces;
+    p.maxFaces = totalFaces;
     cmd.dispatch(psoProject_, p, faceGroups, 1, 1);
 }
 
@@ -185,5 +185,7 @@ PressureSystem GPUProjector::makePressureSystem(Vec3i gridSize) const {
     ps.gridSize = gridSize;
     return ps;
 }
+
+
 
 } // namespace fluid::gpu

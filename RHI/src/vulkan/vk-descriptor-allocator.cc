@@ -13,24 +13,40 @@ namespace sim::rhi::vulkan {
 
 DescriptorSetAllocator::DescriptorSetAllocator(VkDevice device)
     : m_device(device) {
-  // Start with a single pool (the "base" pool).
-  m_pools.push_back(createPool());
+  m_pools.push_back({createPool(), {}});
 }
 
 DescriptorSetAllocator::~DescriptorSetAllocator() {
-  for (VkDescriptorPool pool : m_pools) {
-    if (pool != VK_NULL_HANDLE) {
-      vkDestroyDescriptorPool(m_device, pool, nullptr);
+  for (auto& slot : m_pools) {
+    if (slot.pool != VK_NULL_HANDLE) {
+      vkDestroyDescriptorPool(m_device, slot.pool, nullptr);
     }
   }
   m_pools.clear();
 }
 
-// ---- Single-pool API -------------------------------------------------------
+// ---- Primary API -----------------------------------------------------------
+
+DescriptorSetAllocator::AllocResult
+DescriptorSetAllocator::allocateOrReuse(VkDescriptorSetLayout layout,
+                                        uint64_t contentHash) {
+  auto& slot = m_pools[m_activePoolIdx];
+
+  // Check cache first.
+  auto it = slot.cache.find(contentHash);
+  if (it != slot.cache.end()) {
+    return {it->second, true};
+  }
+
+  // Cache miss — allocate fresh.
+  VkDescriptorSet set = allocate(layout);
+  slot.cache[contentHash] = set;
+  return {set, false};
+}
 
 VkDescriptorSet DescriptorSetAllocator::allocate(VkDescriptorSetLayout layout) {
   VkDescriptorSetAllocateInfo ai{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
-  ai.descriptorPool = m_pools[m_activePoolIdx];
+  ai.descriptorPool = m_pools[m_activePoolIdx].pool;
   ai.descriptorSetCount = 1;
   ai.pSetLayouts = &layout;
 
@@ -48,11 +64,11 @@ VkDescriptorSet DescriptorSetAllocator::allocate(VkDescriptorSetLayout layout) {
 }
 
 void DescriptorSetAllocator::reset() noexcept {
-  // Reset all pools.
-  for (VkDescriptorPool pool : m_pools) {
-    if (pool != VK_NULL_HANDLE) {
-      vkResetDescriptorPool(m_device, pool, 0);
+  for (auto& slot : m_pools) {
+    if (slot.pool != VK_NULL_HANDLE) {
+      vkResetDescriptorPool(m_device, slot.pool, 0);
     }
+    slot.cache.clear();
   }
   m_activePoolIdx = 0;
 }
@@ -63,15 +79,13 @@ void DescriptorSetAllocator::initRing(uint32_t poolCount) {
   if (poolCount < 1) poolCount = 1;
   if (static_cast<uint32_t>(m_pools.size()) == poolCount) return;
 
-  // Destroy extra pools if shrinking (rare).
   while (m_pools.size() > poolCount) {
-    vkDestroyDescriptorPool(m_device, m_pools.back(), nullptr);
+    vkDestroyDescriptorPool(m_device, m_pools.back().pool, nullptr);
     m_pools.pop_back();
   }
 
-  // Create additional pools if growing.
   while (m_pools.size() < poolCount) {
-    m_pools.push_back(createPool());
+    m_pools.push_back({createPool(), {}});
   }
 
   m_activePoolIdx = 0;
@@ -83,10 +97,11 @@ void DescriptorSetAllocator::setActivePool(uint32_t index) noexcept {
 }
 
 void DescriptorSetAllocator::resetActivePool() noexcept {
-  VkDescriptorPool pool = m_pools[m_activePoolIdx];
-  if (pool != VK_NULL_HANDLE) {
-    vkResetDescriptorPool(m_device, pool, 0);
+  auto& slot = m_pools[m_activePoolIdx];
+  if (slot.pool != VK_NULL_HANDLE) {
+    vkResetDescriptorPool(m_device, slot.pool, 0);
   }
+  slot.cache.clear();
 }
 
 // ---- Internal: createPool --------------------------------------------------

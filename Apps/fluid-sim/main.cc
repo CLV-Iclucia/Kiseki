@@ -1,12 +1,12 @@
 //
-// SimCraft Example: Fluid Dam Break (C++)
-// ========================================
+// SimCraft Example: Fluid Dam Break (C++) — GPU Backend
+// =====================================================
 //
 // A block of fluid collapses under gravity in a box domain.
-// Uses the CPU FluidBackend with FLIP advection + CG pressure solve.
+// Uses the GPU FluidBackend with FLIP advection + PCG pressure solve.
 //
 // Demonstrates:
-//   FluidScene setup → CPUFluidBackend → SimulationApp + fluid-scene-proxy
+//   RHI Device/Compiler → FluidScene → GPUFluidBackend → SimulationApp
 //
 // Usage:
 //   fluid-sim [--dt 0.016] [--steps 500] [--res 32] [--particles 50000] [--no-render]
@@ -15,9 +15,10 @@
 #include <cxxopts.hpp>
 #include <FluidSim/fluid-types.h>
 #include <FluidSim/fluid-backend.h>
-#include <FluidSim/cpu/cpu-backend.h>
+#include <FluidSim/gpu/gpu-backend.h>
 #include <Renderer/simulation-app.h>
 #include <FluidSim/scene-proxy.h>
+#include <RHI/rhi.h>
 #include <iostream>
 #include <format>
 #include <random>
@@ -52,13 +53,14 @@ static fluid::InitialFluid generateDamBreakParticles(
 }
 
 int main(int argc, char** argv) {
-    cxxopts::Options options("fluid-sim", "Fluid dam break simulation");
+    cxxopts::Options options("fluid-sim", "Fluid dam break simulation (GPU)");
     options.add_options()
         ("dt", "Frame timestep", cxxopts::value<double>()->default_value("0.016"))
         ("steps", "Number of frames", cxxopts::value<int>()->default_value("500"))
-        ("res", "Grid resolution (uniform)", cxxopts::value<int>()->default_value("32"))
+        ("res", "Grid resolution (uniform)", cxxopts::value<int>()->default_value("64"))
         ("particles", "Number of particles", cxxopts::value<int>()->default_value("50000"))
         ("no-render", "Disable rendering", cxxopts::value<bool>()->default_value("false"))
+        ("validation", "Enable GPU validation layers", cxxopts::value<bool>()->default_value("false"))
         ("h,help", "Print help");
     auto args = options.parse(argc, argv);
 
@@ -72,8 +74,28 @@ int main(int argc, char** argv) {
     const int    res         = args["res"].as<int>();
     const int    nParticles  = args["particles"].as<int>();
     const bool   noRender    = args["no-render"].as<bool>();
+    const bool   validation  = args["validation"].as<bool>();
 
-    // ─── 1. Scene Description ──────────────────────────────────────────────────
+    // ─── 1. RHI Device + Shader Compiler ───────────────────────────────────────
+
+    auto device = rhi::Device::create({
+        .backend          = rhi::Backend::Vulkan,
+        .enableValidation = validation,
+    });
+    if (!device) {
+        std::cerr << "[FluidSim] ERROR: Failed to create RHI device (no Vulkan?).\n";
+        return 1;
+    }
+
+    auto compiler = device->createShaderCompiler();
+    if (!compiler) {
+        std::cerr << "[FluidSim] ERROR: Failed to create shader compiler (DXC unavailable?).\n";
+        return 1;
+    }
+
+    std::cout << "[FluidSim] RHI device created (Vulkan).\n";
+
+    // ─── 2. Scene Description ──────────────────────────────────────────────────
 
     fluid::FluidScene scene;
     scene.domain.origin     = {0.0, 0.0, 0.0};
@@ -85,27 +107,28 @@ int main(int argc, char** argv) {
     scene.solver.density            = 1000.0;
     scene.solver.gravity            = {0.0, -9.8, 0.0};
     scene.solver.maxCfl             = 5.0;
-    scene.solver.pressureMaxIters   = 300;
-    scene.solver.preconditioner     = fluid::PreconditionerMethod::ModifiedIncompleteCholesky;
+    scene.solver.pressureMaxIters   = 1000;
+    // GPU backend: use simple Jacobi iterations (easier to debug)
+    scene.solver.preconditioner     = fluid::PreconditionerMethod::None;
 
     scene.initialFluid = generateDamBreakParticles(nParticles, scene.domain);
 
     std::cout << std::format("[FluidSim] Dam break: {}x{}x{} grid, {} particles, dt={}\n",
                              res, res, res, nParticles, dt);
 
-    // ─── 2. Backend ────────────────────────────────────────────────────────────
+    // ─── 3. GPU Backend ────────────────────────────────────────────────────────
 
-    auto backend = std::make_unique<fluid::cpu::CPUFluidBackend>();
+    auto backend = std::make_unique<fluid::gpu::GPUFluidBackend>(*device, *compiler);
     backend->initialize(scene);
 
-    std::cout << "[FluidSim] CPU backend initialized.\n";
+    std::cout << "[FluidSim] GPU backend initialized.\n";
 
-    // ─── 3. Run ────────────────────────────────────────────────────────────────
+    // ─── 4. Run ────────────────────────────────────────────────────────────────
 
     renderer::SimulationApp app({
         .windowWidth  = 1280,
         .windowHeight = 720,
-        .windowTitle  = "SimCraft - Fluid Dam Break",
+        .windowTitle  = "SimCraft - Fluid Dam Break (GPU)",
     });
 
     app.stepFn = [&](int) {

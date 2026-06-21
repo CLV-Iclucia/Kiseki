@@ -20,6 +20,35 @@
 
 namespace sim::rhi::vulkan {
 
+// ---- FNV-1a 64-bit hash helper for descriptor cache -------------------------
+static uint64_t fnv1a(const void* data, size_t len, uint64_t seed = 0xcbf29ce484222325ULL) {
+  auto* p = static_cast<const uint8_t*>(data);
+  uint64_t h = seed;
+  for (size_t i = 0; i < len; ++i) {
+    h ^= p[i];
+    h *= 0x100000001b3ULL;
+  }
+  return h;
+}
+
+uint64_t VulkanCommandList::computeDescriptorContentHash(
+    const VulkanPipeline* pipeline, uint32_t setIdx,
+    const std::vector<PendingWrite>& writes) {
+  uint64_t h = fnv1a(&pipeline, sizeof(pipeline));
+  h = fnv1a(&setIdx, sizeof(setIdx), h);
+  for (const auto& pw : writes) {
+    h = fnv1a(&pw.binding, sizeof(pw.binding), h);
+    h = fnv1a(&pw.type, sizeof(pw.type), h);
+    h = fnv1a(&pw.kind, sizeof(pw.kind), h);
+    if (pw.kind == PendingWrite::Kind::Buffer) {
+      h = fnv1a(&pw.bufInfo, sizeof(pw.bufInfo), h);
+    } else {
+      h = fnv1a(&pw.imgInfo, sizeof(pw.imgInfo), h);
+    }
+  }
+  return h;
+}
+
 VulkanCommandList::VulkanCommandList(VulkanDevice* device, QueueType queue,
                                      VkCommandBuffer cb)
     : m_device(device), m_queue(queue), m_cmd(cb) {}
@@ -382,16 +411,23 @@ void VulkanCommandList::flushPending() {
 
     VkDescriptorSetLayout layout = m_boundPipeline->setLayout(setIdx);
     if (layout == VK_NULL_HANDLE) {
-      // No layout for this set in the bound pipeline — bind*At was called
-      // for an unused set. Drop the writes silently; pipeline reflection
-      // already raised an error in lookupDescriptorType if the (set,
-      // binding) pair was illegal.
       s.clear();
       continue;
     }
 
-    VkDescriptorSet ds = m_device->descriptorAllocator().allocate(layout);
+    // Compute content hash for cache lookup in the allocator.
+    uint64_t contentHash = computeDescriptorContentHash(m_boundPipeline, setIdx, s.writes);
+    auto [ds, cacheHit] = m_device->descriptorAllocator().allocateOrReuse(layout, contentHash);
 
+    if (cacheHit) {
+      // Descriptor set already has the correct content — just bind it.
+      vkCmdBindDescriptorSets(m_cmd, m_boundPipeline->bindPoint(), m_boundLayout,
+                              setIdx, 1, &ds, 0, nullptr);
+      s.clear();
+      continue;
+    }
+
+    // Fresh allocation — write descriptors and bind.
     std::vector<VkWriteDescriptorSet> writes;
     writes.reserve(s.writes.size());
     for (const auto& pw : s.writes) {
@@ -409,9 +445,11 @@ void VulkanCommandList::flushPending() {
       writes.push_back(w);
     }
 
-    vkUpdateDescriptorSets(m_device->vkDevice(),
-                           static_cast<uint32_t>(writes.size()), writes.data(),
-                           0, nullptr);
+    if (!writes.empty()) {
+      vkUpdateDescriptorSets(m_device->vkDevice(),
+                             static_cast<uint32_t>(writes.size()), writes.data(),
+                             0, nullptr);
+    }
 
     vkCmdBindDescriptorSets(m_cmd, m_boundPipeline->bindPoint(), m_boundLayout,
                             setIdx, 1, &ds, 0, nullptr);

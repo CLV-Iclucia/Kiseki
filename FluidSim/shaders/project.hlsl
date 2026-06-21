@@ -25,7 +25,7 @@ void main(uint3 tid : SV_DispatchThreadID) {
     uint idx = tid.x;
     if (idx >= pc.maxFaces) return;
 
-    float scale = pc.dt / (pc.density * pc.gridSpacing);
+    float scale = pc.dt / pc.gridSpacing;
     uint3 gs = pc.gridSize;
 
     // U faces
@@ -45,15 +45,14 @@ void main(uint3 tid : SV_DispatchThreadID) {
     }
     idx -= nu;
 
-    // V faces
+    // V faces (x-major: x + y*gs.x + z*(gs.y+1)*gs.x)
     uint nv = gs.x * (gs.y + 1) * gs.z;
     if (idx < nv) {
         float fw = faceWeightsV[idx];
         if (fw > 0.0f) {
-            uint y = idx % (gs.y + 1);
-            uint xz = idx / (gs.y + 1);
-            uint x = xz % gs.x;
-            uint z = xz / gs.x;
+            uint x = idx % gs.x;
+            uint y = (idx / gs.x) % (gs.y + 1);
+            uint z = idx / (gs.x * (gs.y + 1));
             float pR = (y < gs.y) ? pressure[idxCell(uint3(x, y,   z), gs)] : 0.0f;
             float pL = (y > 0)    ? pressure[idxCell(uint3(x, y-1, z), gs)] : 0.0f;
             vGrid[idx] -= scale * (pR - pL) * fw;

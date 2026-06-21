@@ -104,8 +104,8 @@ void GpuPCGSolver::solve(CommandList& cmd, const PressureSystem& system) {
         cmd.dispatch(psoSaxpy_, p, cellGroups, 1, 1);
     };
 
-    auto doDiv = [&](BufferRef num, BufferRef denom, BufferRef out) {
-        PCGScalarDivParams p; p.num = num; p.denom = denom; p.out = out;
+    auto doDiv = [&](BufferRef num, BufferRef denom, BufferRef dst) {
+        PCGScalarDivParams p; p.num = num; p.denom = denom; p.result = dst;
         cmd.dispatch(psoScalarDiv_, p, 1, 1, 1);
     };
 

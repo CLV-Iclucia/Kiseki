@@ -59,7 +59,7 @@ SHADER_PARAMS_END();
 SHADER_PARAMS_BEGIN(PCGScalarDivParams)
     SHADER_PARAM_SRV   (sim::rhi::BufferRef, num);
     SHADER_PARAM_SRV   (sim::rhi::BufferRef, denom);
-    SHADER_PARAM_UAV   (sim::rhi::BufferRef, out);
+    SHADER_PARAM_UAV   (sim::rhi::BufferRef, result);
 SHADER_PARAMS_END();
 
 SHADER_PARAMS_BEGIN(PCGUpdateSParams)

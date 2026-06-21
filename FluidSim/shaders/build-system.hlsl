@@ -19,8 +19,9 @@
 [[vk::binding(12, 0)]] StructuredBuffer<float>   faceWeightsU : register(t3);
 [[vk::binding(13, 0)]] StructuredBuffer<float>   faceWeightsV : register(t4);
 [[vk::binding(14, 0)]] StructuredBuffer<float>   faceWeightsW : register(t5);
-[[vk::binding(15, 0)]] Texture3D<float>          fluidSdf     : register(t6);
-[[vk::binding(16, 0)]] SamplerState              sdfSampler   : register(s0);
+[[vk::binding(15, 0)]] StructuredBuffer<uint>    uValid       : register(t6);
+[[vk::binding(16, 0)]] StructuredBuffer<uint>    vValid       : register(t7);
+[[vk::binding(17, 0)]] StructuredBuffer<uint>    wValid       : register(t8);
 
 struct PushParams {
     uint3  gridSize;
@@ -43,11 +44,20 @@ void main(uint3 tid : SV_DispatchThreadID) {
     c.y = (idx / gs.x) % gs.y;
     c.z = idx / (gs.x * gs.y);
 
-    // Fluid cell test via fluidSdf image
-    float3 worldPos = pc.origin + (float3(c) + 0.5f) * pc.gridSpacing;
-    float3 uvw = (worldPos - pc.origin) / (float3(gs) * pc.gridSpacing);
-    float sdf = fluidSdf.SampleLevel(sdfSampler, uvw, 0);
-    bool isFluid = (sdf < 0.0f);
+    // Fluid cell test: cell is fluid if any of its 6 adjacent faces are valid
+    bool isFluid = false;
+    // U faces at (c.x, c.y, c.z) and (c.x+1, c.y, c.z)
+    uint uIdx0 = c.x + c.y * (gs.x+1) + c.z * (gs.x+1) * gs.y;
+    uint uIdx1 = (c.x+1) + c.y * (gs.x+1) + c.z * (gs.x+1) * gs.y;
+    if (uValid[uIdx0] != 0u || uValid[uIdx1] != 0u) isFluid = true;
+    // V faces at (c.x, c.y, c.z) and (c.x, c.y+1, c.z)
+    uint vIdx0 = c.x + c.y * gs.x + c.z * (gs.y+1) * gs.x;
+    uint vIdx1 = c.x + (c.y+1) * gs.x + c.z * (gs.y+1) * gs.x;
+    if (vValid[vIdx0] != 0u || vValid[vIdx1] != 0u) isFluid = true;
+    // W faces at (c.x, c.y, c.z) and (c.x, c.y, c.z+1)
+    uint wIdx0 = c.x + c.y * gs.x + c.z * gs.x * gs.y;
+    uint wIdx1 = c.x + c.y * gs.x + (c.z+1) * gs.x * gs.y;
+    if (wValid[wIdx0] != 0u || wValid[wIdx1] != 0u) isFluid = true;
     active[idx] = isFluid ? 1u : 0u;
 
     if (!isFluid) {
@@ -59,49 +69,50 @@ void main(uint3 tid : SV_DispatchThreadID) {
         return;
     }
 
-    float scale = 1.0f / (pc.density * pc.gridSpacing * pc.gridSpacing);
-    float diag  = 0.0f;
-    float divU  = 0.0f;
+    // Following CPU convention: factor = dt/dx, solve Ap = rhs where rhs = weighted negative divergence
+    float factor = pc.dt / pc.gridSpacing;
+    float diag   = 0.0f;
 
-    // -X face
-    float fx = (c.x > 0) ? faceWeightsU[idxUFace(c, gs)] : 0.0f;
-    diag += fx * scale;
-    Aneighbour0[idx] = -fx * scale;
-    if (c.x > 0) divU += uGrid[idxUFace(c, gs)] * fx;
+    // Face indices
+    uint uL = idxUFace(c, gs);
+    uint uR = idxUFace(uint3(c.x+1, c.y, c.z), gs);
+    uint vB = idxVFace(c, gs);
+    uint vT = idxVFace(uint3(c.x, c.y+1, c.z), gs);
+    uint wBk = idxWFace(c, gs);
+    uint wFr = idxWFace(uint3(c.x, c.y, c.z+1), gs);
 
-    // +X face
-    float fxp = (c.x + 1 < gs.x) ? faceWeightsU[idxUFace(uint3(c.x+1, c.y, c.z), gs)] : 0.0f;
-    diag += fxp * scale;
-    Aneighbour1[idx] = -fxp * scale;
-    if (c.x + 1 < gs.x) divU -= uGrid[idxUFace(uint3(c.x+1, c.y, c.z), gs)] * fxp;
+    float wuL = faceWeightsU[uL];
+    float wuR = faceWeightsU[uR];
+    float wvB = faceWeightsV[vB];
+    float wvT = faceWeightsV[vT];
+    float wwBk = faceWeightsW[wBk];
+    float wwFr = faceWeightsW[wFr];
 
-    // -Y face
-    float fy = (c.y > 0) ? faceWeightsV[idxVFace(c, gs)] : 0.0f;
-    diag += fy * scale;
-    Aneighbour2[idx] = -fy * scale;
-    if (c.y > 0) divU += vGrid[idxVFace(c, gs)] * fy;
+    // RHS = weighted negative divergence (CPU convention: rhs = w_L*u_L - w_R*u_R + ...)
+    float rhsVal = wuL * uGrid[uL] - wuR * uGrid[uR]
+                 + wvB * vGrid[vB] - wvT * vGrid[vT]
+                 + wwBk * wGrid[wBk] - wwFr * wGrid[wFr];
 
-    // +Y face
-    float fyp = (c.y + 1 < gs.y) ? faceWeightsV[idxVFace(uint3(c.x, c.y+1, c.z), gs)] : 0.0f;
-    diag += fyp * scale;
-    Aneighbour3[idx] = -fyp * scale;
-    if (c.y + 1 < gs.y) divU -= vGrid[idxVFace(uint3(c.x, c.y+1, c.z), gs)] * fyp;
+    // Matrix: Adiag += w*factor per face, Aneighbour = -w*factor (only if neighbour exists)
+    // -X
+    Aneighbour0[idx] = (c.x > 0) ? -wuL * factor : 0.0f;
+    diag += wuL * factor;
+    // +X
+    Aneighbour1[idx] = (c.x + 1 < gs.x) ? -wuR * factor : 0.0f;
+    diag += wuR * factor;
+    // -Y
+    Aneighbour2[idx] = (c.y > 0) ? -wvB * factor : 0.0f;
+    diag += wvB * factor;
+    // +Y
+    Aneighbour3[idx] = (c.y + 1 < gs.y) ? -wvT * factor : 0.0f;
+    diag += wvT * factor;
+    // -Z
+    Aneighbour4[idx] = (c.z > 0) ? -wwBk * factor : 0.0f;
+    diag += wwBk * factor;
+    // +Z
+    Aneighbour5[idx] = (c.z + 1 < gs.z) ? -wwFr * factor : 0.0f;
+    diag += wwFr * factor;
 
-    // -Z face
-    float fz = (c.z > 0) ? faceWeightsW[idxWFace(c, gs)] : 0.0f;
-    diag += fz * scale;
-    Aneighbour4[idx] = -fz * scale;
-    if (c.z > 0) divU += wGrid[idxWFace(c, gs)] * fz;
-
-    // +Z face
-    float fzp = (c.z + 1 < gs.z) ? faceWeightsW[idxWFace(uint3(c.x, c.y, c.z+1), gs)] : 0.0f;
-    diag += fzp * scale;
-    Aneighbour5[idx] = -fzp * scale;
-    if (c.z + 1 < gs.z) divU -= wGrid[idxWFace(uint3(c.x, c.y, c.z+1), gs)] * fzp;
-
-    Adiag[idx] = (diag > 0.0f) ? diag : 1.0f;  // avoid zero diagonal
-
-    // RHS = -div(u) / dt  (density absorbed into scale above)
-    divU /= pc.gridSpacing;
-    rhs[idx] = -divU / pc.dt;
+    Adiag[idx] = (diag > 0.0f) ? diag : 1.0f;
+    rhs[idx] = rhsVal;
 }
