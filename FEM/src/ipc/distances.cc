@@ -21,17 +21,8 @@ Real distanceSqrPointTriangle(const glm::dvec3 &p,
                               const glm::dvec3 &a,
                               const glm::dvec3 &b,
                               const glm::dvec3 &c) {
-  auto type = decidePointTriangleDistanceType(p, a, b, c);
-  switch (type) {
-    case PointTriangleDistanceType::P_A:return distanceSqrPointPoint(p, a);
-    case PointTriangleDistanceType::P_B:return distanceSqrPointPoint(p, b);
-    case PointTriangleDistanceType::P_C:return distanceSqrPointPoint(p, c);
-    case PointTriangleDistanceType::P_AB:return distanceSqrPointLine(p, a, b);
-    case PointTriangleDistanceType::P_BC:return distanceSqrPointLine(p, b, c);
-    case PointTriangleDistanceType::P_CA:return distanceSqrPointLine(p, c, a);
-    case PointTriangleDistanceType::P_ABC:return distanceSqrPointPlane(p, a, b, c);
-    default:throw std::runtime_error("Unknown distance type");
-  }
+  // Logic shared with the GPU via <fem/shared/ipc-distance.h>.
+  return shared::shDistanceSqrPointTriangle(p, a, b, c);
 }
 
 // =========================================================================
@@ -183,19 +174,8 @@ Real distanceSqrEdgeEdge(const glm::dvec3 &ea0,
                          const glm::dvec3 &ea1,
                          const glm::dvec3 &eb0,
                          const glm::dvec3 &eb1) {
-  auto type = decideEdgeEdgeDistanceType(ea0, ea1, eb0, eb1);
-  switch (type) {
-    case EdgeEdgeDistanceType::A_C:return distanceSqrPointPoint(ea0, eb0);
-    case EdgeEdgeDistanceType::A_D:return distanceSqrPointPoint(ea0, eb1);
-    case EdgeEdgeDistanceType::B_C:return distanceSqrPointPoint(ea1, eb0);
-    case EdgeEdgeDistanceType::B_D:return distanceSqrPointPoint(ea1, eb1);
-    case EdgeEdgeDistanceType::A_CD:return distanceSqrPointLine(ea0, eb0, eb1);
-    case EdgeEdgeDistanceType::B_CD:return distanceSqrPointLine(ea1, eb0, eb1);
-    case EdgeEdgeDistanceType::AB_C:return distanceSqrPointLine(eb0, ea0, ea1);
-    case EdgeEdgeDistanceType::AB_D:return distanceSqrPointLine(eb1, ea0, ea1);
-    case EdgeEdgeDistanceType::AB_CD:return distanceSqrLineLine(ea0, ea1, eb0, eb1);
-    default:throw std::runtime_error("Unknown distance type");
-  }
+  // Logic shared with the GPU via <fem/shared/ipc-distance.h>.
+  return shared::shDistanceSqrEdgeEdge(ea0, ea1, eb0, eb1);
 }
 
 // =========================================================================

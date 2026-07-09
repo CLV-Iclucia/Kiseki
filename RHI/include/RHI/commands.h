@@ -29,6 +29,7 @@
 
 #include <array>
 #include <cstddef>
+#include <concepts>
 #include <cstdint>
 #include <cstring>
 #include <optional>
@@ -40,6 +41,9 @@
 #include <vector>
 
 namespace sim::rhi {
+
+template <class Derived>
+class ComputeShader;
 
 // ---- Buffer / image copies -------------------------------------------------
 struct BufferCopy {
@@ -290,6 +294,19 @@ class CommandList : public sim::core::NonCopyable {
     }
     params._apply(*this);
     rawDispatch(gx, gy, gz);
+  }
+
+  // Typed compute shader dispatch. ShaderT determines the only accepted
+  // Params type at compile time, then delegates to the existing params path.
+  template <class ShaderT>
+    requires std::derived_from<ShaderT, ComputeShader<ShaderT>>
+  void dispatch(const ShaderT& shader, typename ShaderT::Params& params,
+                uint32_t gx, uint32_t gy = 1, uint32_t gz = 1) {
+    if (!shader.m_pipeline) {
+      throw std::runtime_error(
+          "cannot dispatch an invalid typed compute shader");
+    }
+    dispatch(shader.m_pipeline, params, gx, gy, gz);
   }
 
   // Compatibility overload: plain (gx, gy, gz) → rawDispatch. Picked by

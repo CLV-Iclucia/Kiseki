@@ -38,19 +38,24 @@ add_subdirectory(Core)
 add_subdirectory(Spatify)
 add_subdirectory(Maths)
 add_subdirectory(Deform)
-add_subdirectory(FEM)
 
 # RHI (Vulkan) module — gated behind option so users without Vulkan SDK
 # can still build the rest of the project.
 option(SIMCRAFT_BUILD_RHI "Build RHI module" ON)
 if(SIMCRAFT_BUILD_RHI)
   add_subdirectory(RHI)
+  add_subdirectory(RPK)
 endif()
+
+# FEM has an optional GPU backend (RHI + RPK), so it must come after them.
+add_subdirectory(FEM)
 
 # FluidSim depends on RHI (GPU backend), so it comes after RHI
 add_subdirectory(FluidSim)
 
 add_subdirectory(Renderer)
+
+add_subdirectory(HairSim)
 
 # Applications
 add_subdirectory(Apps)
@@ -60,5 +65,3 @@ option(SIMCRAFT_BUILD_PYTHON "Build Python bindings" ON)
 if(SIMCRAFT_BUILD_PYTHON)
   add_subdirectory(python)
 endif()
-
-# add_subdirectory(HairSim)  # WIP: requires Intel MKL

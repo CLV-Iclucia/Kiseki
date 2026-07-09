@@ -42,8 +42,7 @@ float sampleFace(StructuredBuffer<float> field, float3 worldPos,
 [numthreads(256, 1, 1)]
 void main(uint3 tid : SV_DispatchThreadID) {
     if (tid.x >= pc.numParticles) return;
-    uint base = tid.x * 3;
-    float3 pos = float3(positions[base], positions[base+1], positions[base+2]);
+    float3 pos = load_float3(positions, tid.x);
 
     float dx   = pc.gridSpacing;
     uint3 gs   = pc.gridSize;
@@ -62,7 +61,5 @@ void main(uint3 tid : SV_DispatchThreadID) {
         sampleFace(vGrid, pos, vRes, vOff),
         sampleFace(wGrid, pos, wRes, wOff)
     );
-    velocities[base]   = vel.x;
-    velocities[base+1] = vel.y;
-    velocities[base+2] = vel.z;
+    store_float3(velocities, tid.x, vel);
 }

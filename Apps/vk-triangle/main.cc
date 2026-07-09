@@ -206,6 +206,30 @@ int main() {
   }
 
   uint32_t frameIdx = 0;
+  bool needsRecreate = false;
+
+  // Helper: wait ALL in-flight fences before swapchain recreate so that no
+  // GPU work references old backbuffer images. recreate() does
+  // vkDeviceWaitIdle internally as a safety net, but explicit fence waits
+  // avoid the full pipeline stall on drivers that honour it.
+  auto waitAllFrames = [&]() {
+    for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
+      device->waitFence(*frameFences[i]);
+    }
+  };
+
+  // Helper: (re-)allocate renderDone semaphores to match current image count.
+  auto syncRenderDoneSems = [&]() {
+    const uint32_t count = swapchain->imageCount();
+    if (renderDoneSems.size() != count) {
+      renderDoneSems.resize(count);
+      for (uint32_t i = 0; i < count; ++i) {
+        if (!renderDoneSems[i]) {
+          renderDoneSems[i] = device->createSemaphore();
+        }
+      }
+    }
+  };
 
   // ---- 7. Frame loop -------------------------------------------------------
   while (!glfwWindowShouldClose(window)) {
@@ -223,18 +247,25 @@ int main() {
     device->waitFence(*frameFences[frameIdx]);
     device->resetFence(*frameFences[frameIdx]);
 
-    // (resize check) -- after waitFence, before acquire.
-    if (static_cast<uint32_t>(fbW) != swapchain->width() ||
+    // (resize / out-of-date check) -- after waitFence, before acquire.
+    if (needsRecreate ||
+        static_cast<uint32_t>(fbW) != swapchain->width() ||
         static_cast<uint32_t>(fbH) != swapchain->height()) {
+      waitAllFrames();
       swapchain->recreate(static_cast<uint32_t>(fbW),
                           static_cast<uint32_t>(fbH));
+      syncRenderDoneSems();
+      needsRecreate = false;
     }
 
     // (2) Acquire next backbuffer.
     ImageRef backbuffer = swapchain->acquireNextImage(*imageReadySems[frameIdx]);
     if (!backbuffer) {
+      waitAllFrames();
       swapchain->recreate(static_cast<uint32_t>(fbW),
                           static_cast<uint32_t>(fbH));
+      syncRenderDoneSems();
+      needsRecreate = false;
       continue;
     }
     uint32_t imgIdx = swapchain->currentImageIndex();
@@ -296,7 +327,9 @@ int main() {
     // (5) Present. Wait on the same renderDone semaphore.
     bool presentOk = swapchain->present(*renderDoneSems[imgIdx]);
     if (!presentOk) {
-      // Suboptimal or out-of-date -- will recreate next frame.
+      // Suboptimal or out-of-date -- flag for recreate at start of next frame
+      // (after the fence wait ensures GPU is idle for this frame slot).
+      needsRecreate = true;
     }
 
     // (6) Advance frame index.

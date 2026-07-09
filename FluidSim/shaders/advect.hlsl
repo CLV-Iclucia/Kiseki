@@ -70,9 +70,8 @@ float3 clampToDomain(float3 pos) {
 [numthreads(256, 1, 1)]
 void main(uint3 tid : SV_DispatchThreadID) {
     if (tid.x >= pc.numParticles) return;
-    uint base = tid.x * 3;
-    float3 pos = float3(positions[base], positions[base+1], positions[base+2]);
-    float3 vel = float3(velocities[base], velocities[base+1], velocities[base+2]);
+    float3 pos = load_float3(positions, tid.x);
+    float3 vel = load_float3(velocities, tid.x);
 
     float dt = pc.dt;
 
@@ -100,10 +99,6 @@ void main(uint3 tid : SV_DispatchThreadID) {
         }
     }
 
-    positions[base]   = newPos.x;
-    positions[base+1] = newPos.y;
-    positions[base+2] = newPos.z;
-    velocities[base]   = vel.x;
-    velocities[base+1] = vel.y;
-    velocities[base+2] = vel.z;
+    store_float3(positions, tid.x, newPos);
+    store_float3(velocities, tid.x, vel);
 }

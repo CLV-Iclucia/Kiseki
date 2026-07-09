@@ -7,10 +7,9 @@
 namespace fluid::gpu {
 
 GPUFluidContext::GPUFluidContext(sim::rhi::Device& device,
-                                 sim::rhi::ShaderCompiler& compiler,
                                  const FluidDomain& dom,
                                  uint32_t nParticles)
-    : device_(device), compiler_(compiler)
+    : device_(device)
 {
     // 设置基类成员
     domain = dom;
@@ -29,43 +28,40 @@ GPUFluidContext::GPUFluidContext(sim::rhi::Device& device,
 
     using namespace sim::rhi;
 
-    // 速度场 SSBO
     uint32_t uSize = static_cast<uint32_t>((nx + 1) * ny * nz) * sizeof(float);
     uint32_t vSize = static_cast<uint32_t>(nx * (ny + 1) * nz) * sizeof(float);
     uint32_t wSize = static_cast<uint32_t>(nx * ny * (nz + 1)) * sizeof(float);
 
-    BufferDesc bufDesc{};
-    bufDesc.usage = BufferDesc::Storage;
+    uGrid = createDeviceLocalBuffer(device, uSize, "uGrid");
+    uGridBuf = createDeviceLocalBuffer(device, uSize, "uGridBuf");
+    vGrid = createDeviceLocalBuffer(device, vSize, "vGrid");
+    vGridBuf = createDeviceLocalBuffer(device, vSize, "vGridBuf");
+    wGrid = createDeviceLocalBuffer(device, wSize, "wGrid");
+    wGridBuf = createDeviceLocalBuffer(device, wSize, "wGridBuf");
 
-    bufDesc.sizeBytes = uSize;
-    uGrid = device.createBuffer(bufDesc);
-    uGridBuf = device.createBuffer(bufDesc);
+    uValid = createDeviceLocalBuffer(
+        device, static_cast<size_t>(nx + 1) * ny * nz * sizeof(uint32_t),
+        "uValid");
+    uValidBuf = createDeviceLocalBuffer(
+        device, static_cast<size_t>(nx + 1) * ny * nz * sizeof(uint32_t),
+        "uValidBuf");
+    vValid = createDeviceLocalBuffer(
+        device, static_cast<size_t>(nx) * (ny + 1) * nz * sizeof(uint32_t),
+        "vValid");
+    vValidBuf = createDeviceLocalBuffer(
+        device, static_cast<size_t>(nx) * (ny + 1) * nz * sizeof(uint32_t),
+        "vValidBuf");
+    wValid = createDeviceLocalBuffer(
+        device, static_cast<size_t>(nx) * ny * (nz + 1) * sizeof(uint32_t),
+        "wValid");
+    wValidBuf = createDeviceLocalBuffer(
+        device, static_cast<size_t>(nx) * ny * (nz + 1) * sizeof(uint32_t),
+        "wValidBuf");
 
-    bufDesc.sizeBytes = vSize;
-    vGrid = device.createBuffer(bufDesc);
-    vGridBuf = device.createBuffer(bufDesc);
-
-    bufDesc.sizeBytes = wSize;
-    wGrid = device.createBuffer(bufDesc);
-    wGridBuf = device.createBuffer(bufDesc);
-
-    // 有效性标记 SSBO (uint32 per element)
-    bufDesc.sizeBytes = static_cast<uint32_t>((nx + 1) * ny * nz) * sizeof(uint32_t);
-    uValid = device.createBuffer(bufDesc);
-    uValidBuf = device.createBuffer(bufDesc);
-
-    bufDesc.sizeBytes = static_cast<uint32_t>(nx * (ny + 1) * nz) * sizeof(uint32_t);
-    vValid = device.createBuffer(bufDesc);
-    vValidBuf = device.createBuffer(bufDesc);
-
-    bufDesc.sizeBytes = static_cast<uint32_t>(nx * ny * (nz + 1)) * sizeof(uint32_t);
-    wValid = device.createBuffer(bufDesc);
-    wValidBuf = device.createBuffer(bufDesc);
-
-    // Particles SSBO (SOA: positions + velocities)
-    bufDesc.sizeBytes = particleBufferSize(nParticles);
-    particlePositions = device.createBuffer(bufDesc);
-    particleVelocities = device.createBuffer(bufDesc);
+    particlePositions = createDeviceLocalBuffer(
+        device, particleBufferSize(nParticles), "particlePositions");
+    particleVelocities = createDeviceLocalBuffer(
+        device, particleBufferSize(nParticles), "particleVelocities");
 
     // Readback buffers (SOA)
     BufferDesc readbackDesc{};

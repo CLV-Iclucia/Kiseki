@@ -4,6 +4,7 @@
 // ============================================================================
 #pragma once
 
+#include <FluidSim/gpu/gpu-shaders.h>
 #include <FluidSim/gpu/gpu-solver.h>
 #include <RHI/rhi.h>
 
@@ -23,7 +24,7 @@ public:
 
 private:
     GPUForceConfig config_;
-    sim::rhi::PipelineRef psoBodyForce_;
+    BodyForceCS bodyForce_;
 };
 
 } // namespace fluid::gpu

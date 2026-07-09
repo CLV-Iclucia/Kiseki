@@ -17,12 +17,15 @@
 #include <RHI/sync.h>
 
 #include <cstddef>
+#include <filesystem>
 #include <memory>
 #include <span>
 
 namespace sim::rhi {
 
 class ShaderCompiler;  // forward decl (defined in shader-compiler.h)
+class ComputeShaderBase;
+struct ShaderCompileOptions;
 
 class Device : public sim::core::NonCopyable {
  public:
@@ -113,6 +116,12 @@ class Device : public sim::core::NonCopyable {
       return createShader(bytecode, ShaderStage::Compute, entryPoint);
   }
 
+ private:
+  virtual PipelineRef resolveTypedComputePipeline(
+      const std::filesystem::path& source,
+      const ShaderCompileOptions& options) = 0;
+
+  friend class ComputeShaderBase;
 };
 
 }  // namespace sim::rhi

@@ -12,35 +12,7 @@ using namespace sim::renderer;
 using sim::core::Vec3f;
 using sim::core::Vec3u;
 
-/// Compute area-weighted smooth vertex normals
-static void computeSmoothNormals(MeshProxy& mesh) {
-  const auto& pos = mesh.positions;
-  const auto& tris = mesh.triangles;
 
-  mesh.normals.assign(pos.size(), Vec3f(0.0f));
-
-  for (const auto& tri : tris) {
-    const auto& p0 = pos[tri.x];
-    const auto& p1 = pos[tri.y];
-    const auto& p2 = pos[tri.z];
-
-    Vec3f e1 = p1 - p0;
-    Vec3f e2 = p2 - p0;
-    Vec3f faceNormal = glm::cross(e1, e2); // unnormalized = area-weighted
-
-    mesh.normals[tri.x] += faceNormal;
-    mesh.normals[tri.y] += faceNormal;
-    mesh.normals[tri.z] += faceNormal;
-  }
-
-  for (auto& n : mesh.normals) {
-    float len = glm::length(n);
-    if (len > 1e-8f)
-      n /= len;
-    else
-      n = Vec3f(0.0f, 1.0f, 0.0f);
-  }
-}
 
 /// Build a SceneProxy from the current System state
 static std::unique_ptr<SceneProxy> buildSceneProxy(System& system,

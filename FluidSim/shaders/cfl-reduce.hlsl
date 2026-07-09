@@ -22,8 +22,7 @@ void main(uint3 dtid : SV_DispatchThreadID, uint gid : SV_GroupIndex,
     float localMax = 0.0f;
     uint idx = dtid.x;
     if (idx < pc.numParticles) {
-        uint b = idx * 3;
-        float3 v = float3(velocities[b], velocities[b+1], velocities[b+2]);
+        float3 v = load_float3(velocities, idx);
         localMax = length(v);
     }
 

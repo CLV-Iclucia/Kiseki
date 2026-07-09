@@ -12,73 +12,28 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <cstring>
 #include <filesystem>
 #include <format>
 #include <iostream>
+#include <span>
 
 namespace fluid::gpu {
 
 using namespace sim::rhi;
-namespace fs = std::filesystem;
-
-// ============================================================================
-// SHADER_PARAMS for boundary shaders (owned by GPUFluidBackend)
-// ============================================================================
-
-SHADER_PARAMS_BEGIN(CflReduceParams)
-    SHADER_PARAM_SRV   (BufferRef, velocities);
-    SHADER_PARAM_UAV   (BufferRef, partialMax);
-    SHADER_PARAM_SCALAR(uint32_t,  numParticles);
-SHADER_PARAMS_END();
-
-SHADER_PARAMS_BEGIN(CflReduceFinalParams)
-    SHADER_PARAM_SRV   (BufferRef, partialMax);
-    SHADER_PARAM_UAV   (BufferRef, scalarOut);
-    SHADER_PARAM_SCALAR(uint32_t,  numGroups);
-SHADER_PARAMS_END();
-
-SHADER_PARAMS_BEGIN(BodyForceParams)
-    SHADER_PARAM_UAV   (BufferRef, vGrid);
-    SHADER_PARAM_SCALAR(float,     dt);
-    SHADER_PARAM_SCALAR(float,     gravityY);
-    SHADER_PARAM_SCALAR(uint32_t,  numVFaces);
-SHADER_PARAMS_END();
-
-SHADER_PARAMS_BEGIN(ExtrapolateParams)
-    SHADER_PARAM_SRV   (BufferRef, gridIn);
-    SHADER_PARAM_UAV   (BufferRef, gridOut);
-    SHADER_PARAM_SRV   (BufferRef, validIn);
-    SHADER_PARAM_UAV   (BufferRef, validOut);
-    SHADER_PARAM_SCALAR(uint32_t,  faceResX);
-    SHADER_PARAM_SCALAR(uint32_t,  faceResY);
-    SHADER_PARAM_SCALAR(uint32_t,  faceResZ);
-    SHADER_PARAM_SCALAR(uint32_t,  numFaces);
-SHADER_PARAMS_END();
-
-// ============================================================================
-// Shader path helper
-// ============================================================================
-static fs::path shaderPath(const std::string& name) {
-#ifdef FLUIDSIM_SHADER_DIR
-    return fs::path(FLUIDSIM_SHADER_DIR) / name;
-#else
-    return fs::path(name);
-#endif
-}
-
-static fs::path shaderDir() {
-#ifdef FLUIDSIM_SHADER_DIR
-    return fs::path(FLUIDSIM_SHADER_DIR);
-#else
-    return fs::path{};
-#endif
-}
 
 // ============================================================================
 // Construction / Destruction
 // ============================================================================
-GPUFluidBackend::GPUFluidBackend(Device& device, ShaderCompiler& compiler)
-    : device_(device), compiler_(compiler) {}
+GPUFluidBackend::GPUFluidBackend(Device& device)
+    : device_(device),
+      dirichlet_(device),
+      extrapolate_(device),
+      bodyForce_(device),
+      collider_(device),
+      cflReduce_(device),
+      cflReduceFinal_(device)
+{}
 
 GPUFluidBackend::~GPUFluidBackend() = default;
 
@@ -108,30 +63,17 @@ void GPUFluidBackend::initialize(const FluidScene& scene) {
     }
 
     // 5. Create sub-components
-    advector_      = std::make_unique<GPUAdvector>(device_, compiler_, grid_);
-    projector_     = std::make_unique<GPUProjector>(device_, compiler_, grid_, config_, shaderDir());
-    reconstructor_ = std::make_unique<GPUReconstructor>(device_, compiler_, grid_);
+    advector_      = std::make_unique<GPUAdvector>(device_, grid_);
+    projector_     = std::make_unique<GPUProjector>(device_, grid_, config_);
+    reconstructor_ = std::make_unique<GPUReconstructor>(device_, grid_);
 
-    // 6. Create boundary pipelines
-    createBoundaryPipelines();
-
-    // 7. CFL reduction pipelines + buffers
-    psoCflReduce_      = sim::rhi::compileComputePipeline(device_, compiler_, shaderPath("cfl-reduce.hlsl"));
-    psoCflReduceFinal_ = sim::rhi::compileComputePipeline(device_, compiler_, shaderPath("cfl-reduce-final.hlsl"));
+    // 6. CFL reduction buffers
     {
         uint32_t cflGroups = (grid_.numParticles + 255) / 256;
-        cflPartialBuf_ = device_.createBuffer({
-            .sizeBytes  = sizeof(float) * cflGroups,
-            .visibility = BufferDesc::Visibility::DeviceLocal,
-            .usage      = BufferDesc::Storage | BufferDesc::TransferSrc,
-            .debugName  = "cfl-partial",
-        });
-        cflResultBuf_ = device_.createBuffer({
-            .sizeBytes  = sizeof(float),
-            .visibility = BufferDesc::Visibility::DeviceLocal,
-            .usage      = BufferDesc::Storage | BufferDesc::TransferSrc,
-            .debugName  = "cfl-result",
-        });
+        cflPartialBuf_ = createDeviceLocalBuffer(
+            device_, sizeof(float) * cflGroups, "cfl-partial");
+        cflResultBuf_ = createDeviceLocalBuffer(
+            device_, sizeof(float), "cfl-result");
         cflReadbackBuf_ = device_.createBuffer({
             .sizeBytes  = sizeof(float),
             .visibility = BufferDesc::Visibility::Readback,
@@ -140,7 +82,7 @@ void GPUFluidBackend::initialize(const FluidScene& scene) {
         });
     }
 
-    // 8. Allocate readback buffers (CPU-visible, SOA)
+    // 7. Allocate readback buffers (CPU-visible, SOA)
     readbackPos_ = device_.createBuffer({
         .sizeBytes = particleBufferSize(grid_.numParticles),
         .visibility = BufferDesc::Visibility::Readback,
@@ -164,22 +106,22 @@ void GPUFluidBackend::computeCFL() {
     auto cmd = device_.beginCommands(QueueType::Compute);
 
     // Pass 1: per-workgroup max
-    if (psoCflReduce_.valid()) {
-        CflReduceParams p;
+    if (cflReduce_.valid()) {
+        CflReduceCS::Params p;
         p.velocities   = grid_.particleVelocities;
         p.partialMax   = cflPartialBuf_;
         p.numParticles = grid_.numParticles;
-        cmd->dispatch(psoCflReduce_, p, numGroups, 1, 1);
+        cmd->dispatch(cflReduce_, p, numGroups, 1, 1);
         cmd->memoryBarrier(BarrierDesc::StageComputeShader, BarrierDesc::StageComputeShader);
     }
 
     // Pass 2: final reduction
-    if (psoCflReduceFinal_.valid()) {
-        CflReduceFinalParams p;
+    if (cflReduceFinal_.valid()) {
+        CflReduceFinalCS::Params p;
         p.partialMax = cflPartialBuf_;
         p.scalarOut  = cflResultBuf_;
         p.numGroups  = numGroups;
-        cmd->dispatch(psoCflReduceFinal_, p, 1, 1, 1);
+        cmd->dispatch(cflReduceFinal_, p, 1, 1, 1);
         cmd->memoryBarrier(BarrierDesc::StageComputeShader, BarrierDesc::StageTransfer);
     }
 
@@ -236,15 +178,14 @@ void GPUFluidBackend::readbackParticles(FluidFrame& out) {
     cmd->end();
     device_.submitAndWait(*cmd, QueueType::Transfer);
 
-    // Map + copy (SOA: tightly-packed float3)
-    auto posData = readbackPos_->mapTyped<float>();
-    auto velData = readbackVel_->mapTyped<float>();
+    static_assert(sim::rhi::is_direct_structured_data_v<Vec3f>);
+    auto posData = readbackPos_->mapTyped<Vec3f>();
+    auto velData = readbackVel_->mapTyped<Vec3f>();
     out.particlePositions.resize(grid_.numParticles);
     out.particleVelocities.resize(grid_.numParticles);
     for (uint32_t i = 0; i < grid_.numParticles; ++i) {
-        uint32_t base = i * 3;
-        out.particlePositions[i]  = Vec3d(posData[base], posData[base+1], posData[base+2]);
-        out.particleVelocities[i] = Vec3d(velData[base], velData[base+1], velData[base+2]);
+        out.particlePositions[i] = Vec3d(posData[i]);
+        out.particleVelocities[i] = Vec3d(velData[i]);
     }
     readbackPos_->unmap();
     readbackVel_->unmap();
@@ -257,7 +198,7 @@ void GPUFluidBackend::updateCollider(const Mesh& mesh) {
 void GPUFluidBackend::updateSolverConfig(const SolverConfig& config) {
     config_ = config;
     if (projector_) {
-        projector_->updateConfig(device_, compiler_, config, shaderDir());
+        projector_->updateConfig(device_, config);
     }
 }
 
@@ -270,60 +211,50 @@ void GPUFluidBackend::createSharedBuffers(const FluidScene& scene) {
     grid_.originY = static_cast<float>(scene.domain.origin.y);
     grid_.originZ = static_cast<float>(scene.domain.origin.z);
 
-    auto makeStorage = [&](size_t sizeBytes, const char* name) {
-        return device_.createBuffer({
-            .sizeBytes  = sizeBytes,
-            .visibility = BufferDesc::Visibility::DeviceLocal,
-            .usage      = BufferDesc::Storage | BufferDesc::TransferDst,
-            .debugName  = name,
-        });
-    };
-
     size_t nU = static_cast<size_t>(nx + 1) * ny * nz;
     size_t nV = static_cast<size_t>(nx) * (ny + 1) * nz;
     size_t nW = static_cast<size_t>(nx) * ny * (nz + 1);
 
     // Staggered velocity faces (float32) — need TransferSrc for copy to old buffers
-    auto makeVelocityGrid = [&](size_t sizeBytes, const char* name) {
-        return device_.createBuffer({
-            .sizeBytes  = sizeBytes,
-            .visibility = BufferDesc::Visibility::DeviceLocal,
-            .usage      = BufferDesc::Storage | BufferDesc::TransferSrc | BufferDesc::TransferDst,
-            .debugName  = name,
-        });
-    };
-    grid_.uGrid    = makeVelocityGrid(sizeof(float) * nU, "uGrid");
-    grid_.vGrid    = makeVelocityGrid(sizeof(float) * nV, "vGrid");
-    grid_.wGrid    = makeVelocityGrid(sizeof(float) * nW, "wGrid");
+    grid_.uGrid = createDeviceLocalBuffer(
+        device_, sizeof(float) * nU, "uGrid");
+    grid_.vGrid = createDeviceLocalBuffer(
+        device_, sizeof(float) * nV, "vGrid");
+    grid_.wGrid = createDeviceLocalBuffer(
+        device_, sizeof(float) * nW, "wGrid");
     // Old velocity (saved after P2G, before forces/projection) for FLIP delta
-    grid_.uGridOld = makeStorage(sizeof(float) * nU, "uGridOld");
-    grid_.vGridOld = makeStorage(sizeof(float) * nV, "vGridOld");
-    grid_.wGridOld = makeStorage(sizeof(float) * nW, "wGridOld");
-    grid_.uGridBuf = makeVelocityGrid(sizeof(float) * nU, "uGridBuf");
-    grid_.vGridBuf = makeVelocityGrid(sizeof(float) * nV, "vGridBuf");
-    grid_.wGridBuf = makeVelocityGrid(sizeof(float) * nW, "wGridBuf");
+    grid_.uGridOld = createDeviceLocalBuffer(
+        device_, sizeof(float) * nU, "uGridOld");
+    grid_.vGridOld = createDeviceLocalBuffer(
+        device_, sizeof(float) * nV, "vGridOld");
+    grid_.wGridOld = createDeviceLocalBuffer(
+        device_, sizeof(float) * nW, "wGridOld");
+    grid_.uGridBuf = createDeviceLocalBuffer(
+        device_, sizeof(float) * nU, "uGridBuf");
+    grid_.vGridBuf = createDeviceLocalBuffer(
+        device_, sizeof(float) * nV, "vGridBuf");
+    grid_.wGridBuf = createDeviceLocalBuffer(
+        device_, sizeof(float) * nW, "wGridBuf");
 
     // Valid flags (uint32 per face)
-    grid_.uValid    = makeStorage(sizeof(uint32_t) * nU, "uValid");
-    grid_.vValid    = makeStorage(sizeof(uint32_t) * nV, "vValid");
-    grid_.wValid    = makeStorage(sizeof(uint32_t) * nW, "wValid");
-    grid_.uValidBuf = makeVelocityGrid(sizeof(uint32_t) * nU, "uValidBuf");
-    grid_.vValidBuf = makeVelocityGrid(sizeof(uint32_t) * nV, "vValidBuf");
-    grid_.wValidBuf = makeVelocityGrid(sizeof(uint32_t) * nW, "wValidBuf");
+    grid_.uValid = createDeviceLocalBuffer(
+        device_, sizeof(uint32_t) * nU, "uValid");
+    grid_.vValid = createDeviceLocalBuffer(
+        device_, sizeof(uint32_t) * nV, "vValid");
+    grid_.wValid = createDeviceLocalBuffer(
+        device_, sizeof(uint32_t) * nW, "wValid");
+    grid_.uValidBuf = createDeviceLocalBuffer(
+        device_, sizeof(uint32_t) * nU, "uValidBuf");
+    grid_.vValidBuf = createDeviceLocalBuffer(
+        device_, sizeof(uint32_t) * nV, "vValidBuf");
+    grid_.wValidBuf = createDeviceLocalBuffer(
+        device_, sizeof(uint32_t) * nW, "wValidBuf");
 
     // Particles (SOA: separate position and velocity buffers, tightly-packed float3)
-    grid_.particlePositions = device_.createBuffer({
-        .sizeBytes  = particleBufferSize(grid_.numParticles),
-        .visibility = BufferDesc::Visibility::DeviceLocal,
-        .usage      = BufferDesc::Storage | BufferDesc::TransferSrc | BufferDesc::TransferDst,
-        .debugName  = "particlePositions",
-    });
-    grid_.particleVelocities = device_.createBuffer({
-        .sizeBytes  = particleBufferSize(grid_.numParticles),
-        .visibility = BufferDesc::Visibility::DeviceLocal,
-        .usage      = BufferDesc::Storage | BufferDesc::TransferSrc | BufferDesc::TransferDst,
-        .debugName  = "particleVelocities",
-    });
+    grid_.particlePositions = createDeviceLocalBuffer(
+        device_, particleBufferSize(grid_.numParticles), "particlePositions");
+    grid_.particleVelocities = createDeviceLocalBuffer(
+        device_, particleBufferSize(grid_.numParticles), "particleVelocities");
 
     // Fluid SDF (3D Image, R32_Float — hardware trilinear)
     grid_.fluidSdfImg = device_.createImage({
@@ -358,20 +289,21 @@ void GPUFluidBackend::createSharedBuffers(const FluidScene& scene) {
 void GPUFluidBackend::uploadParticles(const FluidScene& scene) {
     size_t bufSize = particleBufferSize(grid_.numParticles);
 
-    // Pack SOA arrays (tightly-packed float3)
-    std::vector<float> positions(static_cast<size_t>(grid_.numParticles) * 3, 0.0f);
-    std::vector<float> velocities(static_cast<size_t>(grid_.numParticles) * 3, 0.0f);
+    static_assert(sim::rhi::is_direct_structured_data_v<Vec3f>);
+    std::vector<Vec3f> positions(grid_.numParticles, Vec3f(0.0f));
+    std::vector<Vec3f> velocities(grid_.numParticles, Vec3f(0.0f));
     for (uint32_t i = 0; i < grid_.numParticles; ++i) {
-        uint32_t base = i * 3;
-        positions[base + 0] = static_cast<float>(scene.initialFluid.positions[i].x);
-        positions[base + 1] = static_cast<float>(scene.initialFluid.positions[i].y);
-        positions[base + 2] = static_cast<float>(scene.initialFluid.positions[i].z);
+        positions[i] = Vec3f(scene.initialFluid.positions[i]);
         if (i < scene.initialFluid.velocities.size()) {
-            velocities[base + 0] = static_cast<float>(scene.initialFluid.velocities[i].x);
-            velocities[base + 1] = static_cast<float>(scene.initialFluid.velocities[i].y);
-            velocities[base + 2] = static_cast<float>(scene.initialFluid.velocities[i].z);
+            velocities[i] = Vec3f(scene.initialFluid.velocities[i]);
         }
     }
+    const auto positionBytes = sim::rhi::asStructuredBytes(
+        std::span<const Vec3f>(positions));
+    const auto velocityBytes = sim::rhi::asStructuredBytes(
+        std::span<const Vec3f>(velocities));
+    assert(positionBytes.size() == bufSize);
+    assert(velocityBytes.size() == bufSize);
 
     // Upload positions via staging buffer
     auto stagingPos = device_.createBuffer({
@@ -381,7 +313,7 @@ void GPUFluidBackend::uploadParticles(const FluidScene& scene) {
         .debugName = "positions-staging",
     });
     auto* dstPos = stagingPos->map();
-    std::memcpy(dstPos, positions.data(), bufSize);
+    std::memcpy(dstPos, positionBytes.data(), positionBytes.size());
     stagingPos->unmap();
 
     // Upload velocities via staging buffer
@@ -392,7 +324,7 @@ void GPUFluidBackend::uploadParticles(const FluidScene& scene) {
         .debugName = "velocities-staging",
     });
     auto* dstVel = stagingVel->map();
-    std::memcpy(dstVel, velocities.data(), bufSize);
+    std::memcpy(dstVel, velocityBytes.data(), velocityBytes.size());
     stagingVel->unmap();
 
     auto cmd = device_.beginCommands(QueueType::Transfer);
@@ -408,16 +340,6 @@ void GPUFluidBackend::uploadColliderToImage(const Mesh& mesh) {
     // mesh-to-SDF conversion, then upload to 3D image via staging buffer.
     std::cout << "[GPU] Collider SDF upload stub (mesh with "
               << mesh.triangleCount << " triangles)\n";
-}
-
-// ============================================================================
-// Boundary pipelines
-// ============================================================================
-void GPUFluidBackend::createBoundaryPipelines() {
-    psoDirichlet_   = sim::rhi::compileComputePipeline(device_, compiler_, shaderPath("dirichlet.hlsl"));
-    psoExtrapolate_ = sim::rhi::compileComputePipeline(device_, compiler_, shaderPath("extrapolate.hlsl"));
-    psoBodyForce_   = sim::rhi::compileComputePipeline(device_, compiler_, shaderPath("body-force.hlsl"));
-    psoCollider_    = sim::rhi::compileComputePipeline(device_, compiler_, shaderPath("collider.hlsl"));
 }
 
 // ============================================================================
@@ -445,42 +367,42 @@ void GPUFluidBackend::substep(CommandList& cmd, Real dt) {
 
 
     // ---- 2. Body force (gravity on V faces) ----
-    if (psoBodyForce_.valid()) {
-        BodyForceParams p;
+    if (bodyForce_.valid()) {
+        BodyForceCS::Params p;
         p.vGrid      = grid_.vGrid;
         p.dt         = fdt;
         p.gravityY   = static_cast<float>(config_.gravity.y);
         p.numVFaces  = nV;
-        cmd.dispatch(psoBodyForce_, p, (nV + 255) / 256, 1, 1);
+        cmd.dispatch(bodyForce_, p, (nV + 255) / 256, 1, 1);
         barrier();
     }
 
     // ---- 3. Extrapolate velocities (in-place: write result back to grid) ----
-    if (psoExtrapolate_.valid()) {
+    if (extrapolate_.valid()) {
         // Pass 1: extrapolate into gridBuf
         {
-            ExtrapolateParams p;
+            ExtrapolateCS::Params p;
             p.gridIn = grid_.uGrid; p.gridOut = grid_.uGridBuf;
             p.validIn = grid_.uValid; p.validOut = grid_.uValidBuf;
             p.faceResX = nx + 1; p.faceResY = ny; p.faceResZ = nz;
             p.numFaces = nU;
-            cmd.dispatch(psoExtrapolate_, p, (nU + 255) / 256, 1, 1);
+            cmd.dispatch(extrapolate_, p, (nU + 255) / 256, 1, 1);
         }
         {
-            ExtrapolateParams p;
+            ExtrapolateCS::Params p;
             p.gridIn = grid_.vGrid; p.gridOut = grid_.vGridBuf;
             p.validIn = grid_.vValid; p.validOut = grid_.vValidBuf;
             p.faceResX = nx; p.faceResY = ny + 1; p.faceResZ = nz;
             p.numFaces = nV;
-            cmd.dispatch(psoExtrapolate_, p, (nV + 255) / 256, 1, 1);
+            cmd.dispatch(extrapolate_, p, (nV + 255) / 256, 1, 1);
         }
         {
-            ExtrapolateParams p;
+            ExtrapolateCS::Params p;
             p.gridIn = grid_.wGrid; p.gridOut = grid_.wGridBuf;
             p.validIn = grid_.wValid; p.validOut = grid_.wValidBuf;
             p.faceResX = nx; p.faceResY = ny; p.faceResZ = nz + 1;
             p.numFaces = nW;
-            cmd.dispatch(psoExtrapolate_, p, (nW + 255) / 256, 1, 1);
+            cmd.dispatch(extrapolate_, p, (nW + 255) / 256, 1, 1);
         }
         barrier();
         // Copy results back: gridBuf → grid (avoid swap to keep buffer handles stable)

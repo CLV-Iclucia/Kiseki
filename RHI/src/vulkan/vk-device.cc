@@ -7,6 +7,7 @@
 
 #define VMA_IMPLEMENTATION
 #include "vk-device.h"
+#include <RHI/shader-compile-options.h>
 #include <RHI/shader-compiler.h>
 
 #include "vk-buffer.h"
@@ -22,8 +23,14 @@
 
 #include <spdlog/spdlog.h>
 
+#include <compare>
+#include <map>
+#include <mutex>
 #include <stdexcept>
+#include <string>
+#include <system_error>
 #include <utility>
+#include <vector>
 
 namespace sim::rhi {
 
@@ -50,6 +57,54 @@ std::unique_ptr<ShaderCompiler> Device::createShaderCompiler() const {
 
 namespace sim::rhi::vulkan {
 
+namespace {
+
+struct TypedShaderKey {
+  std::string source;
+  std::string entryPoint;
+  Backend backend = Backend::Vulkan;
+  std::vector<std::pair<std::string, std::string>> defines;
+  std::vector<std::string> includeDirs;
+  bool generateDisassembly = false;
+  bool enableDebugInfo = false;
+
+  auto operator<=>(const TypedShaderKey&) const = default;
+};
+
+std::string normalizeShaderPath(const std::filesystem::path& path) {
+  std::error_code ec;
+  auto absolute = std::filesystem::absolute(path, ec);
+  if (ec) absolute = path;
+  return absolute.lexically_normal().generic_string();
+}
+
+TypedShaderKey makeTypedShaderKey(
+    const std::filesystem::path& source,
+    const ShaderCompileOptions& options,
+    Backend backend) {
+  TypedShaderKey key;
+  key.source = normalizeShaderPath(source);
+  key.entryPoint = options.entryPoint;
+  key.backend = backend;
+  key.defines = options.defines;
+  key.generateDisassembly = options.generateDisassembly;
+  key.enableDebugInfo = options.enableDebugInfo;
+  key.includeDirs.reserve(options.includeDirs.size());
+  for (const auto& dir : options.includeDirs) {
+    key.includeDirs.push_back(normalizeShaderPath(dir));
+  }
+  return key;
+}
+
+}  // namespace
+
+struct VulkanDevice::TypedShaderCache {
+  std::unique_ptr<ShaderCompiler> compiler;
+  std::map<TypedShaderKey, ShaderRef> programs;
+  std::map<TypedShaderKey, PipelineRef> pipelines;
+  std::mutex mutex;
+};
+
 // ---- ctor / dtor -----------------------------------------------------------
 VulkanDevice::VulkanDevice(const DeviceDesc& desc) {
   initInstance(desc.enableValidation);
@@ -58,6 +113,7 @@ VulkanDevice::VulkanDevice(const DeviceDesc& desc) {
   initCommandPools();
   initDescriptorAllocator();
   m_pipelineCache = std::make_unique<VulkanPipelineCache>(m_device);
+  m_typedShaderCache = std::make_unique<TypedShaderCache>();
   spdlog::info("Rhi: Vulkan device ready (validation={})", m_validationEnabled);
 }
 
@@ -67,6 +123,10 @@ VulkanDevice::~VulkanDevice() {
   }
 
   // Reverse-order teardown per plan §6.2.
+  // Typed caches hold PipelineRef/ShaderRef copies. Drop those before the
+  // backend pipeline cache and native device.
+  m_typedShaderCache.reset();
+
   // Pipeline cache must be destroyed before descriptor pool (pipelines may hold
   // descriptor set layouts, so drop refs first).
   m_pipelineCache.reset();
@@ -133,12 +193,17 @@ void VulkanDevice::initPhysicalDeviceAndDevice() {
   feats12.bufferDeviceAddress = VK_TRUE;
   feats12.timelineSemaphore = VK_TRUE;
 
+  VkPhysicalDeviceFeatures feats10{};
+  feats10.shaderFloat64 = VK_TRUE;   // Required for double-precision compute (FEM)
+  feats10.shaderInt64   = VK_TRUE;   // Required for 64-bit atomics
+
   vkb::PhysicalDeviceSelector pds(m_vkbInstance);
   // No surface required for headless RHI usage in R0–R2.
   pds.defer_surface_initialization()
      .set_minimum_version(1, 3)
      .set_required_features_13(feats13)
-     .set_required_features_12(feats12);
+     .set_required_features_12(feats12)
+     .set_required_features(feats10);
 
   auto phys_ret = pds.select();
   if (!phys_ret) {
@@ -248,6 +313,49 @@ PipelineRef VulkanDevice::createGraphicsPipeline(
   if (auto cached = m_pipelineCache->findGraphics(desc)) return cached;
   auto pipeline = PipelineRef(new VulkanPipeline(this, desc));
   m_pipelineCache->insertGraphics(desc, pipeline);
+  return pipeline;
+}
+
+PipelineRef VulkanDevice::resolveTypedComputePipeline(
+    const std::filesystem::path& source,
+    const ShaderCompileOptions& requestedOptions) {
+  ShaderCompileOptions options = requestedOptions;
+  options.stage = ShaderStage::Compute;
+  options.targetBackend = backend();
+
+  const auto key = makeTypedShaderKey(source, options, backend());
+  std::scoped_lock lock(m_typedShaderCache->mutex);
+
+  if (auto it = m_typedShaderCache->pipelines.find(key);
+      it != m_typedShaderCache->pipelines.end()) {
+    return it->second;
+  }
+
+  ShaderRef shader;
+  if (auto it = m_typedShaderCache->programs.find(key);
+      it != m_typedShaderCache->programs.end()) {
+    shader = it->second;
+  } else {
+    if (!m_typedShaderCache->compiler) {
+      m_typedShaderCache->compiler = createShaderCompiler();
+    }
+    if (!m_typedShaderCache->compiler) return {};
+
+    auto compiled =
+        m_typedShaderCache->compiler->compileHlslFile(source, options);
+    if (!compiled) return {};
+
+    shader = createShader(compiled->bytecode, ShaderStage::Compute,
+                          options.entryPoint);
+    if (!shader) return {};
+
+    m_typedShaderCache->programs.emplace(key, shader);
+  }
+
+  auto pipeline = createComputePipeline({.shader = shader});
+  if (!pipeline) return {};
+
+  m_typedShaderCache->pipelines.emplace(key, pipeline);
   return pipeline;
 }
 

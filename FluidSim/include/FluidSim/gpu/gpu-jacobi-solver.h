@@ -11,48 +11,31 @@
 #pragma once
 
 #include <FluidSim/gpu/gpu-pressure-solver.h>
+#include <FluidSim/gpu/gpu-shaders.h>
 
-namespace fluid::gpu {
+namespace fluid::gpu
+{
+    class GPUJacobiSolver final : public GPUPressureSolver
+    {
+    public:
+        GPUJacobiSolver(sim::rhi::Device& device,
+                        const PressureSystem& system,
+                        const SolverConfig& config);
 
-SHADER_PARAMS_BEGIN(JacobiIterParams)
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, pressureIn);
-    SHADER_PARAM_UAV   (sim::rhi::BufferRef, pressureOut);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, Adiag);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, Aneighbour0);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, Aneighbour1);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, Aneighbour2);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, Aneighbour3);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, Aneighbour4);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, Aneighbour5);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, rhs);
-    SHADER_PARAM_SCALAR(uint32_t, gridSizeX);
-    SHADER_PARAM_SCALAR(uint32_t, gridSizeY);
-    SHADER_PARAM_SCALAR(uint32_t, gridSizeZ);
-    SHADER_PARAM_SCALAR(uint32_t, numCells);
-SHADER_PARAMS_END();
+        void solve(sim::rhi::CommandList& cmd,
+                   const PressureSystem& system) override;
 
-class GpuJacobiSolver final : public GpuPressureSolver {
-public:
-    GpuJacobiSolver(sim::rhi::Device&         device,
-                    sim::rhi::ShaderCompiler& compiler,
-                    const PressureSystem&     system,
-                    const SolverConfig&       config,
-                    const std::filesystem::path& shaderDir);
+        void updateConfig(const SolverConfig& config) override
+        {
+            iterations_ = config.pressureMaxIters;
+        }
 
-    void solve(sim::rhi::CommandList& cmd,
-               const PressureSystem& system) override;
+    private:
+        int iterations_;
 
-    void updateConfig(const SolverConfig& config) override {
-        iterations_ = config.pressureMaxIters;
-    }
+        // Ping-pong buffer (owned by solver)
+        sim::rhi::BufferRef pressurePing_; // extra buffer; system.pressure is pong
 
-private:
-    int iterations_;
-
-    // Ping-pong buffer (owned by solver)
-    sim::rhi::BufferRef pressurePing_;  // extra buffer; system.pressure is pong
-
-    sim::rhi::PipelineRef psoJacobi_;
-};
-
+        JacobiIterCS jacobi_;
+    };
 } // namespace fluid::gpu

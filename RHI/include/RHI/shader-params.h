@@ -4,16 +4,22 @@
 // See docs/rhi-plan.md §3.4.4 / §13.1 / §13.2.
 //
 // User-facing usage:
-//   SHADER_PARAMS_BEGIN(SaxpyParams)
-//     SHADER_PARAM_UAV   (BufferRef, g_y);
-//     SHADER_PARAM_SCALAR(uint32_t,  count);
-//     SHADER_PARAM_SCALAR(float,     alpha);
+//   SHADER_PARAMS_BEGIN(PhysicsParams)
+//     SHADER_PARAM_UAV   (BufferRef,  g_positions);
+//     SHADER_PARAM_SCALAR(uint32_t,   count);
+//     SHADER_PARAM_SCALAR(float,      dt);
+//     SHADER_PARAM_SCALAR(float3,     gravity);    // vectors just work!
+//     SHADER_PARAM_VEC   (float4,     windForce);  // or use VEC for clarity
+//     SHADER_PARAM_MAT   (float4x4,   transform); // MAT for matrices
 //   SHADER_PARAMS_END();
 //
-//   SaxpyParams params;
-//   params.g_y   = y;       // looks like assignment — IS assignment, but
-//   params.count = N;       // each field is a ParamSlot<T> wrapper that
-//   params.alpha = 2.5f;    // pushes the value into centralised storage.
+//   PhysicsParams params;
+//   params.g_positions = buf;
+//   params.count       = N;
+//   params.dt          = 0.016f;
+//   params.gravity     = float3(0, -9.8f, 0);   // automatic GPU alignment
+//   params.windForce   = float4(1, 0, 0.5f, 0);
+//   params.transform   = float4x4(1.0f);        // identity matrix
 //   cmd->dispatch(pso, params, divRoundUp(N, 256), 1, 1);
 //
 // ===== Design intent (the contract this file enforces) =====================
@@ -79,6 +85,7 @@
 #include <RHI/buffer.h>
 #include <RHI/image.h>
 #include <RHI/reflection.h>
+#include <RHI/shader-types.h>
 
 #include <cstddef>
 #include <cstdint>
@@ -123,6 +130,7 @@ struct FieldInfo {
   uint32_t slotIndex;     // index into _refSlots (for Ref kinds) or byte
                           // offset into _scalarData (for Scalar)
   uint32_t valueSize;     // sizeof of the underlying T (for Scalar push consts)
+  uint32_t alignment;     // GPU alignment requirement (from gpu_align_of_v)
 };
 
 // Per-instance resolved record. Built once on first dispatch (or on
@@ -287,6 +295,10 @@ class ShaderParamsBase {
 
  protected:
   ShaderParamsBase() = default;
+  ShaderParamsBase(const ShaderParamsBase&) = delete;
+  ShaderParamsBase& operator=(const ShaderParamsBase&) = delete;
+  ShaderParamsBase(ShaderParamsBase&&) = delete;
+  ShaderParamsBase& operator=(ShaderParamsBase&&) = delete;
   ~ShaderParamsBase() = default;  // non-virtual; SHADER_PARAMS structs are
                                    // never destroyed via base pointer
 
@@ -296,16 +308,23 @@ class ShaderParamsBase {
                              uint32_t valueSize) {
     uint32_t idx = static_cast<uint32_t>(_refSlots.size());
     _refSlots.emplace_back();
-    _schema.push_back({name, k, idx, valueSize});
+    _schema.push_back({name, k, idx, valueSize, 0});
     return idx;
   }
 
   // Called from the SHADER_PARAM_* macro's DMI side effect for Scalar fields.
   // Allocates bytes in _scalarData and returns the byte offset.
-  uint32_t _registerScalarField(const char* name, uint32_t valueSize) {
-    uint32_t offset = static_cast<uint32_t>(_scalarData.size());
-    _scalarData.resize(_scalarData.size() + valueSize, std::byte{0});
-    _schema.push_back({name, detail::FieldKind::Scalar, offset, valueSize});
+  // `alignment` is the GPU-required alignment for this type (from gpu_align_of_v).
+  // The framework automatically inserts padding so push-constant layout matches
+  // the HLSL [[vk::push_constant]] struct's std430-like packing.
+  uint32_t _registerScalarField(const char* name, uint32_t valueSize,
+                                uint32_t alignment) {
+    // Align the current offset to the type's GPU alignment requirement
+    uint32_t current = static_cast<uint32_t>(_scalarData.size());
+    uint32_t offset = alignUp(current, alignment);
+    // Insert padding if needed, then allocate space for the value
+    _scalarData.resize(offset + valueSize, std::byte{0});
+    _schema.push_back({name, detail::FieldKind::Scalar, offset, valueSize, alignment});
     return offset;
   }
 };
@@ -474,6 +493,10 @@ inline void ShaderParamsBase::_resolve(const ReflectionInfo& ri) {
     e.slotIndex = f.slotIndex;
 
     if (f.kind == detail::FieldKind::Scalar) {
+      // Align pcRunning to the field's GPU alignment requirement
+      uint32_t align = f.alignment > 0 ? f.alignment : 4u;
+      pcRunning = alignUp(pcRunning, align);
+
       if (pcRunning + f.valueSize > pcBlockSize) {
         throw std::runtime_error(
             std::string("shader param '") + f.name +
@@ -575,6 +598,20 @@ inline void ShaderParamsBase::_resolve(const ReflectionInfo& ri) {
           ::sim::rhi::detail::SamplerKindOf<Type>::kind,                       \
           static_cast<uint32_t>(sizeof(Type)))}
 
+// SHADER_PARAM_SCALAR — the universal push-constant parameter macro.
+//
+// Accepts ANY trivially-copyable type: scalars (float, uint32_t, int32_t),
+// vectors (float2, float3, float4, int3, uint4, ...), and matrices
+// (float2x2, float3x3, float4x4, ...). The framework automatically handles
+// GPU alignment (std430/Vulkan push-constant packing rules):
+//   - float/int/uint (4B):  4-byte aligned
+//   - vec2 (8B):            8-byte aligned
+//   - vec3 (12B):          16-byte aligned
+//   - vec4 (16B):          16-byte aligned
+//   - matNxN:              aligned by column vector alignment
+//
+// No manual padding is needed — the RHI inserts it automatically.
+//
 #define SHADER_PARAM_SCALAR(Type, FieldName)                                   \
   static_assert(::std::is_trivially_copyable_v<Type>,                          \
                 "SHADER_PARAM_SCALAR(" #Type ", " #FieldName                   \
@@ -583,7 +620,51 @@ inline void ShaderParamsBase::_resolve(const ReflectionInfo& ri) {
       this,                                                                    \
       this->_registerScalarField(                                              \
           #FieldName,                                                          \
-          static_cast<uint32_t>(sizeof(Type)))}
+          static_cast<uint32_t>(sizeof(Type)),                                 \
+          ::sim::rhi::gpu_align_of_v<Type>)}
+
+// SHADER_PARAM_VEC — semantic alias for vector push-constant members.
+//
+// Functionally identical to SHADER_PARAM_SCALAR but additionally asserts
+// the type is a recognized GPU vector type. Use for documentation clarity.
+//
+// Supported: float2/3/4, int2/3/4, uint2/3/4, any glm::vec<L,T,Q>
+//
+#define SHADER_PARAM_VEC(Type, FieldName)                                      \
+  static_assert(::std::is_trivially_copyable_v<Type>,                          \
+                "SHADER_PARAM_VEC(" #Type ", " #FieldName                      \
+                "): Type must be trivially copyable");                         \
+  static_assert(::sim::rhi::is_gpu_vector_type_v<Type>,                        \
+                "SHADER_PARAM_VEC(" #Type ", " #FieldName                      \
+                "): Type must be a recognized GPU vector/matrix type");        \
+  ::sim::rhi::ParamSlot<Type> FieldName{                                       \
+      this,                                                                    \
+      this->_registerScalarField(                                              \
+          #FieldName,                                                          \
+          static_cast<uint32_t>(sizeof(Type)),                                 \
+          ::sim::rhi::gpu_align_of_v<Type>)}
+
+// SHADER_PARAM_MAT — semantic alias for matrix push-constant members.
+//
+// Functionally identical to SHADER_PARAM_SCALAR but additionally asserts
+// the type is a recognized GPU vector/matrix type. Use for documentation
+// clarity when passing matrices as push constants.
+//
+// Supported: float2x2, float3x3, float4x4, any glm::mat<C,R,T,Q>
+//
+#define SHADER_PARAM_MAT(Type, FieldName)                                      \
+  static_assert(::std::is_trivially_copyable_v<Type>,                          \
+                "SHADER_PARAM_MAT(" #Type ", " #FieldName                      \
+                "): Type must be trivially copyable");                         \
+  static_assert(::sim::rhi::is_gpu_vector_type_v<Type>,                        \
+                "SHADER_PARAM_MAT(" #Type ", " #FieldName                      \
+                "): Type must be a recognized GPU vector/matrix type");        \
+  ::sim::rhi::ParamSlot<Type> FieldName{                                       \
+      this,                                                                    \
+      this->_registerScalarField(                                              \
+          #FieldName,                                                          \
+          static_cast<uint32_t>(sizeof(Type)),                                 \
+          ::sim::rhi::gpu_align_of_v<Type>)}
 
 #define SHADER_PARAMS_END()                                                    \
   }

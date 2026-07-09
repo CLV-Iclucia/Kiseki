@@ -87,12 +87,6 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    auto compiler = device->createShaderCompiler();
-    if (!compiler) {
-        std::cerr << "[FluidSim] ERROR: Failed to create shader compiler (DXC unavailable?).\n";
-        return 1;
-    }
-
     std::cout << "[FluidSim] RHI device created (Vulkan).\n";
 
     // ─── 2. Scene Description ──────────────────────────────────────────────────
@@ -118,7 +112,7 @@ int main(int argc, char** argv) {
 
     // ─── 3. GPU Backend ────────────────────────────────────────────────────────
 
-    auto backend = std::make_unique<fluid::gpu::GPUFluidBackend>(*device, *compiler);
+    auto backend = std::make_unique<fluid::gpu::GPUFluidBackend>(*device);
     backend->initialize(scene);
 
     std::cout << "[FluidSim] GPU backend initialized.\n";

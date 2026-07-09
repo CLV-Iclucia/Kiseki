@@ -5,6 +5,7 @@
 #pragma once
 
 #include <FluidSim/gpu/gpu-backend.h>
+#include <FluidSim/gpu/gpu-shaders.h>
 #include <RHI/rhi.h>
 
 namespace fluid::gpu {
@@ -12,7 +13,6 @@ namespace fluid::gpu {
 class GPUReconstructor {
 public:
     explicit GPUReconstructor(sim::rhi::Device& device,
-                              sim::rhi::ShaderCompiler& compiler,
                               const GPUGridState& grid);
 
     // Called by Backend at end of step
@@ -22,9 +22,8 @@ private:
     // ===== Owned buffers =====
     sim::rhi::ImageRef sdfBuf_;  // ping-pong buffer for smooth
 
-    // ===== Pipelines =====
-    sim::rhi::PipelineRef psoReconstruct_;
-    sim::rhi::PipelineRef psoSmooth_;
+    ReconstructSdfCS reconstruct_;
+    SmoothSdfCS smooth_;
 };
 
 } // namespace fluid::gpu

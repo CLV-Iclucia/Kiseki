@@ -97,3 +97,14 @@ TEST(BufferTest, DeviceLocalViaStaging) {
   }
   readback->unmap();
 }
+
+TEST(BufferTest, CreateDeviceLocalBufferPreset) {
+  auto device = Device::create({.backend = Backend::Vulkan, .enableValidation = true});
+  if (!device) GTEST_SKIP() << "No Vulkan device.";
+
+  constexpr size_t bytes = 64 * sizeof(uint32_t);
+  auto buffer = createDeviceLocalBuffer(*device, bytes, "device-local-preset");
+
+  ASSERT_TRUE(buffer.valid());
+  EXPECT_EQ(buffer->sizeBytes(), bytes);
+}

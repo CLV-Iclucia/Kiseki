@@ -31,8 +31,7 @@ void main(uint3 tid : SV_DispatchThreadID) {
 
     // Simplified: sequential particle scan (Phase 1 approach)
     for (uint i = 0; i < pc.numParticles; ++i) {
-        uint b = i * 3;
-        float3 pos = float3(positions[b], positions[b+1], positions[b+2]);
+        float3 pos = load_float3(positions, i);
         float3 d = cellWorld - pos;
         float dist = length(d) - pc.particleRadius;
         minDist = min(minDist, dist);

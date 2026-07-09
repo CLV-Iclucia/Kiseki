@@ -1,24 +1,16 @@
-# HairSim - WIP: requires Intel MKL
-# Uncomment add_subdirectory(HairSim) in top-level CMakeLists.txt to enable
+project(HairSim LANGUAGES CXX)
 
-file(GLOB_RECURSE srcs CONFIGURE_DEPENDS src/*.cc src/*.cpp include/*.h)
-set(MKL_THREADING "tbb_thread")
-set(MKL_INTERFACE "lp64")
-
-find_package(MKL CONFIG REQUIRED PATHS $ENV{MKLROOT})
-add_library(HairSim STATIC ${srcs})
-
+add_library(HairSim STATIC
+    src/rod.cc
+    src/stretching-energy.cc
+    src/bending-energy.cc
+    src/twisting-energy.cc
+    src/implicit-integrator.cc
+)
 target_include_directories(HairSim PUBLIC include)
-target_include_directories(HairSim PUBLIC ${MKL_INCLUDE})
-target_link_libraries(HairSim PUBLIC Core Eigen3::Eigen MKL::MKL)
+target_link_libraries(HairSim PUBLIC Core Eigen3::Eigen)
+target_compile_features(HairSim PUBLIC cxx_std_20)
 
 add_executable(hair-sim apps/hair-sim-app.cc)
-target_link_libraries(hair-sim PUBLIC Core HairSim)
-
-file(GLOB_RECURSE test_srcs CONFIGURE_DEPENDS tests/*.cc)
-foreach(test_src ${test_srcs})
-    get_filename_component(test_name ${test_src} NAME_WE)
-    add_executable(${test_name} ${test_src})
-    target_link_libraries(${test_name} PUBLIC Core GTest::gtest GTest::gtest_main HairSim)
-    add_test(NAME ${test_name} COMMAND ${test_name})
-endforeach()
+target_link_libraries(hair-sim PRIVATE HairSim Renderer cxxopts)
+target_compile_features(hair-sim PRIVATE cxx_std_20)

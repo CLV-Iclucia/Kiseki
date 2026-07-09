@@ -277,6 +277,10 @@ class DxcShaderCompiler final : public ShaderCompiler {
       addArgL(L"-I");
       addArg(widenPath(dir));
     }
+#ifdef RHI_SHADER_INCLUDE_DIR
+    addArgL(L"-I");
+    addArg(widenPath(std::filesystem::path(RHI_SHADER_INCLUDE_DIR)));
+#endif
     if (!extraIncludeDir.empty()) {
       addArgL(L"-I");
       addArg(widenPath(extraIncludeDir));

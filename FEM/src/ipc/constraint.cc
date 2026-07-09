@@ -14,6 +14,7 @@
 #include <fem/ipc/gipc/pfpx.h>
 #include <fem/ipc/gipc/hessian.h>
 #include <fem/ipc/gipc/mollifier.h>
+#include <fem/shared/gipc-mollifier.h>   // C++/HLSL single-source EE mollifier
 #include <Maths/block-types.h>
 #include <glm/geometric.hpp>
 #include <cassert>
@@ -1128,6 +1129,17 @@ Real constraintPairBarrierEnergy(
     case ConstraintKind::EE: dSqr = computeEEDistanceSqr(pair, x); break;
     default: return 0.0;
   }
+  // Near-parallel edge-edge -> mollified barrier (C1-continuous). Single source
+  // of truth shared with the GPU in <fem/shared/gipc-mollifier.h>.
+  if (pair.type == ConstraintKind::EE) {
+    auto a0 = x[pair.indices[0]], a1 = x[pair.indices[1]];
+    auto b0 = x[pair.indices[2]], b1 = x[pair.indices[3]];
+    auto ra0 = X[pair.indices[0]], ra1 = X[pair.indices[1]];
+    auto rb0 = X[pair.indices[2]], rb1 = X[pair.indices[3]];
+    if (shared::shEEUsesMollifier(a0, a1, b0, b1, ra0, ra1, rb0, rb1))
+      return shared::shMollifiedEnergyEE(a0, a1, b0, b1, ra0, ra1, rb0, rb1,
+                                         barrier.dHat(), kappa);
+  }
   if (dSqr >= barrier.dHatSqr()) return 0.0;
   return kappa * barrier.energy(dSqr);
 }
@@ -1188,13 +1200,24 @@ void constraintPairBarrierGradient(
       auto a0 = x[pair.indices[0]], a1 = x[pair.indices[1]], b0 = x[pair.indices[2]], b1 = x[pair.indices[3]];
       Real dSqr = distanceSqrLineLine(a0, a1, b0, b1);
       if (dSqr >= barrier.dHatSqr()) return;
+      std::array<int, 4> idx = {pair.indices[0], pair.indices[1], pair.indices[2], pair.indices[3]};
+      // Near-parallel -> mollified branch (shared single source of truth).
+      auto ra0 = X[pair.indices[0]], ra1 = X[pair.indices[1]];
+      auto rb0 = X[pair.indices[2]], rb1 = X[pair.indices[3]];
+      if (shared::shEEUsesMollifier(a0, a1, b0, b1, ra0, ra1, rb0, rb1)) {
+        auto m = shared::shMollifiedBarrierEE(a0, a1, b0, b1, ra0, ra1, rb0, rb1,
+                                              barrier.dHat(), kappa);
+        if (!m.active) return;
+        for (int v = 0; v < 4; ++v)
+          globalGradient[idx[v]] += glm::dvec3(m.grad[v * 3], m.grad[v * 3 + 1], m.grad[v * 3 + 2]);
+        break;
+      }
       auto pfpx = computePFPx_EE(a0, a1, b0, b1, dHat);
       if (!pfpx.valid || pfpx.I5 >= 1.0) return;
       Real sqrtI5 = std::sqrt(pfpx.I5);
       Eigen::Matrix<Real, 9, 1> pk1 = pfpx.q0 * (barrier.gradCoeff(pfpx.I5) * sqrtI5);
       Eigen::Matrix<Real, 12, 1> grad = kappa * pfpx.PFPx.transpose() * pk1;
       auto lg = eigenToLocalGrad<4>(grad);
-      std::array<int, 4> idx = {pair.indices[0], pair.indices[1], pair.indices[2], pair.indices[3]};
       assembleLocalGrad<4>(globalGradient, idx, lg);
       break;
     }
@@ -1252,11 +1275,30 @@ void constraintPairBarrierHessian(
       auto a0 = x[pair.indices[0]], a1 = x[pair.indices[1]], b0 = x[pair.indices[2]], b1 = x[pair.indices[3]];
       Real dSqr = distanceSqrLineLine(a0, a1, b0, b1);
       if (dSqr >= barrier.dHatSqr()) return;
+      std::array<int, 4> idx = {pair.indices[0], pair.indices[1], pair.indices[2], pair.indices[3]};
+      // Near-parallel -> mollified branch (shared single source of truth).
+      auto ra0 = X[pair.indices[0]], ra1 = X[pair.indices[1]];
+      auto rb0 = X[pair.indices[2]], rb1 = X[pair.indices[3]];
+      if (shared::shEEUsesMollifier(a0, a1, b0, b1, ra0, ra1, rb0, rb1)) {
+        auto m = shared::shMollifiedBarrierEE(a0, a1, b0, b1, ra0, ra1, rb0, rb1,
+                                              barrier.dHat(), kappa);
+        if (!m.active) return;
+        // H_block(I,J) = Σ_k lam[k] · w[k][I]·w[k][J]ᵀ  (glm dmat3 is col-major).
+        for (int I = 0; I < 4; ++I)
+          for (int J = 0; J < 4; ++J) {
+            glm::dmat3 blk(0.0);
+            for (int k = 0; k < m.rank; ++k)
+              for (int cc = 0; cc < 3; ++cc)
+                for (int rr = 0; rr < 3; ++rr)
+                  blk[cc][rr] += m.lam[k] * m.w[k][I * 3 + rr] * m.w[k][J * 3 + cc];
+            globalHessian.addBlock(idx[I], idx[J], blk);
+          }
+        break;
+      }
       auto pfpx = computePFPx_EE(a0, a1, b0, b1, dHat);
       if (!pfpx.valid || pfpx.I5 >= 1.0) return;
       Real lam = kappa * barrier.clampedLambda0(pfpx.I5);
       auto localH = sandwichRank1<4, 9>(pfpx.PFPx, pfpx.q0, lam);
-      std::array<int, 4> idx = {pair.indices[0], pair.indices[1], pair.indices[2], pair.indices[3]};
       assembleLocalHessian<4>(globalHessian, idx, localH);
       break;
     }

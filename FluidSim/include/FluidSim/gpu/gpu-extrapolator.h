@@ -5,6 +5,7 @@
 // ============================================================================
 #pragma once
 
+#include <FluidSim/gpu/gpu-shaders.h>
 #include <FluidSim/gpu/gpu-solver.h>
 #include <RHI/rhi.h>
 
@@ -18,7 +19,7 @@ public:
 
 private:
     int iters_;
-    sim::rhi::PipelineRef psoExtrapolate_;
+    ExtrapolateCS extrapolate_;
 };
 
 } // namespace fluid::gpu

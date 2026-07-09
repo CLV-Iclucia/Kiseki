@@ -23,6 +23,7 @@
 #include <RHI/shader-compiler.h>
 
 #include <filesystem>
+#include <string>
 #include <string_view>
 
 namespace sim::rhi {
@@ -46,21 +47,33 @@ inline PipelineRef compileComputePipeline(
     Device&                      device,
     ShaderCompiler&              compiler,
     const std::filesystem::path& path,
-    std::string_view             entry = "main")
+    ShaderCompileOptions          options)
 {
-    ShaderCompileOptions opts;
-    opts.entryPoint = std::string(entry);
-    opts.stage      = ShaderStage::Compute;
-    // targetBackend intentionally not set: the compiler instance default
-    // (bound via Device::createShaderCompiler()) is used automatically.
+    // A pipeline belongs to `device`, so selecting its bytecode backend
+    // independently is always an error. Standalone compilation can still
+    // select a backend through ShaderCompiler::compileHlsl* directly.
+    options.stage = ShaderStage::Compute;
+    options.targetBackend = device.backend();
 
-    auto compiled = compiler.compileHlslFile(path, opts);
+    auto compiled = compiler.compileHlslFile(path, options);
     if (!compiled) return {};
 
-    auto shader = device.createShader(compiled->bytecode, ShaderStage::Compute, entry);
+    auto shader = device.createShader(
+        compiled->bytecode, ShaderStage::Compute, options.entryPoint);
     if (!shader.valid()) return {};
 
     return device.createComputePipeline({.shader = shader});
+}
+
+inline PipelineRef compileComputePipeline(
+    Device&                      device,
+    ShaderCompiler&              compiler,
+    const std::filesystem::path& path,
+    std::string_view             entry = "main")
+{
+    ShaderCompileOptions options;
+    options.entryPoint = std::string(entry);
+    return compileComputePipeline(device, compiler, path, options);
 }
 
 } // namespace sim::rhi

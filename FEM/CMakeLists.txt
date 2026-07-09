@@ -1,8 +1,21 @@
 project(FEM LANGUAGES CXX)
 
-file(GLOB_RECURSE srcs CONFIGURE_DEPENDS src/*.cc src/*.cpp include/*.h)
-add_library(FEM STATIC ${srcs})
-target_link_libraries(FEM PUBLIC Maths Core Spatify Deform)
+file(GLOB_RECURSE cpu_srcs CONFIGURE_DEPENDS src/*.cc src/*.cpp include/*.h)
+list(FILTER cpu_srcs EXCLUDE REGEX "/gpu/")
+file(GLOB_RECURSE gpu_srcs CONFIGURE_DEPENDS src/gpu/*.cc src/gpu/*.cpp include/fem/gpu/*.h)
+
+if(SIMCRAFT_BUILD_RHI)
+    add_library(FEM STATIC ${cpu_srcs} ${gpu_srcs})
+    target_link_libraries(FEM PUBLIC Maths Core Spatify Deform RHI RPK)
+    target_compile_definitions(FEM PUBLIC FEM_GPU_ENABLED)
+    target_compile_definitions(FEM PRIVATE FEM_SHADER_DIR="${CMAKE_CURRENT_SOURCE_DIR}/shaders")
+    # Lets GPU modules add FEM/include to the shader compiler's -I so kernels can
+    # #include <fem/shared/*.h> (C++/HLSL cross-language headers).
+    target_compile_definitions(FEM PRIVATE FEM_INCLUDE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/include")
+else()
+    add_library(FEM STATIC ${cpu_srcs})
+    target_link_libraries(FEM PUBLIC Maths Core Spatify Deform)
+endif()
 target_include_directories(FEM PUBLIC include)
 
 set(FEM_ASSETS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/assets)

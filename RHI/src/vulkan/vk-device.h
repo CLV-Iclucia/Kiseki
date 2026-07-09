@@ -88,6 +88,8 @@ class VulkanDevice final : public Device {
   }
 
  private:
+  struct TypedShaderCache;
+
   void initInstance(bool enableValidation);
   void initPhysicalDeviceAndDevice();
   void initVma();
@@ -96,6 +98,10 @@ class VulkanDevice final : public Device {
 
   // Detail used by submit().
   VkQueue resolveQueueForCommandList(CommandList& cmd) const;
+
+  PipelineRef resolveTypedComputePipeline(
+      const std::filesystem::path& source,
+      const ShaderCompileOptions& options) override;
 
   // ---- vk-bootstrap state (kept around for clean teardown) -------------
   vkb::Instance m_vkbInstance{};
@@ -111,6 +117,7 @@ class VulkanDevice final : public Device {
 
   std::unique_ptr<DescriptorSetAllocator> m_descriptorAlloc;
   std::unique_ptr<VulkanPipelineCache> m_pipelineCache;
+  std::unique_ptr<TypedShaderCache> m_typedShaderCache;
 
   bool m_validationEnabled = false;
   bool m_frameLoopActive = false;  // R0–R2: never set

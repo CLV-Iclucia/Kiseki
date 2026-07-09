@@ -7,6 +7,7 @@
 #include <FluidSim/fluid-backend.h>
 #include <FluidSim/fluid-types.h>
 #include <FluidSim/gpu/gpu-particle.h>
+#include <FluidSim/gpu/gpu-shaders.h>
 #include <RHI/rhi.h>
 #include <memory>
 
@@ -44,8 +45,7 @@ class GPUReconstructor;
 
 class GPUFluidBackend : public FluidBackend {
 public:
-    explicit GPUFluidBackend(sim::rhi::Device& device,
-                             sim::rhi::ShaderCompiler& compiler);
+    explicit GPUFluidBackend(sim::rhi::Device& device);
     ~GPUFluidBackend() override;
 
     // ---- FluidBackend interface ----
@@ -62,8 +62,7 @@ public:
     [[nodiscard]] sim::rhi::ImageRef  colliderSdfImage() const { return grid_.colliderSdfImg; }
 
 private:
-    sim::rhi::Device&          device_;
-    sim::rhi::ShaderCompiler&  compiler_;
+    sim::rhi::Device& device_;
 
     // ===== Shared state =====
     GPUGridState grid_;
@@ -73,15 +72,14 @@ private:
     std::unique_ptr<GPUProjector>     projector_;
     std::unique_ptr<GPUReconstructor> reconstructor_;
 
-    // ===== Boundary pipelines =====
-    sim::rhi::PipelineRef psoDirichlet_;
-    sim::rhi::PipelineRef psoExtrapolate_;
-    sim::rhi::PipelineRef psoBodyForce_;
-    sim::rhi::PipelineRef psoCollider_;
+    DirichletCS dirichlet_;
+    ExtrapolateCS extrapolate_;
+    BodyForceCS bodyForce_;
+    ColliderCS collider_;
 
     // ===== CFL reduction =====
-    sim::rhi::PipelineRef psoCflReduce_;
-    sim::rhi::PipelineRef psoCflReduceFinal_;
+    CflReduceCS cflReduce_;
+    CflReduceFinalCS cflReduceFinal_;
     sim::rhi::BufferRef   cflPartialBuf_;
     sim::rhi::BufferRef   cflResultBuf_;       // 1 float on device
     sim::rhi::BufferRef   cflReadbackBuf_;     // 1 float, host-visible
@@ -96,7 +94,6 @@ private:
 
     // ===== Internal methods =====
     void createSharedBuffers(const FluidScene& scene);
-    void createBoundaryPipelines();
     void uploadParticles(const FluidScene& scene);
     void uploadColliderToImage(const Mesh& mesh);
     void computeCFL();

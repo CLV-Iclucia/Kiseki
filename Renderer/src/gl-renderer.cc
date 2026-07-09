@@ -418,8 +418,58 @@ void GLRenderer::drawMesh(const MeshProxy& mesh) {
 }
 
 void GLRenderer::drawWireframe(const WireframeProxy& wf) {
-    // Simple wireframe drawing - would need implementation
-    // For now, just draw lines
+    if (wf.positions.empty() || wf.edges.empty() || !m_wireShader) return;
+
+    auto it = m_meshCache.find(wf.name);
+    bool needCreate = (it == m_meshCache.end());
+
+    GLMeshState state{};
+    if (!needCreate) {
+        state = it->second;
+        const auto indexCount = static_cast<int>(wf.edges.size() * 2);
+        if (state.vertexCount != wf.positions.size() ||
+            state.indexCount != indexCount) {
+            glDeleteVertexArrays(1, &state.vao);
+            glDeleteBuffers(1, &state.vbo);
+            glDeleteBuffers(1, &state.ebo);
+            needCreate = true;
+        }
+    }
+
+    if (needCreate) {
+        glGenVertexArrays(1, &state.vao);
+        glGenBuffers(1, &state.vbo);
+        glGenBuffers(1, &state.ebo);
+        state.vertexCount = wf.positions.size();
+    }
+    state.indexCount = static_cast<int>(wf.edges.size() * 2);
+
+    glBindVertexArray(state.vao);
+
+    glBindBuffer(GL_ARRAY_BUFFER, state.vbo);
+    glBufferData(GL_ARRAY_BUFFER,
+                 static_cast<GLsizeiptr>(wf.positions.size() * sizeof(core::Vec3f)),
+                 wf.positions.data(), GL_DYNAMIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(core::Vec3f), nullptr);
+    glEnableVertexAttribArray(0);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, state.ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+                 static_cast<GLsizeiptr>(wf.edges.size() * sizeof(core::Vec2u)),
+                 wf.edges.data(), GL_DYNAMIC_DRAW);
+
+    glBindVertexArray(0);
+    m_meshCache[wf.name] = state;
+
+    glUseProgram(m_wireShader);
+    glUniform3fv(glGetUniformLocation(m_wireShader, "wireColor"), 1,
+                 glm::value_ptr(wf.color));
+
+    glLineWidth(2.0f);
+    glBindVertexArray(state.vao);
+    glDrawElements(GL_LINES, state.indexCount, GL_UNSIGNED_INT, nullptr);
+    glBindVertexArray(0);
+    glLineWidth(1.0f);
 }
 
 void GLRenderer::drawParticles(const ParticleProxy& particles) {

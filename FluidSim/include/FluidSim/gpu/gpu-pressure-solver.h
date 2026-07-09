@@ -40,9 +40,9 @@ struct PressureSystem {
 // ============================================================================
 // Abstract solver interface
 // ============================================================================
-class GpuPressureSolver {
+class GPUPressureSolver {
 public:
-    virtual ~GpuPressureSolver() = default;
+    virtual ~GPUPressureSolver() = default;
 
     // Solve Ap = b, writing result into system.pressure.
     // The system matrices are already filled by GPUProjector::buildWeightsAndSystem.
@@ -55,12 +55,10 @@ public:
     // Factory: create solver based on SolverConfig::preconditioner.
     // Jacobi → GpuJacobiSolver
     // None / Jacobi (as PCG preconditioner) → GpuPCGSolver
-    static std::unique_ptr<GpuPressureSolver> create(
-        sim::rhi::Device&         device,
-        sim::rhi::ShaderCompiler& compiler,
-        const PressureSystem&     system,
-        const SolverConfig&       config,
-        const std::filesystem::path& shaderDir);
+    static std::unique_ptr<GPUPressureSolver> create(
+        sim::rhi::Device& device,
+        const PressureSystem& system,
+        const SolverConfig& config);
 };
 
 } // namespace fluid::gpu

@@ -36,6 +36,10 @@ endif()
 
 add_library(RHI STATIC ${rhi_common} ${rhi_vulkan} ${rhi_headers})
 
+target_compile_definitions(RHI PRIVATE
+    RHI_SHADER_INCLUDE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/shaders"
+)
+
 target_include_directories(RHI
     PUBLIC  include/
     PRIVATE src/

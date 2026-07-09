@@ -3,28 +3,16 @@
 // ============================================================================
 
 #include <FluidSim/gpu/gpu-extrapolator.h>
-#include <RHI/shader-utils.h>
-#include <filesystem>
 
 namespace fluid::gpu {
 
 using namespace sim::rhi;
-namespace fs = std::filesystem;
-
-static fs::path shaderPath(const std::string& name) {
-#ifdef FLUIDSIM_SHADER_DIR
-    return fs::path(FLUIDSIM_SHADER_DIR) / name;
-#else
-    return fs::path(name);
-#endif
-}
 
 GPUExtrapolatorSolver::GPUExtrapolatorSolver(GPUFluidContext& ctx, int iters)
-    : GPUModularSolver("gpu_extrapolator"), iters_(iters)
-{
-    psoExtrapolate_ = compileComputePipeline(
-        ctx.device(), ctx.compiler(), shaderPath("extrapolate.hlsl"), "CSMain");
-}
+    : GPUModularSolver("gpu_extrapolator"),
+      iters_(iters),
+      extrapolate_(ctx.device())
+{}
 
 void GPUExtrapolatorSolver::solve(GPUFluidContext& ctx, Real dt) {
     (void)dt;

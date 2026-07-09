@@ -28,7 +28,7 @@
 #pragma once
 
 #include <Core/properties.h>
-#include <RHI/backend.h>
+#include <RHI/shader-compile-options.h>
 #include <RHI/shader.h>
 
 #include <cstddef>
@@ -37,37 +37,9 @@
 #include <optional>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 namespace sim::rhi {
-
-struct ShaderCompileOptions {
-  std::string entryPoint = "main";
-  ShaderStage stage = ShaderStage::Compute;
-
-  // Optional per-call override. When unset, ShaderCompiler::create(Backend)
-  // provides the default codegen target for the compiler instance. Leaving both
-  // unset is an error.
-  std::optional<Backend> targetBackend;
-
-  // Preprocessor defines: each pair is (name, value). Empty value emits `-D NAME`.
-  std::vector<std::pair<std::string, std::string>> defines;
-
-  // Additional include search paths (`-I`).
-  std::vector<std::filesystem::path> includeDirs;
-
-  // When true, populate CompiledShader::disassembly with textual disassembly.
-  // R3 limitation: only DXIL output (Backend::Dx12) gets a populated
-  // disassembly. Feeding SPIR-V to IDxcCompiler3::Disassemble fails
-  // (E_FAIL); SPIR-V disassembly would need SPIRV-Tools, which isn't pulled
-  // in until R4. For Vulkan output the field is left empty and an info-level
-  // log is emitted. Adds one extra DXC call when set; disabled by default.
-  bool generateDisassembly = false;
-
-  // -Od -Zi (preserve debug info, disable optimization). Otherwise -O3.
-  bool enableDebugInfo = false;
-};
 
 struct CompiledShader {
   // Final bytecode (SPIR-V if Backend::Vulkan, DXIL if Backend::Dx12).

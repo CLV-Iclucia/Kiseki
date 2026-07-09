@@ -2,6 +2,8 @@
 // fluid-common.hlsl — GPU FluidSim shared types & utilities (float32)
 // ============================================================================
 
+#include <RHI/structured-buffer-access.hlsli>
+
 // ---- Particle SOA helpers ----
 // Particles are stored as SOA (Structure of Arrays):
 //   positions:  StructuredBuffer<float> (tightly-packed, 3 floats per particle)
