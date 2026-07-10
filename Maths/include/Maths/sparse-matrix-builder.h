@@ -2,14 +2,14 @@
 // Created by creeper on 5/23/24.
 //
 
-#ifndef SIMCRAFT_MATHS_INCLUDE_MATHS_SPARSE_MATRIX_BUILDER_H_
-#define SIMCRAFT_MATHS_INCLUDE_MATHS_SPARSE_MATRIX_BUILDER_H_
+#ifndef KISEKI_MATHS_INCLUDE_MATHS_SPARSE_MATRIX_BUILDER_H_
+#define KISEKI_MATHS_INCLUDE_MATHS_SPARSE_MATRIX_BUILDER_H_
 #include <Maths/types.h>
 #include <iostream>
 #include <vector>
 #include <concepts>
 
-namespace sim::maths {
+namespace ksk::maths {
 template<typename T>
 concept IndexType = std::is_convertible_v<T, int32_t>;
 
@@ -172,4 +172,4 @@ struct SparseMatrixBuilder {
     uint64_t tag{};
 };
 }
-#endif //SIMCRAFT_MATHS_INCLUDE_MATHS_SPARSE_MATRIX_BUILDER_H_
+#endif //KISEKI_MATHS_INCLUDE_MATHS_SPARSE_MATRIX_BUILDER_H_

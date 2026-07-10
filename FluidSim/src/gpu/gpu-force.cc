@@ -6,7 +6,7 @@
 
 namespace fluid::gpu {
 
-using namespace sim::rhi;
+using namespace ksk::rhi;
 
 GPUForceSolver::GPUForceSolver(GPUFluidContext& ctx, GPUForceConfig config)
     : GPUModularSolver("gpu_force"),

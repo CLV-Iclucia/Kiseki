@@ -6,7 +6,7 @@
 #include <Core/deserializer.h>
 #include <Eigen/Eigen>
 #include <Eigen/Sparse>
-namespace sim::maths {
+namespace ksk::maths {
 using Eigen::Dynamic;
 template <typename T, int Rows, int Cols>
 using Matrix = Eigen::Matrix<T, Rows, Cols>;
@@ -23,7 +23,7 @@ using Real = double;
 
 
 template <typename T, int N>
-struct sim::core::custom_deserializer<sim::maths::Vector<T, N>> {
+struct ksk::core::custom_deserializer<ksk::maths::Vector<T, N>> {
   static maths::Vector<T, N> do_deserialize(const JsonNode &node) {
     if (!node.is<JsonList>())
       throw std::runtime_error("Expected a list");

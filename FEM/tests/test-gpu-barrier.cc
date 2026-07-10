@@ -23,9 +23,9 @@
 #include <random>
 #include <vector>
 
-using namespace sim::rhi;
-using namespace sim::fem::gpu;
-namespace ipc = sim::fem::ipc;
+using namespace ksk::rhi;
+using namespace ksk::fem::gpu;
+namespace ipc = ksk::fem::ipc;
 
 namespace {
 
@@ -123,10 +123,10 @@ TEST_F(BarrierFixture, MatchesCpuUnifiedBarrier) {
 
     // ---- CPU reference ----
     ipc::gipc::Barrier barrier(dHat);
-    sim::maths::BlockVector<3> xbv(V), Xbv(V), gradCpu(V);
+    ksk::maths::BlockVector<3> xbv(V), Xbv(V), gradCpu(V);
     for (uint32_t i = 0; i < V; ++i) xbv[i] = glm::dvec3(x[i*3], x[i*3+1], x[i*3+2]);
     gradCpu.setZero();
-    sim::maths::BlockSparseMatrix<3> Hcpu;
+    ksk::maths::BlockSparseMatrix<3> Hcpu;
     for (const auto& cp : pairsCpu) {
         ipc::constraintPairBarrierGradient(cp, xbv, Xbv, gradCpu, barrier, kappa);
         ipc::constraintPairBarrierHessian(cp, xbv, Xbv, Hcpu, barrier, kappa);
@@ -235,13 +235,13 @@ TEST_F(BarrierFixture, MollifiedEEMatchesCpu) {
 
     // ---- CPU reference (rest = current; mollifier active via shared header) ----
     ipc::gipc::Barrier barrier(dHat);
-    sim::maths::BlockVector<3> xbv(V), Xbv(V), gradCpu(V);
+    ksk::maths::BlockVector<3> xbv(V), Xbv(V), gradCpu(V);
     for (uint32_t i = 0; i < V; ++i) {
         xbv[i] = glm::dvec3(x[i*3], x[i*3+1], x[i*3+2]);
         Xbv[i] = xbv[i];
     }
     gradCpu.setZero();
-    sim::maths::BlockSparseMatrix<3> Hcpu;
+    ksk::maths::BlockSparseMatrix<3> Hcpu;
     for (int i = 0; i < nEE; ++i) {
         ipc::ConstraintPair cp;
         cp.type = ipc::ConstraintKind::EE;

@@ -7,7 +7,7 @@ if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
 endif()
 
 set(CMAKE_CXX_STANDARD 20)
-project(SimCraft)
+project(Kiseki)
 
 if (MSVC)
     add_compile_options(/Zc:preprocessor)
@@ -17,9 +17,9 @@ find_package(TBB REQUIRED)
 find_package(GTest REQUIRED)
 find_package(Eigen3 REQUIRED)
 
-# Tracy profiler — enable with -DSIMCRAFT_PROFILE=ON
-option(SIMCRAFT_PROFILE "Enable Tracy profiler instrumentation" ON)
-if(SIMCRAFT_PROFILE)
+# Tracy profiler — enable with -DKISEKI_PROFILE=ON
+option(KISEKI_PROFILE "Enable Tracy profiler instrumentation" ON)
+if(KISEKI_PROFILE)
   find_package(Tracy CONFIG REQUIRED)
   add_compile_definitions(TRACY_ENABLE)
   message(STATUS "Tracy profiling ENABLED")
@@ -39,10 +39,14 @@ add_subdirectory(Spatify)
 add_subdirectory(Maths)
 add_subdirectory(Deform)
 
+# Kiseki-level runtime layer. Keep it before physics modules so FEM/HairSim
+# adapters can depend on Kiseki::Runtime without creating reverse dependencies.
+add_subdirectory(Runtime)
+
 # RHI (Vulkan) module — gated behind option so users without Vulkan SDK
 # can still build the rest of the project.
-option(SIMCRAFT_BUILD_RHI "Build RHI module" ON)
-if(SIMCRAFT_BUILD_RHI)
+option(KISEKI_BUILD_RHI "Build RHI module" ON)
+if(KISEKI_BUILD_RHI)
   add_subdirectory(RHI)
   add_subdirectory(RPK)
 endif()
@@ -61,7 +65,7 @@ add_subdirectory(HairSim)
 add_subdirectory(Apps)
 
 # Python bindings
-option(SIMCRAFT_BUILD_PYTHON "Build Python bindings" ON)
-if(SIMCRAFT_BUILD_PYTHON)
+option(KISEKI_BUILD_PYTHON "Build Python bindings" ON)
+if(KISEKI_BUILD_PYTHON)
   add_subdirectory(python)
 endif()

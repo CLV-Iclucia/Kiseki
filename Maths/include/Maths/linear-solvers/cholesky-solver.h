@@ -6,7 +6,7 @@
 
 #include <Maths/linear-solver.h>
 
-namespace sim::maths {
+namespace ksk::maths {
 struct SparseCholeskySolver final : LinearSolver {
   Vector<Real, Dynamic> solve(const SparseMatrix<Real> &A, const Vector<Real, Dynamic> &b) override {
     solver.compute(A);

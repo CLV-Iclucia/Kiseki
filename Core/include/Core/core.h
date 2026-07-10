@@ -8,7 +8,7 @@
 #ifdef _WIN32
 #define NOMINMAX
 #endif
-namespace sim::core {
+namespace ksk::core {
 using Real = double;
 using Index = int;
 using Vec2i = glm::ivec2;
@@ -60,4 +60,4 @@ enum Device {
   CPU = 0,
   GPU = 1,
 };
-} // namespace sim::core
+} // namespace ksk::core

@@ -14,7 +14,7 @@
 #include <cstdint>
 #include <string>
 
-namespace sim::rhi {
+namespace ksk::rhi {
 
 struct ImageDesc {
   enum class Dim : uint32_t { D1, D2, D3 };
@@ -42,7 +42,7 @@ struct ImageDesc {
 };
 
 // ---- Abstract Image --------------------------------------------------------
-class Image : public sim::core::NonCopyable {
+class Image : public ksk::core::NonCopyable {
  public:
   void addRef() noexcept { m_rc.fetch_add(1, std::memory_order_relaxed); }
   void release() noexcept {
@@ -72,7 +72,7 @@ struct SamplerDesc {
   AddressMode addressMode = AddressMode::ClampToEdge;
 };
 
-class Sampler : public sim::core::NonCopyable {
+class Sampler : public ksk::core::NonCopyable {
  public:
   void addRef() noexcept { m_rc.fetch_add(1, std::memory_order_relaxed); }
   void release() noexcept {
@@ -101,4 +101,4 @@ struct ImageBinding {
   SamplerRef sampler;  // empty => pure storage / load-store
 };
 
-}  // namespace sim::rhi
+}  // namespace ksk::rhi

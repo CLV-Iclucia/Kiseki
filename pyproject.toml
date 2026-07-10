@@ -3,21 +3,21 @@ requires = ["scikit-build-core>=0.10", "pybind11"]
 build-backend = "scikit_build_core.build"
 
 [project]
-name = "simcraft"
+name = "kiseki"
 version = "0.1.0"
-description = "SimCraft physics simulation framework - Python bindings"
+description = "Kiseki physics simulation framework - Python bindings"
 requires-python = ">=3.8"
 dependencies = ["numpy"]
 
 [tool.scikit-build]
 # Only build the Python extension target
-cmake.targets = ["simcraft"]
+cmake.targets = ["kiseki"]
 cmake.build-type = "Release"
 cmake.verbose = true
 
 # Instruct scikit-build-core to look in the python/ subdirectory for the install target
 # The root CMakeLists.txt includes python/ via add_subdirectory
-cmake.args = ["-DSIMCRAFT_BUILD_PYTHON=ON"]
+cmake.args = ["-DKISEKI_BUILD_PYTHON=ON"]
 
-# Wheel will contain just simcraft.pyd at the root
+# Wheel will contain just kiseki.pyd at the root
 wheel.install-dir = "."

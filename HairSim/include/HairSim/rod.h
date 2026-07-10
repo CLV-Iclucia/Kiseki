@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-namespace sim::hairsim {
+namespace ksk::hairsim {
 
 using RodBlock = glm::dvec4;
 
@@ -90,4 +90,4 @@ class Rod {
   RodMaterial material_;
 };
 
-}  // namespace sim::hairsim
+}  // namespace ksk::hairsim

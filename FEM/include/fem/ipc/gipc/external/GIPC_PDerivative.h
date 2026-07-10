@@ -12,7 +12,7 @@
 #include <cmath>
 #include <glm/glm.hpp>
 
-namespace sim::fem::ipc::gipc::external
+namespace ksk::fem::ipc::gipc::external
 {
 
     struct Vector4 {

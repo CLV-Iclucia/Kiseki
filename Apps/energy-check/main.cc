@@ -38,9 +38,9 @@
 #include <limits>
 #include <cmath>
 
-using namespace sim;
-using namespace sim::fem;
-using namespace sim::deform;
+using namespace ksk;
+using namespace ksk::fem;
+using namespace ksk::deform;
 
 // ─── Main ──────────────────────────────────────────────────────────────────────
 

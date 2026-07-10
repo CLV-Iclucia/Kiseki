@@ -1,5 +1,5 @@
-#ifndef SIMCRAFT_RHI_STRUCTURED_BUFFER_ACCESS_HLSLI
-#define SIMCRAFT_RHI_STRUCTURED_BUFFER_ACCESS_HLSLI
+#ifndef KISEKI_RHI_STRUCTURED_BUFFER_ACCESS_HLSLI
+#define KISEKI_RHI_STRUCTURED_BUFFER_ACCESS_HLSLI
 
 float3 load_float3(StructuredBuffer<float> src, uint index) {
     const uint base = index * 3u;

@@ -7,7 +7,7 @@
 #include <fem/integrator.h>
 #include <fem/system.h>
 
-namespace sim::fem {
+namespace ksk::fem {
 struct FEMSimulation final : public core::Animation {
   FEMSimulation() = default;
   void step(core::Frame &frame) override {

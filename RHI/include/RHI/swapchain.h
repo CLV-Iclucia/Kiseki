@@ -26,7 +26,7 @@
 #include <cstdint>
 #include <functional>
 
-namespace sim::rhi {
+namespace ksk::rhi {
 
 // ---- Present mode ----------------------------------------------------------
 enum class PresentMode : uint32_t {
@@ -88,7 +88,7 @@ struct SwapchainDesc {
 //
 // See docs/rhi-r7-swapchain-plan.md §2 for the full pattern.
 //
-class Swapchain : public sim::core::NonCopyable {
+class Swapchain : public ksk::core::NonCopyable {
  public:
   virtual ~Swapchain() = default;
 
@@ -137,4 +137,4 @@ class Swapchain : public sim::core::NonCopyable {
   Swapchain() = default;
 };
 
-}  // namespace sim::rhi
+}  // namespace ksk::rhi

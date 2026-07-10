@@ -4,7 +4,7 @@
 #include <fem/integrator-factory.h>
 #include <spdlog/spdlog.h>
 
-namespace sim::fem {
+namespace ksk::fem {
 
 IntegratorFactory& IntegratorFactory::instance() {
   static IntegratorFactory instance;

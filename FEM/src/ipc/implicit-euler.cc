@@ -5,7 +5,7 @@
 #include <fem/ipc/implicit-euler.h>
 #include <fem/system.h>
 
-namespace sim::fem {
+namespace ksk::fem {
 
 Real IpcImplicitEuler::incrementalPotentialKinematicEnergy(const maths::BlockVector<3> &x_t, Real h) const {
   // x_hat = x_t + h*v + h²*a

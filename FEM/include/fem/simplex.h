@@ -5,7 +5,7 @@
 #pragma once
 #include <glm/glm.hpp>
 
-namespace sim::fem {
+namespace ksk::fem {
 using Triangle = glm::ivec3;
 using Edge = glm::ivec2;
 using Tetrahedron = glm::ivec4;

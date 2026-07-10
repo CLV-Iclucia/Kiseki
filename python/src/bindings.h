@@ -1,4 +1,4 @@
-// Shared Python wrapper types for SimCraft bindings
+// Shared Python wrapper types for Kiseki bindings
 // All binding files include this header to share type definitions.
 #pragma once
 
@@ -26,8 +26,8 @@
 #include <spdlog/spdlog.h>
 
 namespace py = pybind11;
-using namespace sim::fem;
-using namespace sim::deform;
+using namespace ksk::fem;
+using namespace ksk::deform;
 
 // ─── Python wrapper types ───────────────────────────────────────────────
 
@@ -184,11 +184,11 @@ struct PySimulation {
 
     // 1. Initialize system (populates system.x with vertex positions)
     py_system->system.init();
-    spdlog::info("[simcraft] system.init() done, x has {} blocks", py_system->system.x.numBlocks());
+    spdlog::info("[kiseki] system.init() done, x has {} blocks", py_system->system.x.numBlocks());
 
     // 2. Apply deferred constraints (pin_vertices needs system.x to be populated)
     if (!py_system->pending_pin_vertices.empty()) {
-      spdlog::info("[simcraft] applying {} pending pin_vertices", py_system->pending_pin_vertices.size());
+      spdlog::info("[kiseki] applying {} pending pin_vertices", py_system->pending_pin_vertices.size());
       py_system->system.constraints().pinVertices(
           py_system->pending_pin_vertices, py_system->system.x);
       py_system->pending_pin_vertices.clear();
@@ -201,12 +201,12 @@ struct PySimulation {
 
     // 3. Build constraint index (free/constrained DOF masks)
     if (!py_system->system.constraints().allConstraints().empty()) {
-      spdlog::info("[simcraft] building constraints for {} blocks", py_system->system.x.numBlocks());
+      spdlog::info("[kiseki] building constraints for {} blocks", py_system->system.x.numBlocks());
       py_system->system.constraints().build(py_system->system.x.numBlocks());
     }
 
     // 4. Create IPC integrator with solver
-    spdlog::info("[simcraft] creating IPC integrator...");
+    spdlog::info("[kiseki] creating IPC integrator...");
     IpcIntegrator::Config cfg;
     cfg.dHat = py_integrator->dHat;
     cfg.eps = py_integrator->eps;
@@ -214,12 +214,12 @@ struct PySimulation {
     cfg.stepSizeScale = py_integrator->stepSizeScale;
 
     auto ipc = std::make_unique<IpcImplicitEuler>(py_system->system, cfg);
-    spdlog::info("[simcraft] creating BlockPCG solver...");
-    ipc->solver = std::make_unique<sim::maths::BlockPCGSolver>(1000, 1e-6);
+    spdlog::info("[kiseki] creating BlockPCG solver...");
+    ipc->solver = std::make_unique<ksk::maths::BlockPCGSolver>(1000, 1e-6);
     integrator = std::move(ipc);
 
     initialized = true;
-    spdlog::info("[simcraft] initialization complete");
+    spdlog::info("[kiseki] initialization complete");
   }
 
   void lock_all() {
@@ -231,9 +231,9 @@ struct PySimulation {
   void do_step(Real dt) {
     ensure_initialized();
     lock_all();
-    spdlog::info("[simcraft] calling integrator->step(dt={})...", dt);
+    spdlog::info("[kiseki] calling integrator->step(dt={})...", dt);
     integrator->step(dt);
-    spdlog::info("[simcraft] step complete");
+    spdlog::info("[kiseki] step complete");
     // Note: IpcIntegrator::step() already calls advanceTime(dt) internally
     steps_completed++;
   }

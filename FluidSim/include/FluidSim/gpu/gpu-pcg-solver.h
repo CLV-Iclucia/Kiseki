@@ -13,11 +13,11 @@ namespace fluid::gpu {
 // ============================================================================
 class GpuPCGSolver final : public GPUPressureSolver {
 public:
-    GpuPCGSolver(sim::rhi::Device& device,
+    GpuPCGSolver(ksk::rhi::Device& device,
                  const PressureSystem& system,
                  const SolverConfig& config);
 
-    void solve(sim::rhi::CommandList& cmd,
+    void solve(ksk::rhi::CommandList& cmd,
                const PressureSystem& system) override;
 
     void updateConfig(const SolverConfig& config) override {
@@ -28,14 +28,14 @@ private:
     int maxIters_;
 
     // CG working vectors
-    sim::rhi::BufferRef cgR_, cgZ_, cgS_;
+    ksk::rhi::BufferRef cgR_, cgZ_, cgS_;
 
     // Scalar buffers for alpha/beta (GPU-side, no CPU readback)
-    sim::rhi::BufferRef reduceBuf_;       // partial sums (one per workgroup)
-    sim::rhi::BufferRef sigmaScalar_;     // σ = dot(z, r)
-    sim::rhi::BufferRef dotSZScalar_;     // dot(s, z) → denominator for α
-    sim::rhi::BufferRef alphaScalar_;     // α = σ / dot(s,z)
-    sim::rhi::BufferRef sigmaNewScalar_;  // σ_new for β
+    ksk::rhi::BufferRef reduceBuf_;       // partial sums (one per workgroup)
+    ksk::rhi::BufferRef sigmaScalar_;     // σ = dot(z, r)
+    ksk::rhi::BufferRef dotSZScalar_;     // dot(s, z) → denominator for α
+    ksk::rhi::BufferRef alphaScalar_;     // α = σ / dot(s,z)
+    ksk::rhi::BufferRef sigmaNewScalar_;  // σ_new for β
 
     PCGSpMVCS spmv_;
     PCGDotCS dotProduct_;

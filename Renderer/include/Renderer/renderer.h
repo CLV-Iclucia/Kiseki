@@ -6,12 +6,12 @@
 #include <functional>
 #include <atomic>
 
-namespace sim::renderer {
+namespace ksk::renderer {
 
 struct RendererConfig {
   int windowWidth = 1280;
   int windowHeight = 720;
-  std::string windowTitle = "SimCraft";
+  std::string windowTitle = "Kiseki";
   bool vsync = true;
   bool headless = false;
 };
@@ -90,4 +90,4 @@ private:
 /// 工厂函数
 std::unique_ptr<Renderer> createRenderer(const RendererConfig& config = {});
 
-} // namespace sim::renderer
+} // namespace ksk::renderer

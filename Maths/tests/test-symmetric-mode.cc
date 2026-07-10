@@ -3,7 +3,7 @@
 #include <Maths/block-types.h>
 #include <Maths/block-solvers/block-pcg.h>
 
-using namespace sim::maths;
+using namespace ksk::maths;
 
 // Helper: build a known SPD block tridiagonal matrix (full storage, both triangles)
 static BlockSparseMatrix<3> buildFullSPD(int nBlocks) {

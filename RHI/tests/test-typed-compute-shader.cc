@@ -8,7 +8,7 @@
 #include <fstream>
 #include <type_traits>
 
-using namespace sim::rhi;
+using namespace ksk::rhi;
 
 namespace {
 

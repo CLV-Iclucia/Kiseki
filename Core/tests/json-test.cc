@@ -6,7 +6,7 @@
 #include <Core/json.h>
 #include <sstream>
 
-using namespace sim::core;
+using namespace ksk::core;
 
 TEST(JsonParserTest, BasicTypes) {
     // 测试基本类型解析

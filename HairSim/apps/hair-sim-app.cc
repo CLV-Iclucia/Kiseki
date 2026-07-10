@@ -15,10 +15,10 @@
 
 namespace {
 
-using sim::hairsim::ImplicitRodIntegrator;
-using sim::hairsim::Rod;
-using sim::hairsim::RodBlock;
-using sim::hairsim::RodMaterial;
+using ksk::hairsim::ImplicitRodIntegrator;
+using ksk::hairsim::Rod;
+using ksk::hairsim::RodBlock;
+using ksk::hairsim::RodMaterial;
 
 std::vector<RodBlock> straightRod(int vertices, const glm::dvec3& origin,
                                   double length) {
@@ -44,7 +44,7 @@ std::vector<RodBlock> helicalRod(int vertices, const glm::dvec3& origin,
         origin.x + pitch * turns * u,
         origin.y + radius * std::cos(angle),
         origin.z + radius * std::sin(angle),
-        0.0);
+        0);
   }
   return blocks;
 }
@@ -75,7 +75,13 @@ std::unique_ptr<Rod> makeRod(const std::string& scenario, int vertices,
   } else if (scenario == "twist") {
     for (int i = 0; i + 1 < vertices; ++i) {
       const double u = static_cast<double>(i) / (vertices - 1);
-      rod->state().setTheta(static_cast<size_t>(i), 2000.0 * u);
+      rod->state().setTheta(static_cast<size_t>(i), 200.0 * u);
+    }
+  } else if (scenario == "helix")
+  {
+    for (int i = 0; i + 1 < vertices; ++i) {
+      const double u = static_cast<double>(i) / (vertices - 1);
+      rod->state().setTheta(static_cast<size_t>(i), 200.0 * u);
     }
   }
   rod->resetReferenceFrames();
@@ -100,10 +106,10 @@ glm::dvec3 parallelTransport(const glm::dvec3& director,
       glm::cross(axis, glm::cross(axis, director)) / denominator);
 }
 
-std::unique_ptr<sim::renderer::SceneProxy> buildProxy(
+std::unique_ptr<ksk::renderer::SceneProxy> buildProxy(
     const std::vector<std::unique_ptr<Rod>>& rods, int frame, double dt,
     bool show_frames) {
-  auto scene = std::make_unique<sim::renderer::SceneProxy>();
+  auto scene = std::make_unique<ksk::renderer::SceneProxy>();
   scene->frameIndex = frame;
   scene->simulationTime = static_cast<float>(frame * dt);
   scene->camera.position = {0.08f, 0.08f, 0.20f};
@@ -116,7 +122,7 @@ std::unique_ptr<sim::renderer::SceneProxy> buildProxy(
       {0.83f, 0.58f, 0.16f},
   };
   for (size_t r = 0; r < rods.size(); ++r) {
-    sim::renderer::WireframeProxy wire;
+    ksk::renderer::WireframeProxy wire;
     wire.name = std::format("rod-{}", r);
     wire.color = COLORS[r % std::size(COLORS)];
     const auto& state = rods[r]->state();
@@ -127,7 +133,7 @@ std::unique_ptr<sim::renderer::SceneProxy> buildProxy(
       wire.edges.emplace_back(i, i + 1);
     scene->wireframes.push_back(std::move(wire));
 
-    sim::renderer::ParticleProxy particles;
+    ksk::renderer::ParticleProxy particles;
     particles.name = std::format("vertices-{}", r);
     particles.positions = scene->wireframes.back().positions;
     particles.radius = 0.0015f;
@@ -135,7 +141,7 @@ std::unique_ptr<sim::renderer::SceneProxy> buildProxy(
     scene->particles.push_back(std::move(particles));
 
     if (show_frames) {
-      sim::renderer::WireframeProxy frames;
+      ksk::renderer::WireframeProxy frames;
       frames.name = std::format("frames-{}", r);
       frames.color = {0.25f, 0.85f, 0.75f};
       std::vector<glm::dvec3> tangents(state.size() - 1);
@@ -156,9 +162,9 @@ std::unique_ptr<sim::renderer::SceneProxy> buildProxy(
         const glm::dvec3 director =
             std::cos(theta) * references[i] + std::sin(theta) * second;
         const glm::dvec3 center = 0.5 * (p0 + p1);
-        const uint32_t base = static_cast<uint32_t>(frames.positions.size());
+        const auto base = static_cast<uint32_t>(frames.positions.size());
         frames.positions.emplace_back(center);
-        frames.positions.emplace_back(center + 0.06 * director);
+        frames.positions.emplace_back(center + 0.006 * director);
         frames.edges.emplace_back(base, base + 1);
       }
       scene->wireframes.push_back(std::move(frames));
@@ -176,12 +182,12 @@ int main(int argc, char** argv) {
        cxxopts::value<std::string>()->default_value("helix"))
       ("vertices", "Vertices per rod",
        cxxopts::value<int>()->default_value("32"))
-      ("dt", "Time step", cxxopts::value<double>()->default_value("0.001"))
+      ("dt", "Time step", cxxopts::value<double>()->default_value("0.00001"))
       ("steps", "Number of steps", cxxopts::value<int>()->default_value("10000"))
       ("no-render", "Disable rendering",
        cxxopts::value<bool>()->default_value("false"))
       ("show-frames", "Show material-frame directors",
-       cxxopts::value<bool>()->default_value("false"))
+       cxxopts::value<bool>()->default_value("true"))
       ("h,help", "Print help");
   const auto args = options.parse(argc, argv);
   if (args.count("help")) {
@@ -196,7 +202,7 @@ int main(int argc, char** argv) {
   const bool no_render = args["no-render"].as<bool>();
   const bool show_frames = args["show-frames"].as<bool>();
 
-  const int rod_count = scenario == "multi" ? 4 : 1;
+  const int rod_count = 4;
   std::vector<std::unique_ptr<Rod>> rods;
   std::vector<std::unique_ptr<ImplicitRodIntegrator>> integrators;
   for (int i = 0; i < rod_count; ++i) {
@@ -206,10 +212,10 @@ int main(int argc, char** argv) {
         std::make_unique<ImplicitRodIntegrator>(*rods.back()));
   }
 
-  sim::renderer::SimulationApp app({
+  ksk::renderer::SimulationApp app({
       .windowWidth = 1280,
       .windowHeight = 720,
-      .windowTitle = "SimCraft - Discrete Elastic Rods",
+      .windowTitle = "Kiseki - Discrete Elastic Rods",
   });
   app.stepFn = [&](int step) {
     for (size_t i = 0; i < rods.size(); ++i) {

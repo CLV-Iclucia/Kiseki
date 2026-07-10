@@ -12,7 +12,7 @@
 //   SH_INLINE    `inline`                   / nothing
 //   SH_OUT(T)    `T&`                        / `out T`
 //   SH_ASSERT(x) `assert(x)`                / nothing
-//   SH_NS_BEGIN/END  wrap shared symbols in `sim::fem::shared` on the CPU,
+//   SH_NS_BEGIN/END  wrap shared symbols in `ksk::fem::shared` on the CPU,
 //                    expand to nothing in HLSL (which has no namespaces).
 //
 // Vector ops (shDot / shCross / shMax) are written as explicit scalar double
@@ -20,8 +20,8 @@
 // float-only and silently downcast double arguments, which would break
 // bit-for-bit agreement with the CPU. Keep everything in full double here.
 //
-#ifndef SIMCRAFT_FEM_INCLUDE_FEM_SHARED_CROSS_LANG_H_
-#define SIMCRAFT_FEM_INCLUDE_FEM_SHARED_CROSS_LANG_H_
+#ifndef KISEKI_FEM_INCLUDE_FEM_SHARED_CROSS_LANG_H_
+#define KISEKI_FEM_INCLUDE_FEM_SHARED_CROSS_LANG_H_
 
 #ifdef __cplusplus
   // ----------------------------- C++ ------------------------------------
@@ -29,12 +29,12 @@
   #include <cassert>
   #include <cmath>
 
-  namespace sim::fem::shared {
+  namespace ksk::fem::shared {
   using sh_real  = double;
   using sh_real3 = glm::dvec3;
-  }  // namespace sim::fem::shared
+  }  // namespace ksk::fem::shared
 
-  #define SH_NS_BEGIN  namespace sim::fem::shared {
+  #define SH_NS_BEGIN  namespace ksk::fem::shared {
   #define SH_NS_END    }
   #define SH_INLINE    inline
   #define SH_OUT(T)    T&
@@ -121,4 +121,4 @@ SH_INLINE sh_real shLog(sh_real x) {
 
 SH_NS_END
 
-#endif  // SIMCRAFT_FEM_INCLUDE_FEM_SHARED_CROSS_LANG_H_
+#endif  // KISEKI_FEM_INCLUDE_FEM_SHARED_CROSS_LANG_H_

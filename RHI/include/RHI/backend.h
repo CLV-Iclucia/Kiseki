@@ -8,7 +8,7 @@
 
 #include <cstdint>
 
-namespace sim::rhi {
+namespace ksk::rhi {
 
 enum class Backend : uint32_t {
   Vulkan,
@@ -27,4 +27,4 @@ struct DeviceDesc {
   // Future: GPU picker, extension allowlist, feature opt-ins.
 };
 
-}  // namespace sim::rhi
+}  // namespace ksk::rhi

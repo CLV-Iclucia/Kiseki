@@ -6,7 +6,7 @@
 
 #include <map>
 #include <type_traits>
-namespace sim::core {
+namespace ksk::core {
 #define REPLACE_FOR_EACH_1(what, _1) what(_1)
 #define REPLACE_FOR_EACH_2(what, _1, _2) what(_1) what(_2)
 #define REPLACE_FOR_EACH_3(what, _1, _2, _3) what(_1) what(_2) what(_3)
@@ -184,7 +184,7 @@ template <typename T> constexpr bool can_reflect() {
   } else
     return false;
 }
-} // namespace sim::core
+} // namespace ksk::core
 
 #define REFLECT(...)                                                        \
   struct reflect {                                                             \

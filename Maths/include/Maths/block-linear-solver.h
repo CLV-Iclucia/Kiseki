@@ -3,7 +3,7 @@
 #include <Maths/block-sparse-matrix.h>
 #include <memory>
 
-namespace sim::maths {
+namespace ksk::maths {
 
 struct SolveResult {
   bool converged = false;
@@ -26,4 +26,4 @@ struct BlockLinearSolver {
   virtual ~BlockLinearSolver() = default;
 };
 
-} // namespace sim::maths
+} // namespace ksk::maths

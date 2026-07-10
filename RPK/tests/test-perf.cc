@@ -18,8 +18,8 @@
 #include <random>
 #include <vector>
 
-using namespace sim::rhi;
-using namespace sim::rpk;
+using namespace ksk::rhi;
+using namespace ksk::rpk;
 using Clock = std::chrono::high_resolution_clock;
 
 namespace {

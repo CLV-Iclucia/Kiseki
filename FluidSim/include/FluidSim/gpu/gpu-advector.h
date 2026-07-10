@@ -12,16 +12,16 @@ namespace fluid::gpu {
 
 class GPUAdvector {
 public:
-    explicit GPUAdvector(sim::rhi::Device& device,
+    explicit GPUAdvector(ksk::rhi::Device& device,
                          const GPUGridState& grid);
 
     // Called by Backend in substep
-    void scatterP2G(sim::rhi::CommandList& cmd, GPUGridState& grid, Real dt);
-    void gatherAndAdvect(sim::rhi::CommandList& cmd, GPUGridState& grid, Real dt);
+    void scatterP2G(ksk::rhi::CommandList& cmd, GPUGridState& grid, Real dt);
+    void gatherAndAdvect(ksk::rhi::CommandList& cmd, GPUGridState& grid, Real dt);
 
 private:
     // ===== Owned buffers (P2G weights) =====
-    sim::rhi::BufferRef uWeights_, vWeights_, wWeights_;
+    ksk::rhi::BufferRef uWeights_, vWeights_, wWeights_;
 
     P2GScatterCS p2g_;
     P2GNormalizeCS normalize_;

@@ -2,14 +2,14 @@
 // Created by creeper on 10/24/24.
 //
 
-#ifndef SIMCRAFT_FEM_INCLUDE_FEM_BOUNDARY_CONDITIONS_H_
-#define SIMCRAFT_FEM_INCLUDE_FEM_BOUNDARY_CONDITIONS_H_
+#ifndef KISEKI_FEM_INCLUDE_FEM_BOUNDARY_CONDITIONS_H_
+#define KISEKI_FEM_INCLUDE_FEM_BOUNDARY_CONDITIONS_H_
 
 #include <variant>
 #include <functional>
 #include <fem/types.h>
 #include <Core/json.h>
-namespace sim::fem {
+namespace ksk::fem {
 struct DirichletBoundaryCondition {
   Index element{};
   uint8_t dofIdx{};
@@ -22,4 +22,4 @@ struct DirichletBoundaryCondition {
 };
 
 }// namespace fem
-#endif //SIMCRAFT_FEM_INCLUDE_FEM_BOUNDARY_CONDITIONS_H_
+#endif //KISEKI_FEM_INCLUDE_FEM_BOUNDARY_CONDITIONS_H_

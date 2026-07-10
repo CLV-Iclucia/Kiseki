@@ -2,8 +2,8 @@
 // Created by creeper on 23-8-9.
 //
 
-#ifndef SIMCRAFT_HAIRSIM_INCLUDE_HAIRSIM_SYSTEM_H_
-#define SIMCRAFT_HAIRSIM_INCLUDE_HAIRSIM_SYSTEM_H_
+#ifndef KISEKI_HAIRSIM_INCLUDE_HAIRSIM_SYSTEM_H_
+#define KISEKI_HAIRSIM_INCLUDE_HAIRSIM_SYSTEM_H_
 #include <HairSim/hair-sim.h>
 #include <HairSim/band-matrix.h>
 #include <HairSim/hair.h>
@@ -60,4 +60,4 @@ struct System : core::NonCopyable {
   std::vector<std::unique_ptr<Hair>> hairs;
 };
 }
-#endif // SIMCRAFT_HAIRSIM_INCLUDE_HAIRSIM_HAIR_SYSTEM_H_
+#endif // KISEKI_HAIRSIM_INCLUDE_HAIRSIM_HAIR_SYSTEM_H_

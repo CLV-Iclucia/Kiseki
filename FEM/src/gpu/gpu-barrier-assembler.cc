@@ -16,9 +16,9 @@
 #define FEM_INCLUDE_DIR "."
 #endif
 
-namespace sim::fem::gpu {
+namespace ksk::fem::gpu {
 
-using namespace sim::rhi;
+using namespace ksk::rhi;
 namespace fs = std::filesystem;
 
 static constexpr uint32_t kWG = 256;
@@ -138,4 +138,4 @@ GpuBarrierAssembler::assemble(const BufferRef& x, const BufferRef& pairs,
     return res;
 }
 
-} // namespace sim::fem::gpu
+} // namespace ksk::fem::gpu

@@ -18,8 +18,8 @@
 #include <cmath>
 #include <vector>
 
-using namespace sim::rhi;
-using namespace sim::fem::gpu;
+using namespace ksk::rhi;
+using namespace ksk::fem::gpu;
 
 namespace {
 

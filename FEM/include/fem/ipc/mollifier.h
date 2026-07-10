@@ -2,14 +2,14 @@
 // Created by creeper on 9/7/24.
 //
 
-#ifndef SIMCRAFT_FEM_INCLUDE_FEM_IPC_MOLLIFIER_H_
-#define SIMCRAFT_FEM_INCLUDE_FEM_IPC_MOLLIFIER_H_
+#ifndef KISEKI_FEM_INCLUDE_FEM_IPC_MOLLIFIER_H_
+#define KISEKI_FEM_INCLUDE_FEM_IPC_MOLLIFIER_H_
 
 #include <glm/glm.hpp>
 #include <fem/ipc/external/mollifier.h>
 #include <Maths/block-types.h>
 
-namespace sim::fem::ipc {
+namespace ksk::fem::ipc {
 
 using maths::LocalGrad;
 using maths::LocalHessian;
@@ -65,5 +65,5 @@ inline LocalGrad<4> edgeEdgeMollifierThresholdGradient(
   return localGradFromFlat<4>(g);
 }
 
-} // namespace sim::fem::ipc
-#endif // SIMCRAFT_FEM_INCLUDE_FEM_IPC_MOLLIFIER_H_
+} // namespace ksk::fem::ipc
+#endif // KISEKI_FEM_INCLUDE_FEM_IPC_MOLLIFIER_H_

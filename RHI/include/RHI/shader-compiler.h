@@ -39,7 +39,7 @@
 #include <string_view>
 #include <vector>
 
-namespace sim::rhi {
+namespace ksk::rhi {
 
 struct CompiledShader {
   // Final bytecode (SPIR-V if Backend::Vulkan, DXIL if Backend::Dx12).
@@ -49,7 +49,7 @@ struct CompiledShader {
   std::string disassembly;
 };
 
-class ShaderCompiler : public sim::core::NonCopyable {
+class ShaderCompiler : public ksk::core::NonCopyable {
  public:
   // Returns nullptr if dxcompiler is unavailable (DLL/SO not on the loader
   // path, or DxcCreateInstance fails).
@@ -78,4 +78,4 @@ class ShaderCompiler : public sim::core::NonCopyable {
       const ShaderCompileOptions& options) = 0;
 };
 
-}  // namespace sim::rhi
+}  // namespace ksk::rhi

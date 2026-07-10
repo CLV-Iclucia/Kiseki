@@ -6,7 +6,7 @@
 
 namespace fluid::gpu {
 
-GPUFluidContext::GPUFluidContext(sim::rhi::Device& device,
+GPUFluidContext::GPUFluidContext(ksk::rhi::Device& device,
                                  const FluidDomain& dom,
                                  uint32_t nParticles)
     : device_(device)
@@ -26,7 +26,7 @@ GPUFluidContext::GPUFluidContext(sim::rhi::Device& device,
     int ny = dom.resolution.y;
     int nz = dom.resolution.z;
 
-    using namespace sim::rhi;
+    using namespace ksk::rhi;
 
     uint32_t uSize = static_cast<uint32_t>((nx + 1) * ny * nz) * sizeof(float);
     uint32_t vSize = static_cast<uint32_t>(nx * (ny + 1) * nz) * sizeof(float);
@@ -89,12 +89,12 @@ GPUFluidContext::GPUFluidContext(sim::rhi::Device& device,
 }
 
 void GPUFluidContext::beginFrame() {
-    activeCmd_ = device_.beginCommands(sim::rhi::QueueType::Compute);
+    activeCmd_ = device_.beginCommands(ksk::rhi::QueueType::Compute);
 }
 
 void GPUFluidContext::endFrame() {
     if (activeCmd_) {
-        device_.submitAndWait(*activeCmd_, sim::rhi::QueueType::Compute);
+        device_.submitAndWait(*activeCmd_, ksk::rhi::QueueType::Compute);
         activeCmd_.reset();
     }
 }

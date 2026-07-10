@@ -10,7 +10,7 @@
 #include <fem/ipc/distances.h>
 #include <Maths/block-types.h>
 
-namespace sim::fem {
+namespace ksk::fem {
 namespace ipc {
 
 enum class CollisionPairKind {
@@ -120,4 +120,4 @@ struct CollisionPairSet {
 };
 
 } // namespace ipc
-} // namespace sim::fem
+} // namespace ksk::fem

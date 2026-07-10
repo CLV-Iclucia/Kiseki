@@ -23,7 +23,7 @@
 #include <array>
 
 
-namespace sim::fem {
+namespace ksk::fem {
 struct System;
 namespace ipc {
 
@@ -276,5 +276,5 @@ struct DeformableKinematicVTConstraint {
 };
 
 } // namespace ipc
-} // namespace sim::fem
+} // namespace ksk::fem
 

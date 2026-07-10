@@ -30,9 +30,9 @@
 #include <iostream>
 #include <format>
 
-using namespace sim;
-using namespace sim::fem;
-using namespace sim::deform;
+using namespace ksk;
+using namespace ksk::fem;
+using namespace ksk::deform;
 
 // ─── Helper: 将网格平移 ──────────────────────────────────────────────────────
 static TetMesh translateMesh(const TetMesh& src, Vector<Real, 3> offset) {

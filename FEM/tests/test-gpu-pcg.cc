@@ -15,8 +15,8 @@
 #include <random>
 #include <vector>
 
-using namespace sim;
-using namespace sim::fem::gpu;
+using namespace ksk;
+using namespace ksk::fem::gpu;
 
 namespace {
 
@@ -65,12 +65,12 @@ maths::BlockSparseMatrix<3> makeSpdBlockMatrix(int n, uint32_t seed) {
 }
 
 struct GpuPcgFixture : public ::testing::Test {
-    std::unique_ptr<sim::rhi::Device> device;
-    std::unique_ptr<sim::rhi::ShaderCompiler> compiler;
+    std::unique_ptr<ksk::rhi::Device> device;
+    std::unique_ptr<ksk::rhi::ShaderCompiler> compiler;
     std::unique_ptr<GpuBlockPCGSolver> solver;
 
     void SetUp() override {
-        device = sim::rhi::Device::create({.backend = sim::rhi::Backend::Vulkan,
+        device = ksk::rhi::Device::create({.backend = ksk::rhi::Backend::Vulkan,
                                            .enableValidation = true});
         if (!device) GTEST_SKIP() << "No Vulkan device";
         compiler = device->createShaderCompiler();

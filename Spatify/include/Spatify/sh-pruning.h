@@ -2,8 +2,8 @@
 // Created by creeper on 5/31/24.
 //
 
-#ifndef SIMCRAFT_SPATIFY_INCLUDE_SPATIFY_RASTERIZERS_H_
-#define SIMCRAFT_SPATIFY_INCLUDE_SPATIFY_RASTERIZERS_H_
+#ifndef KISEKI_SPATIFY_INCLUDE_SPATIFY_RASTERIZERS_H_
+#define KISEKI_SPATIFY_INCLUDE_SPATIFY_RASTERIZERS_H_
 // some frequently used rasterizers for point, edge and triangle
 #include <Spatify/bbox.h>
 namespace spatify {
@@ -55,4 +55,4 @@ struct BBoxIterator {
   bool ended{false};
 };
 }
-#endif //SIMCRAFT_SPATIFY_INCLUDE_SPATIFY_RASTERIZERS_H_
+#endif //KISEKI_SPATIFY_INCLUDE_SPATIFY_RASTERIZERS_H_

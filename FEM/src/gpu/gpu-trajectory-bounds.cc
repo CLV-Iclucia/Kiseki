@@ -5,9 +5,9 @@
 
 #include <spdlog/spdlog.h>
 
-namespace sim::fem::gpu {
+namespace ksk::fem::gpu {
 
-using namespace sim::rhi;
+using namespace ksk::rhi;
 
 #ifndef FEM_SHADER_DIR
 #define FEM_SHADER_DIR "."
@@ -48,4 +48,4 @@ void GpuTrajectoryBounds::compute(const BufferRef& x, const BufferRef& p,
     device_.submitAndWait(*cmd, QueueType::Compute);
 }
 
-} // namespace sim::fem::gpu
+} // namespace ksk::fem::gpu

@@ -9,7 +9,7 @@
 #include <sstream>
 #include <fstream>
 
-namespace sim::core {
+namespace ksk::core {
 bool myLoadObj(const std::string& path, Mesh* mesh) {
   std::ifstream file(path);
   if (!file.is_open()) {

@@ -13,7 +13,7 @@
 #include <unordered_map>
 #include <spdlog/spdlog.h>
 
-namespace sim::deform {
+namespace ksk::deform {
 template<typename T>
 struct StrainEnergyDensity {
   [[nodiscard]] virtual T computeEnergyDensity(const DeformationGradient<T, 3> &dg) const = 0;

@@ -26,7 +26,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace sim::rhi::vulkan {
+namespace ksk::rhi::vulkan {
 
 // ---- VK_CHECK --------------------------------------------------------------
 #define VK_CHECK(expr)                                                       \
@@ -272,4 +272,4 @@ inline VkShaderStageFlags toVkShaderStage(ShaderStage s) noexcept {
   return 0;
 }
 
-}  // namespace sim::rhi::vulkan
+}  // namespace ksk::rhi::vulkan

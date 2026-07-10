@@ -29,9 +29,9 @@
 #include <iostream>
 #include <format>
 
-using namespace sim;
-using namespace sim::fem;
-using namespace sim::deform;
+using namespace ksk;
+using namespace ksk::fem;
+using namespace ksk::deform;
 
 // ─── Helper: 创建地面三角网格 ────────────────────────────────────────────────
 // 在 y = groundY 处创建一个 gridN x gridN 的正方形平面，中心在原点。

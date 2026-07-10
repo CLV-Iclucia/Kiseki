@@ -6,7 +6,7 @@
 
 struct GLFWwindow;
 
-namespace sim::renderer {
+namespace ksk::renderer {
 
 struct SceneBounds {
   glm::vec3 center{0.0f};
@@ -72,4 +72,4 @@ private:
   void buildGroundGrid();
 };
 
-} // namespace sim::renderer
+} // namespace ksk::renderer

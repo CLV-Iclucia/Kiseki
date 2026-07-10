@@ -2,8 +2,8 @@
 // Created by creeper on 23-8-9.
 //
 
-#ifndef SIMCRAFT_HAIRSIM_INCLUDE_HAIRSIM_MATH_UTILS_H_
-#define SIMCRAFT_HAIRSIM_INCLUDE_HAIRSIM_MATH_UTILS_H_
+#ifndef KISEKI_HAIRSIM_INCLUDE_HAIRSIM_MATH_UTILS_H_
+#define KISEKI_HAIRSIM_INCLUDE_HAIRSIM_MATH_UTILS_H_
 #include <HairSim/hair-sim.h>
 namespace hairsim {
 static constexpr Real PI = 3.14159265358979323846264338327950288419716939937510;
@@ -32,4 +32,4 @@ inline Vec3d parallelTransport(const Vec3d &e0, const Vec3d &e1,
 inline Real sqr(Real x) { return x * x; }
 inline Real cube(Real x) { return x * x * x; }
 } // namespace hairsim
-#endif // SIMCRAFT_HAIRSIM_INCLUDE_HAIRSIM_MATH_UTILS_H_
+#endif // KISEKI_HAIRSIM_INCLUDE_HAIRSIM_MATH_UTILS_H_

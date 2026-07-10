@@ -2,8 +2,8 @@
 // Created by creeper on 23-8-10.
 //
 
-#ifndef SIMCRAFT_HAIRSIM_INCLUDE_HAIRSIM_FORCES_H_
-#define SIMCRAFT_HAIRSIM_INCLUDE_HAIRSIM_FORCES_H_
+#ifndef KISEKI_HAIRSIM_INCLUDE_HAIRSIM_FORCES_H_
+#define KISEKI_HAIRSIM_INCLUDE_HAIRSIM_FORCES_H_
 
 #include <HairSim/hair-dof.h>
 #include <HairSim/hair-sim.h>
@@ -48,4 +48,4 @@ public:
 
 } // namespace hairsim
 
-#endif // SIMCRAFT_HAIRSIM_INCLUDE_HAIRSIM_FORCES_H_
+#endif // KISEKI_HAIRSIM_INCLUDE_HAIRSIM_FORCES_H_

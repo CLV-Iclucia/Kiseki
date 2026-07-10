@@ -11,7 +11,7 @@
 
 #include <map>
 
-namespace sim::rhi::vulkan {
+namespace ksk::rhi::vulkan {
 
 class VulkanPipelineCache {
  public:
@@ -36,4 +36,4 @@ class VulkanPipelineCache {
   std::map<GraphicsPipelineDesc, PipelineRef> m_graphics;
 };
 
-}  // namespace sim::rhi::vulkan
+}  // namespace ksk::rhi::vulkan

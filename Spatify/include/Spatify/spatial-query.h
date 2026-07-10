@@ -1,8 +1,8 @@
 //
 // Created by creeper on 5/23/24.
 //
-#ifndef SIMCRAFT_SPATIFY_INCLUDE_SPATIFY_SPATIAL_QUERY_H_
-#define SIMCRAFT_SPATIFY_INCLUDE_SPATIFY_SPATIAL_QUERY_H_
+#ifndef KISEKI_SPATIFY_INCLUDE_SPATIFY_SPATIAL_QUERY_H_
+#define KISEKI_SPATIFY_INCLUDE_SPATIFY_SPATIAL_QUERY_H_
 #include <Spatify/bbox.h>
 namespace spatify {
 template <typename T>
@@ -15,4 +15,4 @@ concept BBoxIntersectionQuery = requires(T query) {
   { query(BBox<typename T::CoordType, 3>()) } -> std::same_as<bool>;
 };
 }
-#endif //SIMCRAFT_SPATIFY_INCLUDE_SPATIFY_SPATIAL_QUERY_H_
+#endif //KISEKI_SPATIFY_INCLUDE_SPATIFY_SPATIAL_QUERY_H_

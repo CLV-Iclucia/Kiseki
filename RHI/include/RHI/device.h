@@ -21,13 +21,13 @@
 #include <memory>
 #include <span>
 
-namespace sim::rhi {
+namespace ksk::rhi {
 
 class ShaderCompiler;  // forward decl (defined in shader-compiler.h)
 class ComputeShaderBase;
 struct ShaderCompileOptions;
 
-class Device : public sim::core::NonCopyable {
+class Device : public ksk::core::NonCopyable {
  public:
   // Returns nullptr if no compatible Vulkan device is available
   // (driver missing, no compatible GPU, validation layer not installed when
@@ -124,4 +124,4 @@ class Device : public sim::core::NonCopyable {
   friend class ComputeShaderBase;
 };
 
-}  // namespace sim::rhi
+}  // namespace ksk::rhi

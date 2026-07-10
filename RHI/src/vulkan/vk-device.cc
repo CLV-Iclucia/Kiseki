@@ -32,7 +32,7 @@
 #include <utility>
 #include <vector>
 
-namespace sim::rhi {
+namespace ksk::rhi {
 
 // ---- Device::create factory ------------------------------------------------
 std::unique_ptr<Device> Device::create(const DeviceDesc& desc) {
@@ -53,9 +53,9 @@ std::unique_ptr<ShaderCompiler> Device::createShaderCompiler() const {
   return ShaderCompiler::create(backend());
 }
 
-}  // namespace sim::rhi
+}  // namespace ksk::rhi
 
-namespace sim::rhi::vulkan {
+namespace ksk::rhi::vulkan {
 
 namespace {
 
@@ -506,4 +506,4 @@ VkQueue VulkanDevice::resolveQueueForCommandList(CommandList& cmd) const {
   return m_queuePools[(int)vcmd->queueType()].queue;
 }
 
-}  // namespace sim::rhi::vulkan
+}  // namespace ksk::rhi::vulkan

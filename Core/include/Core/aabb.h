@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <limits>
 
-namespace sim::core {
+namespace ksk::core {
 
 template <typename T, int Dim>
 struct AABB {
@@ -51,4 +51,4 @@ using AABB3d = AABB<Real, 3>;
 using AABB3f = AABB<float, 3>;
 using AABB2d = AABB<Real, 2>;
 
-} // namespace sim::core
+} // namespace ksk::core

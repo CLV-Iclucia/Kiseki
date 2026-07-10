@@ -5,7 +5,7 @@
 #pragma once
 #include <Deform/strain-energy-density.h>
 #include <mutex>
-namespace sim::deform {
+namespace ksk::deform {
 
 template<typename T>
 struct StrainEnergyDensityFactory {

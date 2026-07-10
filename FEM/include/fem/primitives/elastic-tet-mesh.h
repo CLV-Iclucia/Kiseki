@@ -11,7 +11,7 @@
 #include <memory>
 #include "tet-mesh.h"
 
-namespace sim::fem {
+namespace ksk::fem {
 struct ElasticTetMeshConfig {
   TetMesh mesh{};
   Real density{};

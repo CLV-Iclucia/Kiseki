@@ -6,7 +6,7 @@
 
 #include "vk-device.h"
 
-namespace sim::rhi::vulkan {
+namespace ksk::rhi::vulkan {
 
 // ---- VulkanFence -----------------------------------------------------------
 VulkanFence::VulkanFence(VulkanDevice* device, VkFence handle)
@@ -30,4 +30,4 @@ VulkanSemaphore::~VulkanSemaphore() {
   }
 }
 
-}  // namespace sim::rhi::vulkan
+}  // namespace ksk::rhi::vulkan

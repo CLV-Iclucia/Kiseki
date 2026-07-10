@@ -22,35 +22,35 @@
 #include <filesystem>
 #include <memory>
 
-namespace sim::fem::gpu {
+namespace ksk::fem::gpu {
 
 SHADER_PARAMS_BEGIN(BroadCountParams)
-    SHADER_PARAM_UAV   (sim::rhi::BufferRef, counts);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, nodeLo);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, nodeHi);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, lch);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, rch);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, sortedIdx);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, qLo);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, qHi);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, conn);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, dHatBuf);
+    SHADER_PARAM_UAV   (ksk::rhi::BufferRef, counts);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, nodeLo);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, nodeHi);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, lch);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, rch);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, sortedIdx);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, qLo);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, qHi);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, conn);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, dHatBuf);
     SHADER_PARAM_SCALAR(uint32_t,            numQueries);
     SHADER_PARAM_SCALAR(uint32_t,            numPrims);
 SHADER_PARAMS_END();
 
 SHADER_PARAMS_BEGIN(BroadWriteParams)
-    SHADER_PARAM_UAV   (sim::rhi::BufferRef, out);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, nodeLo);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, nodeHi);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, lch);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, rch);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, sortedIdx);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, qLo);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, qHi);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, conn);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, dHatBuf);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, offsets);
+    SHADER_PARAM_UAV   (ksk::rhi::BufferRef, out);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, nodeLo);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, nodeHi);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, lch);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, rch);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, sortedIdx);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, qLo);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, qHi);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, conn);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, dHatBuf);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, offsets);
     SHADER_PARAM_SCALAR(uint32_t,            numQueries);
     SHADER_PARAM_SCALAR(uint32_t,            numPrims);
 SHADER_PARAMS_END();
@@ -60,8 +60,8 @@ SHADER_PARAMS_END();
 // ============================================================================
 class GpuBroadPhase {
 public:
-    GpuBroadPhase(sim::rhi::Device& device,
-                  sim::rhi::ShaderCompiler& compiler,
+    GpuBroadPhase(ksk::rhi::Device& device,
+                  ksk::rhi::ShaderCompiler& compiler,
                   const std::filesystem::path& shaderDir = {});
 
     [[nodiscard]] bool valid() const { return valid_; }
@@ -72,10 +72,10 @@ public:
     //   dHatBuf    : double[1]
     // Returns candidate count; pairs available in vtPairs() as uint[count*4].
     uint32_t queryVT(const GPULBVH& triBvh,
-                     const sim::rhi::BufferRef& qVertLo,
-                     const sim::rhi::BufferRef& qVertHi,
-                     const sim::rhi::BufferRef& triConn,
-                     const sim::rhi::BufferRef& dHatBuf,
+                     const ksk::rhi::BufferRef& qVertLo,
+                     const ksk::rhi::BufferRef& qVertHi,
+                     const ksk::rhi::BufferRef& triConn,
+                     const ksk::rhi::BufferRef& dHatBuf,
                      uint32_t numVerts);
 
     // EE: query each of `numEdges` edges against the edge BVH.
@@ -83,35 +83,35 @@ public:
     //                buffers used to build edgeBvh)
     //   edgeConn   : uint[numEdges*2]
     uint32_t queryEE(const GPULBVH& edgeBvh,
-                     const sim::rhi::BufferRef& qEdgeLo,
-                     const sim::rhi::BufferRef& qEdgeHi,
-                     const sim::rhi::BufferRef& edgeConn,
-                     const sim::rhi::BufferRef& dHatBuf,
+                     const ksk::rhi::BufferRef& qEdgeLo,
+                     const ksk::rhi::BufferRef& qEdgeHi,
+                     const ksk::rhi::BufferRef& edgeConn,
+                     const ksk::rhi::BufferRef& dHatBuf,
                      uint32_t numEdges);
 
-    [[nodiscard]] const sim::rhi::BufferRef& vtPairs() const { return vtOut_; }
-    [[nodiscard]] const sim::rhi::BufferRef& eePairs() const { return eeOut_; }
+    [[nodiscard]] const ksk::rhi::BufferRef& vtPairs() const { return vtOut_; }
+    [[nodiscard]] const ksk::rhi::BufferRef& eePairs() const { return eeOut_; }
 
 private:
-    sim::rhi::Device& device_;
+    ksk::rhi::Device& device_;
     bool valid_ = false;
 
-    std::unique_ptr<sim::rpk::Scan> scan_;
-    sim::rhi::PipelineRef psoVtCount_, psoVtWrite_, psoEeCount_, psoEeWrite_;
+    std::unique_ptr<ksk::rpk::Scan> scan_;
+    ksk::rhi::PipelineRef psoVtCount_, psoVtWrite_, psoEeCount_, psoEeWrite_;
 
-    sim::rhi::BufferRef counts_, offsets_, vtOut_, eeOut_;
+    ksk::rhi::BufferRef counts_, offsets_, vtOut_, eeOut_;
     uint32_t capQuery_ = 0, capVt_ = 0, capEe_ = 0;
 
     // Shared query driver: returns candidate count, leaves pairs in `outBuf`.
-    uint32_t runQuery(const sim::rhi::PipelineRef& psoCount,
-                      const sim::rhi::PipelineRef& psoWrite,
+    uint32_t runQuery(const ksk::rhi::PipelineRef& psoCount,
+                      const ksk::rhi::PipelineRef& psoWrite,
                       const GPULBVH& bvh,
-                      const sim::rhi::BufferRef& qLo, const sim::rhi::BufferRef& qHi,
-                      const sim::rhi::BufferRef& conn, const sim::rhi::BufferRef& dHatBuf,
-                      uint32_t numQueries, sim::rhi::BufferRef& outBuf, uint32_t& outCap);
+                      const ksk::rhi::BufferRef& qLo, const ksk::rhi::BufferRef& qHi,
+                      const ksk::rhi::BufferRef& conn, const ksk::rhi::BufferRef& dHatBuf,
+                      uint32_t numQueries, ksk::rhi::BufferRef& outBuf, uint32_t& outCap);
 
     void ensureQueryCap(uint32_t numQueries);
-    uint32_t readbackUintAt(const sim::rhi::BufferRef& src, uint32_t index);
+    uint32_t readbackUintAt(const ksk::rhi::BufferRef& src, uint32_t index);
 };
 
-} // namespace sim::fem::gpu
+} // namespace ksk::fem::gpu

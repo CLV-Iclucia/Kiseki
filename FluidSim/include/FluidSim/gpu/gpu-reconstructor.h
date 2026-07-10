@@ -12,15 +12,15 @@ namespace fluid::gpu {
 
 class GPUReconstructor {
 public:
-    explicit GPUReconstructor(sim::rhi::Device& device,
+    explicit GPUReconstructor(ksk::rhi::Device& device,
                               const GPUGridState& grid);
 
     // Called by Backend at end of step
-    void execute(sim::rhi::CommandList& cmd, GPUGridState& grid);
+    void execute(ksk::rhi::CommandList& cmd, GPUGridState& grid);
 
 private:
     // ===== Owned buffers =====
-    sim::rhi::ImageRef sdfBuf_;  // ping-pong buffer for smooth
+    ksk::rhi::ImageRef sdfBuf_;  // ping-pong buffer for smooth
 
     ReconstructSdfCS reconstruct_;
     SmoothSdfCS smooth_;

@@ -9,7 +9,7 @@
 #include <span>
 #include <string_view>
 
-using namespace sim::rhi;
+using namespace ksk::rhi;
 
 namespace {
 

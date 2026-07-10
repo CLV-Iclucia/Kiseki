@@ -6,7 +6,7 @@
 #include <fem/ipc/constraint.h>
 #include <cassert>
 
-namespace sim::fem::ipc {
+namespace ksk::fem::ipc {
 
 // =========================================================================
 // VertexTriangleCollisionPair
@@ -309,4 +309,4 @@ void ColliderVTCollisionPair::appendConstraintPair(ConstraintPairSet& out, Real 
   out.colliderPairs.push_back(ccp);
 }
 
-} // namespace sim::fem::ipc
+} // namespace ksk::fem::ipc

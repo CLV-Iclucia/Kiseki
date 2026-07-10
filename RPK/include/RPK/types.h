@@ -6,7 +6,7 @@
 
 #include <cstdint>
 
-namespace sim::rpk {
+namespace ksk::rpk {
 
 // Scalar type of the elements being processed.
 enum class ScalarType : uint32_t {
@@ -16,4 +16,4 @@ enum class ScalarType : uint32_t {
     Uint32  = 3,
 };
 
-}  // namespace sim::rpk
+}  // namespace ksk::rpk

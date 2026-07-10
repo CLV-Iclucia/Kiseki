@@ -2,8 +2,8 @@
 // Created by creeper on 23-8-10.
 //
 
-#ifndef SIMCRAFT_HAIRSIM_INCLUDE_HAIRSIM_GRADS_H_
-#define SIMCRAFT_HAIRSIM_INCLUDE_HAIRSIM_GRADS_H_
+#ifndef KISEKI_HAIRSIM_INCLUDE_HAIRSIM_GRADS_H_
+#define KISEKI_HAIRSIM_INCLUDE_HAIRSIM_GRADS_H_
 
 #include <HairSim/hair.h>
 #include <HairSim/utils.h>
@@ -88,4 +88,4 @@ inline Mat3d p2m_pe2(const Hair& hair, Index i, Index j, Index k) {
 }
 } // namespace hairsim
 
-#endif // SIMCRAFT_HAIRSIM_INCLUDE_HAIRSIM_GRADS_H_
+#endif // KISEKI_HAIRSIM_INCLUDE_HAIRSIM_GRADS_H_

@@ -27,9 +27,9 @@
 #include <random>
 #include <vector>
 
-using namespace sim;
-using namespace sim::rhi;
-using namespace sim::fem::gpu;
+using namespace ksk;
+using namespace ksk::rhi;
+using namespace ksk::fem::gpu;
 
 namespace {
 

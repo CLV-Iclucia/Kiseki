@@ -8,9 +8,9 @@
 
 #include <Core/properties.h>
 
-namespace sim::rhi {
+namespace ksk::rhi {
 
-class Fence : public sim::core::NonCopyable {
+class Fence : public ksk::core::NonCopyable {
  public:
   virtual ~Fence() = default;
 
@@ -18,7 +18,7 @@ class Fence : public sim::core::NonCopyable {
   Fence() = default;
 };
 
-class Semaphore : public sim::core::NonCopyable {
+class Semaphore : public ksk::core::NonCopyable {
  public:
   virtual ~Semaphore() = default;
 
@@ -26,4 +26,4 @@ class Semaphore : public sim::core::NonCopyable {
   Semaphore() = default;
 };
 
-}  // namespace sim::rhi
+}  // namespace ksk::rhi

@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 #include <HairSim/band-matrix.h>
-using hairsim::BandSquareMatrix;
-using hairsim::BandLUSolver;
-using hairsim::VecXd;
+using hairksk::BandSquareMatrix;
+using hairksk::BandLUSolver;
+using hairksk::VecXd;
 
 TEST(BandSquareMatrixTest, Assemble) {
   int n = 3;

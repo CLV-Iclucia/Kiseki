@@ -8,8 +8,8 @@
 #include <iostream>
 #include <format>
 
-using namespace sim;
-using namespace sim::fem;
+using namespace ksk;
+using namespace ksk::fem;
 
 void checkArgs(const cxxopts::ParseResult& result) {
   if (!result.count("input")) {

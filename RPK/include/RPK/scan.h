@@ -22,7 +22,7 @@
 #include <cstdint>
 #include <filesystem>
 
-namespace sim::rpk {
+namespace ksk::rpk {
 
 enum class ScanOp : uint32_t {
     Sum = 0,
@@ -83,4 +83,4 @@ private:
                        uint32_t count, bool isExclusive, int level);
 };
 
-}  // namespace sim::rpk
+}  // namespace ksk::rpk

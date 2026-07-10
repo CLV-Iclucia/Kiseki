@@ -7,7 +7,7 @@
 #include "vk-device.h"
 #include "vk-internals.h"
 
-namespace sim::rhi::vulkan {
+namespace ksk::rhi::vulkan {
 
 // ---- VulkanImage -----------------------------------------------------------
 VulkanImage::VulkanImage(VulkanDevice* device, const ImageDesc& desc)
@@ -131,4 +131,4 @@ void VulkanSampler::destroy() noexcept {
   delete this;
 }
 
-}  // namespace sim::rhi::vulkan
+}  // namespace ksk::rhi::vulkan

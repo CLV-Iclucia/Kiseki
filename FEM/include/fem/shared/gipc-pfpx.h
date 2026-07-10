@@ -16,8 +16,8 @@
 //   PT: [p, t0, t1, t2]    v[0..11]
 //   EE: [ea0,ea1,eb0,eb1]  v[0..11]
 //
-#ifndef SIMCRAFT_FEM_INCLUDE_FEM_SHARED_GIPC_PFPX_H_
-#define SIMCRAFT_FEM_INCLUDE_FEM_SHARED_GIPC_PFPX_H_
+#ifndef KISEKI_FEM_INCLUDE_FEM_SHARED_GIPC_PFPX_H_
+#define KISEKI_FEM_INCLUDE_FEM_SHARED_GIPC_PFPX_H_
 
 #include <fem/shared/ipc-distance.h>
 
@@ -196,4 +196,4 @@ SH_INLINE ShGipcPfpx shGipcPFPx_EE(sh_real3 ea0, sh_real3 ea1, sh_real3 eb0, sh_
 
 SH_NS_END
 
-#endif  // SIMCRAFT_FEM_INCLUDE_FEM_SHARED_GIPC_PFPX_H_
+#endif  // KISEKI_FEM_INCLUDE_FEM_SHARED_GIPC_PFPX_H_

@@ -10,7 +10,7 @@
 #include <string>
 #include <variant>
 #include <vector>
-namespace sim::core {
+namespace ksk::core {
 struct JsonNode;
 using JsonDict = std::unordered_map<std::string, JsonNode>;
 using JsonList = std::vector<JsonNode>;

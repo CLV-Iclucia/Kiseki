@@ -4,7 +4,7 @@
 #include <Maths/linear-solvers/cg-solver.h>
 #include <Maths/linear-solver-factory.h>
 
-namespace sim::maths {
+namespace ksk::maths {
 
 int cg_auto_reg = ([]() {
     LinearSolverFactory::instance().registerCreator(

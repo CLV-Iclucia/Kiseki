@@ -24,7 +24,7 @@
 #include <cstdint>
 #include <type_traits>
 
-namespace sim::rhi {
+namespace ksk::rhi {
 
 // ============================================================================
 // Float vector types (matching HLSL float2/float3/float4)
@@ -189,4 +189,4 @@ inline constexpr uint32_t alignUp(uint32_t offset, uint32_t alignment) {
   return (offset + alignment - 1u) & ~(alignment - 1u);
 }
 
-}  // namespace sim::rhi
+}  // namespace ksk::rhi

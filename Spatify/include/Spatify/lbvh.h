@@ -2,8 +2,8 @@
 // Created by creeper on 5/23/24.
 //
 
-#ifndef SIMCRAFT_SPATIFY_INCLUDE_SPATIFY_LBVH_H_
-#define SIMCRAFT_SPATIFY_INCLUDE_SPATIFY_LBVH_H_
+#ifndef KISEKI_SPATIFY_INCLUDE_SPATIFY_LBVH_H_
+#define KISEKI_SPATIFY_INCLUDE_SPATIFY_LBVH_H_
 #include <array>
 #include <vector>
 #include <concepts>
@@ -192,4 +192,4 @@ class LBVH {
   BBox<Real, 3> sceneBound{};
 };
 }
-#endif //SIMCRAFT_SPATIFY_INCLUDE_SPATIFY_LBVH_H_
+#endif //KISEKI_SPATIFY_INCLUDE_SPATIFY_LBVH_H_

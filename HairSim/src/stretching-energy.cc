@@ -2,7 +2,7 @@
 
 #include <cmath>
 
-namespace sim::hairsim {
+namespace ksk::hairsim {
 
 StretchingEnergy::StretchingEnergy(const RodState& state,
                                    const RodRestState& rest,
@@ -42,4 +42,4 @@ void StretchingEnergy::accumulate(RodAssembly assembly) const {
   }
 }
 
-}  // namespace sim::hairsim
+}  // namespace ksk::hairsim

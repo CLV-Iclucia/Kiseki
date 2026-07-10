@@ -19,8 +19,8 @@
 
 #include <cmath>
 
-using namespace sim;
-using namespace sim::fem;
+using namespace ksk;
+using namespace ksk::fem;
 
 namespace {
 
@@ -51,7 +51,7 @@ glm::dvec3 centerOfMass(const FEMFrame& f) {
 }  // namespace
 
 TEST(GpuFemBackend, FreeFallUnderGravity) {
-    auto device = sim::rhi::Device::create({.backend = sim::rhi::Backend::Vulkan,
+    auto device = ksk::rhi::Device::create({.backend = ksk::rhi::Backend::Vulkan,
                                             .enableValidation = true});
     if (!device) GTEST_SKIP() << "No Vulkan device";
     auto compiler = device->createShaderCompiler();

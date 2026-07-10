@@ -9,7 +9,7 @@
 #include <RHI/sync.h>
 #include <vulkan/vulkan.h>
 
-namespace sim::rhi::vulkan {
+namespace ksk::rhi::vulkan {
 
 class VulkanDevice;
 
@@ -37,4 +37,4 @@ class VulkanSemaphore final : public Semaphore {
   VkSemaphore m_handle;
 };
 
-}  // namespace sim::rhi::vulkan
+}  // namespace ksk::rhi::vulkan

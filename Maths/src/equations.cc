@@ -2,7 +2,7 @@
 #include <Core/utils.h>
 #include <iostream>
 
-namespace sim::maths {
+namespace ksk::maths {
 
 // the methods come from "A Fast & Robust Solution for Cubic & Higher-Order Polynomials" by Cem Yuksel, SIGGRAPH 2022
 CubicEquationRoots quadraticSolve(const QuadraticPolynomial &poly) {

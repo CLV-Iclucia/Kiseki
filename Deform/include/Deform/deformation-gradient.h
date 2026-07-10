@@ -2,11 +2,11 @@
 // Created by creeper on 6/3/24.
 //
 
-#ifndef SIMCRAFT_DEFORM_INCLUDE_DEFORM_DEFORMATION_GRADIENT_H_
-#define SIMCRAFT_DEFORM_INCLUDE_DEFORM_DEFORMATION_GRADIENT_H_
+#ifndef KISEKI_DEFORM_INCLUDE_DEFORM_DEFORMATION_GRADIENT_H_
+#define KISEKI_DEFORM_INCLUDE_DEFORM_DEFORMATION_GRADIENT_H_
 #include <Deform/types.h>
 #include <Maths/svd.h>
-namespace sim::deform {
+namespace ksk::deform {
 template<typename T, int Dim>
 struct DeformationGradient {
   DeformationGradient() : m_Dm_inverse(Matrix<T, Dim, Dim>::Identity()) {}
@@ -86,4 +86,4 @@ struct DeformationGradient {
 
 
 }
-#endif //SIMCRAFT_DEFORM_INCLUDE_DEFORM_DEFORMATION_GRADIENT_H_
+#endif //KISEKI_DEFORM_INCLUDE_DEFORM_DEFORMATION_GRADIENT_H_

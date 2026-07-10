@@ -1,8 +1,8 @@
 """
-SimCraft Example: Prescribed Motion
+Kiseki Example: Prescribed Motion
 ====================================
 
-A vertex is driven by a Python lambda — sinusoidal oscillation in x.
+A vertex is driven by a Python lambda 鈥?sinusoidal oscillation in x.
 Demonstrates: prescribe_motion with a Python callable.
 
 Usage:
@@ -12,10 +12,10 @@ Usage:
 import numpy as np
 
 try:
-    import simcraft
+    import kiseki
 except ImportError:
     raise ImportError(
-        "Cannot import simcraft. Install first:\n"
+        "Cannot import kiseki. Install first:\n"
         "  python dev_setup.py                     (developer: after CLion build)\n"
         "  pip install .                            (user: from VS Dev Prompt)\n"
         "See python/README.md for details."
@@ -23,19 +23,19 @@ except ImportError:
 
 from pathlib import Path
 
-print(f"simcraft {simcraft.__version__}")
+print(f"kiseki {kiseki.__version__}")
 
-# ─── Setup ───────────────────────────────────────────────────────────────────
+# 鈹€鈹€鈹€ Setup 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 mesh_path = Path(__file__).resolve().parents[2] / "FEM" / "assets" / "tets" / "cube10x10.tobj"
-mesh = simcraft.TetMesh.from_file(str(mesh_path))
+mesh = kiseki.TetMesh.from_file(str(mesh_path))
 print(f"Mesh: {mesh.num_vertices} vertices, {mesh.num_elements} tets")
 
 # Read vertex positions BEFORE add_elastic_body (which moves the mesh)
 verts = mesh.vertices
 
-material = simcraft.NeoHookean(young=2e5, poisson=0.45)
+material = kiseki.NeoHookean(young=2e5, poisson=0.45)
 
-system = simcraft.System()
+system = kiseki.System()
 system.add_elastic_body(mesh, material, density=800.0, color=(0.35, 0.80, 0.80))
 system.gravity = np.array([0.0, -9.81, 0.0])
 
@@ -55,9 +55,9 @@ amplitude = 0.3
 freq = 1.0  # Hz
 print(f"Prescribed sinusoidal motion on {len(driven_face)} vertices (x_max face)")
 
-# ─── Run ─────────────────────────────────────────────────────────────────────
-integrator = simcraft.IpcIntegrator(dHat=1e-3, kappa=1e8)
-sim = simcraft.Simulation(system, integrator)
+# 鈹€鈹€鈹€ Run 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+integrator = kiseki.IpcIntegrator(dHat=1e-3, kappa=1e8)
+sim = kiseki.Simulation(system, integrator)
 
 print("Running... close window to stop.")
 sim.display(dt=0.01, steps=300, title="Prescribed Motion")

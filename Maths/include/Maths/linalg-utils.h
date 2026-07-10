@@ -4,7 +4,7 @@
 
 #pragma once
 #include <Maths/types.h>
-namespace sim::maths {
+namespace ksk::maths {
 template<typename T>
 Matrix<T, 3, 3> skewt(const Vector<T, 3> &v) {
   Matrix<T, 3, 3> A;

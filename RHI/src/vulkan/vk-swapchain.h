@@ -11,7 +11,7 @@
 
 #include <vector>
 
-namespace sim::rhi::vulkan {
+namespace ksk::rhi::vulkan {
 
 class VulkanDevice;
 
@@ -72,4 +72,4 @@ class VulkanSwapchain final : public Swapchain {
   VkQueue m_presentQueue = VK_NULL_HANDLE;
 };
 
-}  // namespace sim::rhi::vulkan
+}  // namespace ksk::rhi::vulkan

@@ -10,10 +10,11 @@ file(GLOB_RECURSE rpk_srcs    CONFIGURE_DEPENDS src/*.cc)
 file(GLOB_RECURSE rpk_headers CONFIGURE_DEPENDS include/RPK/*.h)
 
 add_library(RPK STATIC ${rpk_srcs} ${rpk_headers})
+add_library(Kiseki::RPK ALIAS RPK)
 
 target_include_directories(RPK PUBLIC include/)
 
-target_link_libraries(RPK PUBLIC RHI)
+target_link_libraries(RPK PUBLIC Kiseki::RHI)
 
 target_compile_features(RPK PUBLIC cxx_std_20)
 
@@ -27,7 +28,7 @@ file(GLOB rpk_test_srcs CONFIGURE_DEPENDS tests/*.cc)
 foreach(test_src ${rpk_test_srcs})
     get_filename_component(test_name ${test_src} NAME_WE)
     add_executable(${test_name} ${test_src})
-    target_link_libraries(${test_name} PRIVATE RPK GTest::gtest GTest::gtest_main)
+    target_link_libraries(${test_name} PRIVATE Kiseki::RPK GTest::gtest GTest::gtest_main)
     add_test(NAME ${test_name} COMMAND ${test_name})
 
     if(WIN32 AND CMAKE_VERSION VERSION_GREATER_EQUAL "3.21")

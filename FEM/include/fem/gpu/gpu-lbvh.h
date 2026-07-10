@@ -15,86 +15,86 @@
 
 #include <memory>
 
-namespace sim::fem::gpu {
+namespace ksk::fem::gpu {
 
-class LBVHMortonCS final : public sim::rhi::ComputeShader<LBVHMortonCS> {
+class LBVHMortonCS final : public ksk::rhi::ComputeShader<LBVHMortonCS> {
 public:
     DECLARE_COMPUTE_SHADER(LBVHMortonCS);
 
     SHADER_PARAMS_BEGIN(Params)
-        SHADER_PARAM_UAV   (sim::rhi::BufferRef, keys);
-        SHADER_PARAM_UAV   (sim::rhi::BufferRef, vals);
-        SHADER_PARAM_SRV   (sim::rhi::BufferRef, aabbLo);
-        SHADER_PARAM_SRV   (sim::rhi::BufferRef, aabbHi);
-        SHADER_PARAM_SRV   (sim::rhi::BufferRef, sceneBound);
+        SHADER_PARAM_UAV   (ksk::rhi::BufferRef, keys);
+        SHADER_PARAM_UAV   (ksk::rhi::BufferRef, vals);
+        SHADER_PARAM_SRV   (ksk::rhi::BufferRef, aabbLo);
+        SHADER_PARAM_SRV   (ksk::rhi::BufferRef, aabbHi);
+        SHADER_PARAM_SRV   (ksk::rhi::BufferRef, sceneBound);
         SHADER_PARAM_SCALAR(uint32_t,            n);
     SHADER_PARAMS_END();
 };
 
-class LBVHLeavesCS final : public sim::rhi::ComputeShader<LBVHLeavesCS> {
+class LBVHLeavesCS final : public ksk::rhi::ComputeShader<LBVHLeavesCS> {
 public:
     DECLARE_COMPUTE_SHADER(LBVHLeavesCS);
 
     SHADER_PARAMS_BEGIN(Params)
-        SHADER_PARAM_UAV   (sim::rhi::BufferRef, nodeLo);
-        SHADER_PARAM_UAV   (sim::rhi::BufferRef, nodeHi);
-        SHADER_PARAM_SRV   (sim::rhi::BufferRef, sortedIdx);
-        SHADER_PARAM_SRV   (sim::rhi::BufferRef, aabbLo);
-        SHADER_PARAM_SRV   (sim::rhi::BufferRef, aabbHi);
+        SHADER_PARAM_UAV   (ksk::rhi::BufferRef, nodeLo);
+        SHADER_PARAM_UAV   (ksk::rhi::BufferRef, nodeHi);
+        SHADER_PARAM_SRV   (ksk::rhi::BufferRef, sortedIdx);
+        SHADER_PARAM_SRV   (ksk::rhi::BufferRef, aabbLo);
+        SHADER_PARAM_SRV   (ksk::rhi::BufferRef, aabbHi);
         SHADER_PARAM_SCALAR(uint32_t,            n);
     SHADER_PARAMS_END();
 };
 
-class LBVHInternalCS final : public sim::rhi::ComputeShader<LBVHInternalCS> {
+class LBVHInternalCS final : public ksk::rhi::ComputeShader<LBVHInternalCS> {
 public:
     DECLARE_COMPUTE_SHADER(LBVHInternalCS);
 
     SHADER_PARAMS_BEGIN(Params)
-        SHADER_PARAM_UAV   (sim::rhi::BufferRef, lch);
-        SHADER_PARAM_UAV   (sim::rhi::BufferRef, rch);
-        SHADER_PARAM_UAV   (sim::rhi::BufferRef, fa);
-        SHADER_PARAM_SRV   (sim::rhi::BufferRef, mortons);
-        SHADER_PARAM_SRV   (sim::rhi::BufferRef, idxs);
+        SHADER_PARAM_UAV   (ksk::rhi::BufferRef, lch);
+        SHADER_PARAM_UAV   (ksk::rhi::BufferRef, rch);
+        SHADER_PARAM_UAV   (ksk::rhi::BufferRef, fa);
+        SHADER_PARAM_SRV   (ksk::rhi::BufferRef, mortons);
+        SHADER_PARAM_SRV   (ksk::rhi::BufferRef, idxs);
         SHADER_PARAM_SCALAR(uint32_t,            n);
     SHADER_PARAMS_END();
 };
 
-class LBVHRefitCS final : public sim::rhi::ComputeShader<LBVHRefitCS> {
+class LBVHRefitCS final : public ksk::rhi::ComputeShader<LBVHRefitCS> {
 public:
     DECLARE_COMPUTE_SHADER(LBVHRefitCS);
 
     SHADER_PARAMS_BEGIN(Params)
-        SHADER_PARAM_UAV   (sim::rhi::BufferRef, nodeLo);
-        SHADER_PARAM_UAV   (sim::rhi::BufferRef, nodeHi);
-        SHADER_PARAM_UAV   (sim::rhi::BufferRef, flags);
-        SHADER_PARAM_SRV   (sim::rhi::BufferRef, lch);
-        SHADER_PARAM_SRV   (sim::rhi::BufferRef, rch);
-        SHADER_PARAM_SRV   (sim::rhi::BufferRef, fa);
+        SHADER_PARAM_UAV   (ksk::rhi::BufferRef, nodeLo);
+        SHADER_PARAM_UAV   (ksk::rhi::BufferRef, nodeHi);
+        SHADER_PARAM_UAV   (ksk::rhi::BufferRef, flags);
+        SHADER_PARAM_SRV   (ksk::rhi::BufferRef, lch);
+        SHADER_PARAM_SRV   (ksk::rhi::BufferRef, rch);
+        SHADER_PARAM_SRV   (ksk::rhi::BufferRef, fa);
         SHADER_PARAM_SCALAR(uint32_t,            n);
     SHADER_PARAMS_END();
 };
 
 class LBVHBoundBlockCS final
-    : public sim::rhi::ComputeShader<LBVHBoundBlockCS> {
+    : public ksk::rhi::ComputeShader<LBVHBoundBlockCS> {
 public:
     DECLARE_COMPUTE_SHADER(LBVHBoundBlockCS);
 
     SHADER_PARAMS_BEGIN(Params)
-        SHADER_PARAM_UAV   (sim::rhi::BufferRef, partial);
-        SHADER_PARAM_SRV   (sim::rhi::BufferRef, lo);
-        SHADER_PARAM_SRV   (sim::rhi::BufferRef, hi);
+        SHADER_PARAM_UAV   (ksk::rhi::BufferRef, partial);
+        SHADER_PARAM_SRV   (ksk::rhi::BufferRef, lo);
+        SHADER_PARAM_SRV   (ksk::rhi::BufferRef, hi);
         SHADER_PARAM_SCALAR(uint32_t,            n);
     SHADER_PARAMS_END();
 };
 
 class LBVHBoundFinalCS final
-    : public sim::rhi::ComputeShader<LBVHBoundFinalCS> {
+    : public ksk::rhi::ComputeShader<LBVHBoundFinalCS> {
 public:
     DECLARE_COMPUTE_SHADER(LBVHBoundFinalCS);
 
     SHADER_PARAMS_BEGIN(Params)
-        SHADER_PARAM_UAV   (sim::rhi::BufferRef, sceneBound);
-        SHADER_PARAM_SRV   (sim::rhi::BufferRef, partial);
+        SHADER_PARAM_UAV   (ksk::rhi::BufferRef, sceneBound);
+        SHADER_PARAM_SRV   (ksk::rhi::BufferRef, partial);
         SHADER_PARAM_SCALAR(uint32_t,            numGroups);
     SHADER_PARAMS_END();
 };
@@ -163,4 +163,4 @@ private:
                      const rhi::BufferRef& sceneBound, uint32_t N);
 };
 
-} // namespace sim::fem::gpu
+} // namespace ksk::fem::gpu

@@ -6,7 +6,7 @@
 // docs/rhi-r7-swapchain-plan.md §2.
 //
 // Build:
-//   cmake -B build -DSIMCRAFT_BUILD_RHI=ON
+//   cmake -B build -DKISEKI_BUILD_RHI=ON
 //   cmake --build build --target vk-triangle
 //
 // Requires: Vulkan SDK, GPU with Vulkan 1.3, and a display.
@@ -26,7 +26,7 @@
 #include <cstdlib>
 #include <vector>
 
-using namespace sim::rhi;
+using namespace ksk::rhi;
 
 // ---- HLSL sources (embedded) -----------------------------------------------
 static const char* kVertexShader = R"(

@@ -8,7 +8,7 @@
 #include <fem/colliders.h>
 #include <fem/simplex.h>
 
-namespace sim::fem {
+namespace ksk::fem {
 
 struct GeometryReference {
   int primitiveId;

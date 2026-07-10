@@ -8,7 +8,7 @@
 
 #include <cstdint>
 
-namespace sim::rhi {
+namespace ksk::rhi {
 
 enum class Format : uint32_t {
   Undefined = 0,
@@ -162,4 +162,4 @@ constexpr bool formatHasStencil(Format f) noexcept {
   return f == Format::D24_UNorm_S8_UInt || f == Format::D32_Float_S8_UInt;
 }
 
-}  // namespace sim::rhi
+}  // namespace ksk::rhi

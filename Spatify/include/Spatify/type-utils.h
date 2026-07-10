@@ -2,8 +2,8 @@
 // Created by creeper on 23-8-15.
 //
 
-#ifndef SIMCRAFT_CORE_INCLUDE_CORE_TYPE_UTILS_H_
-#define SIMCRAFT_CORE_INCLUDE_CORE_TYPE_UTILS_H_
+#ifndef KISEKI_CORE_INCLUDE_CORE_TYPE_UTILS_H_
+#define KISEKI_CORE_INCLUDE_CORE_TYPE_UTILS_H_
 #include <type_traits>
 namespace spatify {
 template <int a, int b> struct compile_time_gcd {
@@ -70,4 +70,4 @@ struct is_compile_time_vec<
 };
 
 } // namespace core
-#endif // SIMCRAFT_CORE_INCLUDE_CORE_TYPE_UTILS_H_
+#endif // KISEKI_CORE_INCLUDE_CORE_TYPE_UTILS_H_

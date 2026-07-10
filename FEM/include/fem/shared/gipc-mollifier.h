@@ -24,8 +24,8 @@
 //
 // Vertex/DOF order: x = [ea0, ea1, eb0, eb1]; grad[0..11], w[*][0..11].
 //
-#ifndef SIMCRAFT_FEM_INCLUDE_FEM_SHARED_GIPC_MOLLIFIER_H_
-#define SIMCRAFT_FEM_INCLUDE_FEM_SHARED_GIPC_MOLLIFIER_H_
+#ifndef KISEKI_FEM_INCLUDE_FEM_SHARED_GIPC_MOLLIFIER_H_
+#define KISEKI_FEM_INCLUDE_FEM_SHARED_GIPC_MOLLIFIER_H_
 
 #include <fem/shared/gipc-pfpx.h>     // shGipcPFPx_EE (r8) + shDistanceSqrLineLine
 #include <fem/shared/gipc-barrier.h>  // shared barrier conventions
@@ -245,4 +245,4 @@ SH_INLINE sh_real shMollifiedEnergyEE(
 
 SH_NS_END
 
-#endif  // SIMCRAFT_FEM_INCLUDE_FEM_SHARED_GIPC_MOLLIFIER_H_
+#endif  // KISEKI_FEM_INCLUDE_FEM_SHARED_GIPC_MOLLIFIER_H_

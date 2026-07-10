@@ -4,7 +4,7 @@
 #include <string>
 #include <iostream>
 #include <Core/reflection.h>
-using namespace sim::core;
+using namespace ksk::core;
 
 struct Student {
   std::string name;

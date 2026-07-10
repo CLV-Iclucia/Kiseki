@@ -8,7 +8,7 @@
 #include <spdlog/spdlog.h>
 #include <optional>
 
-namespace sim::fem {
+namespace ksk::fem {
 void tetAssembleGlobal(VecXd &global, const Vector<Real, 12> &local,
                        const Vector<int, 4> &tet) {
   for (int i = 0; i < 4; i++)
@@ -298,4 +298,4 @@ System SystemBuilder::build(const core::JsonNode &json) {
   return system;
 }  // closes SystemBuilder::build()
 
-} // namespace sim::fem
+} // namespace ksk::fem

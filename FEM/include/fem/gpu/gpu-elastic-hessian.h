@@ -17,23 +17,23 @@
 #include <filesystem>
 #include <vector>
 
-namespace sim::fem::gpu {
+namespace ksk::fem::gpu {
 
 // Elastic Hessian left resident in device buffers (16*nTets BCOO entries,
 // duplicates kept). Suitable for feeding GpuBcooSorter -> GpuBlockPCGSolver
 // with no CPU round-trip.
 struct DeviceBcoo {
-    sim::rhi::BufferRef blocks;   // double[nnz*9], column-major dmat3
-    sim::rhi::BufferRef row;      // uint[nnz]
-    sim::rhi::BufferRef col;      // uint[nnz]
+    ksk::rhi::BufferRef blocks;   // double[nnz*9], column-major dmat3
+    ksk::rhi::BufferRef row;      // uint[nnz]
+    ksk::rhi::BufferRef col;      // uint[nnz]
     uint32_t nnz    = 0;
     uint32_t nVerts = 0;
 };
 
 class GpuElasticHessian {
 public:
-    GpuElasticHessian(sim::rhi::Device& device,
-                      sim::rhi::ShaderCompiler& compiler,
+    GpuElasticHessian(ksk::rhi::Device& device,
+                      ksk::rhi::ShaderCompiler& compiler,
                       const std::filesystem::path& shaderDir = {},
                       int cyclicSweeps = 20);
 
@@ -58,16 +58,16 @@ public:
                                double mu, double lambda);
 
 private:
-    sim::rhi::Device& device_;
+    ksk::rhi::Device& device_;
     bool valid_ = false;
-    sim::rhi::PipelineRef pso_;
+    ksk::rhi::PipelineRef pso_;
 
     // Persistent device output buffers (grown on demand).
-    sim::rhi::BufferRef bBlocks_, bRow_, bCol_;
+    ksk::rhi::BufferRef bBlocks_, bRow_, bCol_;
     uint32_t capEntries_ = 0;
 
-    void uploadBytes(const sim::rhi::BufferRef& dst, const void* data, size_t bytes);
-    void download(const sim::rhi::BufferRef& src, void* dst, size_t bytes);
+    void uploadBytes(const ksk::rhi::BufferRef& dst, const void* data, size_t bytes);
+    void download(const ksk::rhi::BufferRef& src, void* dst, size_t bytes);
 };
 
-} // namespace sim::fem::gpu
+} // namespace ksk::fem::gpu

@@ -13,7 +13,7 @@
 #include <spdlog/spdlog.h>
 #include <stdexcept>
 
-namespace sim::fem {
+namespace ksk::fem {
 
 // ============================================================================
 // Helper: convert E, nu → mu, lambda (Lame parameters)
@@ -264,4 +264,4 @@ std::unique_ptr<FEMBackend> createFEMBackend(const std::string& type) {
     throw std::runtime_error("[createFEMBackend] Unknown backend type: " + type);
 }
 
-} // namespace sim::fem
+} // namespace ksk::fem

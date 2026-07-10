@@ -12,7 +12,7 @@
 #include <Maths/block-linear-solver.h>
 #include <functional>
 
-namespace sim::fem {
+namespace ksk::fem {
 
 class IpcIntegrator : public Integrator {
   public:

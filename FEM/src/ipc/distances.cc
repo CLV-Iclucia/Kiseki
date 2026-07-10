@@ -8,7 +8,7 @@
 #include <glm/geometric.hpp>
 #include <stdexcept>
 
-namespace sim::fem::ipc {
+namespace ksk::fem::ipc {
 
 using maths::LocalGrad;
 using maths::LocalHessian;
@@ -367,4 +367,4 @@ LocalHessian<4> localDistanceSqrEdgeEdgeHessian(const glm::dvec3 &a,
   }
 }
 
-} // namespace sim::fem::ipc
+} // namespace ksk::fem::ipc

@@ -14,8 +14,8 @@
 // fem/ipc/distances.h (EdgeEdgeDistanceType / PointTriangleDistanceType), so a
 // plain static_cast across the boundary is exact.
 //
-#ifndef SIMCRAFT_FEM_INCLUDE_FEM_SHARED_IPC_DISTANCE_TYPE_H_
-#define SIMCRAFT_FEM_INCLUDE_FEM_SHARED_IPC_DISTANCE_TYPE_H_
+#ifndef KISEKI_FEM_INCLUDE_FEM_SHARED_IPC_DISTANCE_TYPE_H_
+#define KISEKI_FEM_INCLUDE_FEM_SHARED_IPC_DISTANCE_TYPE_H_
 
 #include <fem/shared/cross-lang.h>
 
@@ -178,4 +178,4 @@ SH_INLINE int shDecidePointTriangleDistanceType(
 
 SH_NS_END
 
-#endif  // SIMCRAFT_FEM_INCLUDE_FEM_SHARED_IPC_DISTANCE_TYPE_H_
+#endif  // KISEKI_FEM_INCLUDE_FEM_SHARED_IPC_DISTANCE_TYPE_H_

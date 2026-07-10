@@ -9,7 +9,7 @@
 #include <array>
 #include <cassert>
 
-namespace sim::rhi::vulkan {
+namespace ksk::rhi::vulkan {
 
 DescriptorSetAllocator::DescriptorSetAllocator(VkDevice device)
     : m_device(device) {
@@ -128,4 +128,4 @@ VkDescriptorPool DescriptorSetAllocator::createPool() {
   return pool;
 }
 
-}  // namespace sim::rhi::vulkan
+}  // namespace ksk::rhi::vulkan

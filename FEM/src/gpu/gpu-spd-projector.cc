@@ -13,9 +13,9 @@
 #define FEM_SHADER_DIR "."
 #endif
 
-namespace sim::fem::gpu {
+namespace ksk::fem::gpu {
 
-using namespace sim::rhi;
+using namespace ksk::rhi;
 namespace fs = std::filesystem;
 
 // Compile with custom preprocessor defines (compileComputePipeline can't).
@@ -113,4 +113,4 @@ void GpuSpdProjector9::project(Strategy strategy, Clamp clamp,
     }
 }
 
-} // namespace sim::fem::gpu
+} // namespace ksk::fem::gpu

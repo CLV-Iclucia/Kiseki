@@ -17,9 +17,9 @@
 #define FEM_SHADER_DIR "."
 #endif
 
-namespace sim::fem::gpu {
+namespace ksk::fem::gpu {
 
-using namespace sim::rhi;
+using namespace ksk::rhi;
 namespace fs = std::filesystem;
 
 static constexpr uint32_t kWG = 256;
@@ -334,4 +334,4 @@ GpuBlockPCGSolver::runResident(const BufferRef& blocks, const BufferRef& row,
     return res;
 }
 
-} // namespace sim::fem::gpu
+} // namespace ksk::fem::gpu

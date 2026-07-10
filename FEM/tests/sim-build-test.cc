@@ -10,14 +10,14 @@
 #include <fstream>
 #include <filesystem>
 
-using namespace sim::fem;
+using namespace ksk::fem;
 
 class FEMSimulationBuildTest : public ::testing::Test {
 protected:
     // 从JSON字符串构建FEMSimulation
     FEMSimulation buildFromJsonString(const std::string& jsonStr) {
-        auto jsonNode = sim::core::parseJson(jsonStr);
-        if (!jsonNode || !jsonNode->is<sim::core::JsonDict>()) {
+        auto jsonNode = ksk::core::parseJson(jsonStr);
+        if (!jsonNode || !jsonNode->is<ksk::core::JsonDict>()) {
             throw std::runtime_error("Json Parse failed");
         }
         FEMSimulationBuilder builder;

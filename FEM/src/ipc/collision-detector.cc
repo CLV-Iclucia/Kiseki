@@ -12,7 +12,7 @@
 #include <tbb/tbb.h>
 #include <spdlog/spdlog.h>
 
-namespace sim::fem::ipc {
+namespace ksk::fem::ipc {
 
 // GLM-based mixed product: a · (b × c)
 static inline Real mixedProduct(const glm::dvec3 &a,
@@ -21,7 +21,7 @@ static inline Real mixedProduct(const glm::dvec3 &a,
   return glm::dot(a, glm::cross(b, c));
 }
 
-using sim::maths::CubicEquationRoots;
+using ksk::maths::CubicEquationRoots;
 
 maths::CubicEquationRoots solveCoplanarTime(const CCDQuery &query, Real toi) {
   const auto &[x1, x2_x1, x3_x1, x4_x1, u1, u2_u1, u3_u1, u4_u1] = query;

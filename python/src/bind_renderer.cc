@@ -8,9 +8,9 @@
 #include <thread>
 #include <atomic>
 
-using namespace sim::renderer;
-using sim::core::Vec3f;
-using sim::core::Vec3u;
+using namespace ksk::renderer;
+using ksk::core::Vec3f;
+using ksk::core::Vec3u;
 
 
 
@@ -100,7 +100,7 @@ void bind_renderer(py::module_& m)
     }),
     py::arg("width") = 1280,
     py::arg("height") = 720,
-    py::arg("title") = "SimCraft",
+    py::arg("title") = "Kiseki",
     py::arg("vsync") = true,
     "Create a renderer with window configuration")
 

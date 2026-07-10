@@ -16,9 +16,9 @@
 #define FEM_INCLUDE_DIR "."
 #endif
 
-namespace sim::fem::gpu {
+namespace ksk::fem::gpu {
 
-using namespace sim::rhi;
+using namespace ksk::rhi;
 namespace fs = std::filesystem;
 
 static constexpr uint32_t kWG = 256;
@@ -38,7 +38,7 @@ GPUACCD::GPUACCD(Device& device, ShaderCompiler& compiler, const fs::path& shade
 {
     fs::path dir = shaderDir.empty() ? fs::path(FEM_SHADER_DIR) : shaderDir;
 
-    reduce_ = std::make_unique<sim::rpk::Reduce>(device, compiler);
+    reduce_ = std::make_unique<ksk::rpk::Reduce>(device, compiler);
 
     psoVt_ = compileWithShared(device, compiler, dir / "ccd-vt.hlsl");
     psoEe_ = compileWithShared(device, compiler, dir / "ccd-ee.hlsl");
@@ -120,7 +120,7 @@ double GPUACCD::stepSizeUpperBound(const BufferRef& x, const BufferRef& pdir,
         }
         cmd->memoryBarrier(B::StageComputeShader, B::StageComputeShader);
 
-        reduce_->run(*cmd, sim::rpk::ReduceOp::Min, sim::rpk::ScalarType::Float64,
+        reduce_->run(*cmd, ksk::rpk::ReduceOp::Min, ksk::rpk::ScalarType::Float64,
                      toiOut_, result_, nc);
         device_.submitAndWait(*cmd, QueueType::Compute);
     }
@@ -128,4 +128,4 @@ double GPUACCD::stepSizeUpperBound(const BufferRef& x, const BufferRef& pdir,
     return readbackDouble(result_);
 }
 
-} // namespace sim::fem::gpu
+} // namespace ksk::fem::gpu

@@ -36,7 +36,7 @@
 #include <utility>
 #include <vector>
 
-namespace sim::rhi {
+namespace ksk::rhi {
 namespace {
 
 // ---- RAII -----------------------------------------------------------------
@@ -303,4 +303,4 @@ ReflectionInfo reflectSpirv(std::span<const std::byte> spirv,
   return info;
 }
 
-}  // namespace sim::rhi
+}  // namespace ksk::rhi

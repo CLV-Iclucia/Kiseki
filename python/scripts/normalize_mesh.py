@@ -17,10 +17,10 @@ import sys
 from pathlib import Path
 
 try:
-    import simcraft
+    import kiseki
 except ImportError:
     raise ImportError(
-        "Cannot import simcraft. Install first:\n"
+        "Cannot import kiseki. Install first:\n"
         "  python dev_setup.py                     (developer: after CLion build)\n"
         "  pip install .                            (user: from VS Dev Prompt)\n"
         "See python/README.md for details."
@@ -37,7 +37,7 @@ def normalize_mesh(input_path: str, output_path: str, target_scale: float = 1.0)
         target_scale: Target max bounding box dimension (default 1.0)
     """
     print(f"Loading mesh from {input_path}...")
-    mesh = simcraft.TetMesh.from_file(str(input_path))
+    mesh = kiseki.TetMesh.from_file(str(input_path))
 
     # Get vertex positions BEFORE commit (mesh.vertices will be cleared after)
     verts = mesh.vertices.copy()  # (N, 3) numpy array
@@ -78,11 +78,11 @@ def normalize_mesh(input_path: str, output_path: str, target_scale: float = 1.0)
 
     # Create normalized mesh and save
     # Note: TetMesh constructor will consume the vertices and tets
-    normalized_mesh = simcraft.TetMesh(verts_normalized, tets)
+    normalized_mesh = kiseki.TetMesh(verts_normalized, tets)
 
     # Save to output file
     # For now, we'll use a workaround: create a temporary system just to demonstrate
-    # the mesh is valid, then manually write it. Since simcraft doesn't expose
+    # the mesh is valid, then manually write it. Since kiseki doesn't expose
     # mesh writing directly, we'll write a simple .tobj format ourselves.
     print(f"\nWriting normalized mesh to {output_path}...")
     _write_tobj(output_path, verts_normalized, tets)

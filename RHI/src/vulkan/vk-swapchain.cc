@@ -16,7 +16,7 @@
 #include <algorithm>
 #include <stdexcept>
 
-namespace sim::rhi::vulkan {
+namespace ksk::rhi::vulkan {
 
 // ============================================================================
 // VulkanSwapchain
@@ -356,4 +356,4 @@ Format VulkanSwapchain::fromVkFormat(VkFormat f) {
   }
 }
 
-}  // namespace sim::rhi::vulkan
+}  // namespace ksk::rhi::vulkan

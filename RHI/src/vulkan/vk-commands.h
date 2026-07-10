@@ -15,7 +15,7 @@
 #include <optional>
 #include <vector>
 
-namespace sim::rhi::vulkan {
+namespace ksk::rhi::vulkan {
 
 class VulkanDevice;
 class VulkanPipeline;
@@ -148,4 +148,4 @@ class VulkanCommandList final : public CommandList {
 };
 
 
-}  // namespace sim::rhi::vulkan
+}  // namespace ksk::rhi::vulkan

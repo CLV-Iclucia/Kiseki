@@ -14,8 +14,8 @@
 namespace fluid {
 
 // Namespace alias: allows existing code using `core::Xxx` inside `namespace fluid`
-// to resolve correctly to `sim::core::Xxx`.
-namespace core = sim::core;
+// to resolve correctly to `ksk::core::Xxx`.
+namespace core = ksk::core;
 
 using Index = int;
 using core::Real;

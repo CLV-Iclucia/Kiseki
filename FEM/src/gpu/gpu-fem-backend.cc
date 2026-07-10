@@ -23,11 +23,11 @@
 #define FEM_INCLUDE_DIR "."
 #endif
 
-namespace sim::fem
+namespace ksk::fem
 {
-    using namespace sim::rhi;
+    using namespace ksk::rhi;
     namespace fs = std::filesystem;
-    namespace gpu_ns = sim::fem::gpu;
+    namespace gpu_ns = ksk::fem::gpu;
 
     static constexpr uint32_t kWG = 256;
     static uint32_t groups(uint32_t n) { return (n + kWG - 1) / kWG; }
@@ -172,7 +172,7 @@ namespace sim::fem
         // TODO: must unique_ptr?
         sorter_ = std::make_unique<gpu_ns::GPUBCOOSorter>(device_, compiler_);
         pcg_ = std::make_unique<gpu_ns::GpuBlockPCGSolver>(device_, compiler_);
-        reduce_ = std::make_unique<sim::rpk::Reduce>(device_, compiler_);
+        reduce_ = std::make_unique<ksk::rpk::Reduce>(device_, compiler_);
 
         // Contact components (deformable self-contact) — reuse the existing ones.
         traj_ = std::make_unique<gpu_ns::GpuTrajectoryBounds>(device_);
@@ -648,7 +648,7 @@ namespace sim::fem
                 auto cmd = device_.beginCommands(QueueType::Compute);
                 cmd->dispatch(psoEEnergy_, p, groups(M), 1, 1);
                 cc(*cmd);
-                reduce_->run(*cmd, sim::rpk::ReduceOp::Sum, sim::rpk::ScalarType::Float64,
+                reduce_->run(*cmd, ksk::rpk::ReduceOp::Sum, ksk::rpk::ScalarType::Float64,
                              work_.elemE, work_.scalar, M);
                 device_.submitAndWait(*cmd, QueueType::Compute);
             }
@@ -668,7 +668,7 @@ namespace sim::fem
                 auto cmd = device_.beginCommands(QueueType::Compute);
                 cmd->dispatch(psoBEnergy_, p, groups(total), 1, 1);
                 cc(*cmd);
-                reduce_->run(*cmd, sim::rpk::ReduceOp::Sum, sim::rpk::ScalarType::Float64,
+                reduce_->run(*cmd, ksk::rpk::ReduceOp::Sum, ksk::rpk::ScalarType::Float64,
                              contact_.energy, work_.scalar, total);
                 device_.submitAndWait(*cmd, QueueType::Compute);
                 Ebar = readbackScalar(work_.scalar);
@@ -686,7 +686,7 @@ namespace sim::fem
                 auto cmd = device_.beginCommands(QueueType::Compute);
                 cmd->dispatch(psoMul_, p, groups(v3), 1, 1);
                 cc(*cmd);
-                reduce_->run(*cmd, sim::rpk::ReduceOp::Sum, sim::rpk::ScalarType::Float64,
+                reduce_->run(*cmd, ksk::rpk::ReduceOp::Sum, ksk::rpk::ScalarType::Float64,
                              work_.tmp, work_.scalar, v3);
                 device_.submitAndWait(*cmd, QueueType::Compute);
             }
@@ -837,7 +837,7 @@ namespace sim::fem
                 auto cmd = device_.beginCommands(QueueType::Compute);
                 cmd->dispatch(psoAbs_, p, groups(v3), 1, 1);
                 cc(*cmd);
-                reduce_->run(*cmd, sim::rpk::ReduceOp::Max, sim::rpk::ScalarType::Float64,
+                reduce_->run(*cmd, ksk::rpk::ReduceOp::Max, ksk::rpk::ScalarType::Float64,
                              work_.tmp, work_.scalar, v3);
                 device_.submitAndWait(*cmd, QueueType::Compute);
             }
@@ -880,11 +880,11 @@ namespace sim::fem
     // ============================================================================
     // TODO:  this shouldn't be placed in gpu-fem-backend.cc
     std::unique_ptr<FEMBackend> createFEMBackend(const std::string& type,
-                                                 sim::rhi::Device& device,
-                                                 sim::rhi::ShaderCompiler& compiler)
+                                                 ksk::rhi::Device& device,
+                                                 ksk::rhi::ShaderCompiler& compiler)
     {
         if (type == "gpu") return std::make_unique<GPUFEMBackend>(device, compiler);
         if (type == "cpu") return std::make_unique<CPUFEMBackend>();
         throw std::runtime_error("[createFEMBackend] Unknown backend type: " + type);
     }
-} // namespace sim::fem
+} // namespace ksk::fem

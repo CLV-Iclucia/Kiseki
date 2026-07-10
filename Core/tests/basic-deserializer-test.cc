@@ -13,7 +13,7 @@
 #include <variant>
 #include <vector>
 
-using namespace sim::core;
+using namespace ksk::core;
 
 // 测试基本类型反序列化
 TEST(BasicDeserializerTest, BasicTypes) {
@@ -82,7 +82,7 @@ struct CustomDeserializeType {
   std::map<std::string, double> metrics;
 };
 
-template <> struct sim::core::custom_deserializer<CustomDeserializeType> {
+template <> struct ksk::core::custom_deserializer<CustomDeserializeType> {
   static CustomDeserializeType do_deserialize(const JsonNode &node) {
     if (!node.is<JsonDict>())
       throw std::runtime_error("Expected a dictionary");

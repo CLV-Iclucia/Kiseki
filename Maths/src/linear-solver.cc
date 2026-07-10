@@ -3,7 +3,7 @@
 //
 #include <Maths/linear-solver-factory.h>
 
-namespace sim::maths {
+namespace ksk::maths {
 
 std::unique_ptr<LinearSolver>
 createLinearSolver(const core::JsonNode &node) {
@@ -15,4 +15,4 @@ createLinearSolver(const core::JsonNode &node) {
   return LinearSolverFactory::instance().create(type, node);
 }
 
-} // namespace sim::maths 
+} // namespace ksk::maths 

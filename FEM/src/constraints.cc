@@ -2,7 +2,7 @@
 #include <fem/system.h>
 #include <spdlog/spdlog.h>
 
-namespace sim::fem {
+namespace ksk::fem {
 
 void ConstraintManager::pinVertices(const std::vector<int>& indices,
                                     const maths::BlockVector<3>& positions) {
@@ -145,4 +145,4 @@ void ConstraintManager::projectToFreeSpace(maths::BlockVector<3>& v) const {
   }
 }
 
-} // namespace sim::fem
+} // namespace ksk::fem

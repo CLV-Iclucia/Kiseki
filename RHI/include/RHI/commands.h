@@ -40,7 +40,7 @@
 #include <variant>
 #include <vector>
 
-namespace sim::rhi {
+namespace ksk::rhi {
 
 template <class Derived>
 class ComputeShader;
@@ -220,7 +220,7 @@ class PushConstants {
 };
 
 // ---- CommandList -----------------------------------------------------------
-class CommandList : public sim::core::NonCopyable {
+class CommandList : public ksk::core::NonCopyable {
  public:
   virtual ~CommandList() = default;
 
@@ -388,4 +388,4 @@ inline void ShaderParamsBase::_apply(CommandList& cmd) const {
   }
 }
 
-}  // namespace sim::rhi
+}  // namespace ksk::rhi

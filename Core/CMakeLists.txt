@@ -11,11 +11,12 @@ set(CORE_SOURCES
 )
 
 add_library(Core STATIC ${CORE_SOURCES})
+add_library(Kiseki::Core ALIAS Core)
 target_include_directories(Core PUBLIC include)
 target_include_directories(Core PUBLIC ${EXTERNAL_PATH}/glm)
 target_link_libraries(Core PUBLIC spdlog)
 
-if(SIMCRAFT_PROFILE)
+if(KISEKI_PROFILE)
   target_link_libraries(Core PUBLIC Tracy::TracyClient)
 endif()
 
@@ -24,6 +25,6 @@ file(GLOB_RECURSE test_srcs CONFIGURE_DEPENDS tests/*.cc)
 foreach(test_src ${test_srcs})
     get_filename_component(test_name ${test_src} NAME_WE)
     add_executable(${test_name} ${test_src})
-    target_link_libraries(${test_name} PUBLIC Core GTest::gtest GTest::gtest_main)
+    target_link_libraries(${test_name} PUBLIC Kiseki::Core GTest::gtest GTest::gtest_main)
     add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()

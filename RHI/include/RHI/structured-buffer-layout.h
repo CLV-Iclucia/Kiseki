@@ -6,7 +6,7 @@
 #include <span>
 #include <type_traits>
 
-namespace sim::rhi {
+namespace ksk::rhi {
 
 namespace detail {
 
@@ -54,4 +54,4 @@ static_assert(is_direct_structured_data_v<glm::dmat3>);
 static_assert(is_direct_structured_data_v<glm::vec4>);
 static_assert(is_direct_structured_data_v<glm::dvec4>);
 
-}  // namespace sim::rhi
+}  // namespace ksk::rhi

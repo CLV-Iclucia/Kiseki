@@ -5,9 +5,9 @@
 #include <Renderer/scene-proxy.h>
 #include <thread>
 
-using namespace sim::renderer;
-using sim::core::Vec3f;
-using sim::core::Vec3u;
+using namespace ksk::renderer;
+using ksk::core::Vec3f;
+using ksk::core::Vec3u;
 
 // Forward-declare buildSceneProxy (defined in bind_renderer.cc as static)
 // We re-use a local copy here since it's small and avoids cross-TU dependency.
@@ -105,7 +105,7 @@ void bind_simulation(py::module_& m)
        "Run simulation for multiple timesteps. Locks system after call.")
 
     // ─── display(): the Pythonic way to run with visualization ──────────────
-    // Equivalent to simcraft.run_and_display(sim, renderer, dt, steps, ...)
+    // Equivalent to kiseki.run_and_display(sim, renderer, dt, steps, ...)
     // but as a method call: sim.display(dt, steps)
     //
     // Key guarantee: frames are pushed automatically. User CANNOT forget.
@@ -182,7 +182,7 @@ void bind_simulation(py::module_& m)
     },
     py::arg("dt") = 0.01, py::arg("steps") = 1000,
     py::arg("width") = 1280, py::arg("height") = 720,
-    py::arg("title") = "SimCraft",
+    py::arg("title") = "Kiseki",
     py::arg("on_step") = py::none(), py::arg("log_interval") = 0,
     "Run simulation with real-time display (method style).\n\n"
     "Frames are pushed automatically after every timestep. You only need\n"
@@ -192,11 +192,11 @@ void bind_simulation(py::module_& m)
     "    steps:        Number of timesteps. Default: 1000\n"
     "    width:        Window width. Default: 1280\n"
     "    height:       Window height. Default: 720\n"
-    "    title:        Window title. Default: 'SimCraft'\n"
+    "    title:        Window title. Default: 'Kiseki'\n"
     "    on_step:      Optional callback(step: int, time: float) per step.\n"
     "    log_interval: Print progress every N steps (0 = silent).\n\n"
     "Example::\n\n"
-    "    sim = simcraft.Simulation(system, integrator)\n"
+    "    sim = kiseki.Simulation(system, integrator)\n"
     "    sim.display(dt=0.01, steps=500, title='Cube Drop')\n")
 
     .def_property_readonly("steps_completed", [](const PySimulation& self) {

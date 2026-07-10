@@ -4,7 +4,7 @@
 
 #pragma once
 
-namespace sim::fem {
+namespace ksk::fem {
 
 struct ExternalForce {
 

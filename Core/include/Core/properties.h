@@ -10,7 +10,7 @@
 #include <unordered_map>
 #include <optional>
 
-namespace sim::core {
+namespace ksk::core {
 
 struct NonCopyable {
   NonCopyable() = default;
@@ -60,4 +60,4 @@ private:
     std::unordered_map<std::string, std::any> data_;
 };
 
-} // namespace sim::core
+} // namespace ksk::core

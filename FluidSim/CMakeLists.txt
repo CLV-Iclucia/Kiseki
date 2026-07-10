@@ -27,17 +27,17 @@ file(GLOB_RECURSE gpu_headers CONFIGURE_DEPENDS include/FluidSim/gpu/*.h)
 # Legacy code (CPUFluidBackend, GPUFluidBackend) is still compiled for
 # backward compatibility during the transition period.
 #
-# If RHI is not available (SIMCRAFT_BUILD_RHI=OFF) the GPU sources are simply
+# If RHI is not available (KISEKI_BUILD_RHI=OFF) the GPU sources are simply
 # omitted via the conditional below — the CPU backend remains fully usable.
 # ============================================================================
-if(SIMCRAFT_BUILD_RHI)
+if(KISEKI_BUILD_RHI)
     add_library(FluidSim STATIC
         ${common_srcs}    ${common_headers}
         ${cpu_srcs}       ${cpu_headers}
         ${gpu_srcs}       ${gpu_headers}
     )
 
-    target_link_libraries(FluidSim PUBLIC Core Spatify TBB::tbb RHI)
+    target_link_libraries(FluidSim PUBLIC Kiseki::Core Kiseki::Spatify TBB::tbb Kiseki::RHI)
 else()
     message(STATUS "[FluidSim] RHI not available — GPU backend excluded")
 
@@ -46,14 +46,15 @@ else()
         ${cpu_srcs}       ${cpu_headers}
     )
 
-    target_link_libraries(FluidSim PUBLIC Core Spatify TBB::tbb)
+    target_link_libraries(FluidSim PUBLIC Kiseki::Core Kiseki::Spatify TBB::tbb)
 endif()
+add_library(Kiseki::Fluid ALIAS FluidSim)
 
 target_include_directories(FluidSim PUBLIC include/)
 
 target_compile_definitions(FluidSim PRIVATE
     FLUIDSIM_SHADER_DIR="${CMAKE_CURRENT_SOURCE_DIR}/shaders"
-    SIMCRAFT_ASSETS_DIR="${ASSETS_PATH}"
+    KISEKI_ASSETS_DIR="${ASSETS_PATH}"
 )
 
 

@@ -14,7 +14,7 @@
 #include <Core/json.h>
 #include <Core/reflection.h>
 
-namespace sim::core {
+namespace ksk::core {
 template<typename T>
 struct custom_deserializer {
   static T do_deserialize(const JsonNode &node) {

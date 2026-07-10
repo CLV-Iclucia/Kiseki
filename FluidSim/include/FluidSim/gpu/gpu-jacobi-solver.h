@@ -18,11 +18,11 @@ namespace fluid::gpu
     class GPUJacobiSolver final : public GPUPressureSolver
     {
     public:
-        GPUJacobiSolver(sim::rhi::Device& device,
+        GPUJacobiSolver(ksk::rhi::Device& device,
                         const PressureSystem& system,
                         const SolverConfig& config);
 
-        void solve(sim::rhi::CommandList& cmd,
+        void solve(ksk::rhi::CommandList& cmd,
                    const PressureSystem& system) override;
 
         void updateConfig(const SolverConfig& config) override
@@ -34,7 +34,7 @@ namespace fluid::gpu
         int iterations_;
 
         // Ping-pong buffer (owned by solver)
-        sim::rhi::BufferRef pressurePing_; // extra buffer; system.pressure is pong
+        ksk::rhi::BufferRef pressurePing_; // extra buffer; system.pressure is pong
 
         JacobiIterCS jacobi_;
     };

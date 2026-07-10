@@ -24,9 +24,9 @@
 #include <random>
 #include <vector>
 
-using namespace sim::rhi;
-using namespace sim::fem::gpu;
-namespace shared = sim::fem::shared;
+using namespace ksk::rhi;
+using namespace ksk::fem::gpu;
+namespace shared = ksk::fem::shared;
 
 namespace {
 

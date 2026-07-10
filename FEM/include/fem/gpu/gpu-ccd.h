@@ -19,14 +19,14 @@
 #include <filesystem>
 #include <memory>
 
-namespace sim::fem::gpu {
+namespace ksk::fem::gpu {
 
 SHADER_PARAMS_BEGIN(CcdParams)
-    SHADER_PARAM_UAV   (sim::rhi::BufferRef, toiOut);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, x);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, pdir);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, cand);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, paramBuf);
+    SHADER_PARAM_UAV   (ksk::rhi::BufferRef, toiOut);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, x);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, pdir);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, cand);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, paramBuf);
     SHADER_PARAM_SCALAR(uint32_t,            num);
     SHADER_PARAM_SCALAR(uint32_t,            streamOffset);
 SHADER_PARAMS_END();
@@ -75,4 +75,4 @@ private:
     double readbackDouble(const rhi::BufferRef& src);
 };
 
-} // namespace sim::fem::gpu
+} // namespace ksk::fem::gpu

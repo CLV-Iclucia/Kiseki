@@ -8,7 +8,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace sim::core {
+namespace ksk::core {
 
 /// 带源码位置的致命错误：记录日志并抛出 std::runtime_error。
 /// pybind11 会自动把 std::runtime_error 映射为 Python RuntimeError。
@@ -18,10 +18,10 @@ namespace sim::core {
     throw std::runtime_error(full);
 }
 
-} // namespace sim::core
+} // namespace ksk::core
 
 /// 报错并抛异常。C++ 端有日志，Python 端 pybind11 自动捕获为 RuntimeError。
-#define SIM_THROW(msg) ::sim::core::throwError(__FILE__, __LINE__, (msg))
+#define SIM_THROW(msg) ::ksk::core::throwError(__FILE__, __LINE__, (msg))
 
 /// 条件断言：condition 不满足时报错抛异常。
 #define SIM_ASSERT(condition, msg) \

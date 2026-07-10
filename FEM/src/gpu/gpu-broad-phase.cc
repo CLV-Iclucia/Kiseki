@@ -12,9 +12,9 @@
 #define FEM_SHADER_DIR "."
 #endif
 
-namespace sim::fem::gpu {
+namespace ksk::fem::gpu {
 
-using namespace sim::rhi;
+using namespace ksk::rhi;
 namespace fs = std::filesystem;
 
 static constexpr uint32_t kWG = 256;
@@ -25,7 +25,7 @@ GpuBroadPhase::GpuBroadPhase(Device& device, ShaderCompiler& compiler, const fs:
 {
     fs::path dir = shaderDir.empty() ? fs::path(FEM_SHADER_DIR) : shaderDir;
 
-    scan_ = std::make_unique<sim::rpk::Scan>(device, compiler);
+    scan_ = std::make_unique<ksk::rpk::Scan>(device, compiler);
 
     psoVtCount_ = compileComputePipeline(device, compiler, dir / "broadphase-vt-count.hlsl");
     psoVtWrite_ = compileComputePipeline(device, compiler, dir / "broadphase-vt-write.hlsl");
@@ -85,7 +85,7 @@ uint32_t GpuBroadPhase::runQuery(const PipelineRef& psoCount, const PipelineRef&
           p.numQueries = numQueries; p.numPrims = N;
           cmd->dispatch(psoCount, p, g, 1, 1); }
         cmd->memoryBarrier(B::StageComputeShader, B::StageComputeShader);
-        scan_->exclusive(*cmd, sim::rpk::ScanOp::Sum, sim::rpk::ScalarType::Uint32,
+        scan_->exclusive(*cmd, ksk::rpk::ScanOp::Sum, ksk::rpk::ScalarType::Uint32,
                          counts_, offsets_, numQueries);
         device_.submitAndWait(*cmd, QueueType::Compute);
     }
@@ -127,4 +127,4 @@ uint32_t GpuBroadPhase::queryEE(const GPULBVH& edgeBvh, const BufferRef& qEdgeLo
                     numEdges, eeOut_, capEe_);
 }
 
-} // namespace sim::fem::gpu
+} // namespace ksk::fem::gpu

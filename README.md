@@ -1,6 +1,6 @@
-# SimCraft
+# Kiseki
 
-SimCraft is my personal physics based simulation playground, where I implement and test various simulation stuffs
+Kiseki is my personal physics based simulation playground, where I implement and test various simulation stuffs
 
 ## Now it includes
 

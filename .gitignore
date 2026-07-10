@@ -8,3 +8,5 @@ dev_setup.py
 fast-cloc.bat
 fast-cloc.sh
 .*
+AGENTS.md
+CLAUDE.md

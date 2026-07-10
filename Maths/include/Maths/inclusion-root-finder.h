@@ -6,7 +6,7 @@
 #include <optional>
 #include <Maths/types.h>
 #include <queue>
-namespace sim::maths {
+namespace ksk::maths {
 
 struct Interval {
   std::array<Real, 2> bounds{};

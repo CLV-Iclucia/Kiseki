@@ -10,7 +10,7 @@
 
 namespace fluid::gpu {
 
-using namespace sim::rhi;
+using namespace ksk::rhi;
 
 GPUReconstructor::GPUReconstructor(Device& device, const GPUGridState& grid)
     : reconstruct_(device),

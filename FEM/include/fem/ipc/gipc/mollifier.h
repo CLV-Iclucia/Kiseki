@@ -27,7 +27,7 @@
 #include <cmath>
 
 
-namespace sim::fem::ipc::gipc {
+namespace ksk::fem::ipc::gipc {
 
 // ============================================================================
 // 高层结果结构
@@ -347,4 +347,4 @@ inline Eigen::Matrix<Real, 9, 9> computeMollifierInnerHessian(
   return H;
 }
 
-} // namespace sim::fem::ipc::gipc
+} // namespace ksk::fem::ipc::gipc

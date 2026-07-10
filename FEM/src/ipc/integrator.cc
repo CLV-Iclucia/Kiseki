@@ -20,7 +20,7 @@
 #include <string_view>
 
 
-namespace sim::fem {
+namespace ksk::fem {
 
 static int ipc_auto_reg = ([]() {
     IntegratorFactory::instance().registerCreator(
@@ -55,7 +55,7 @@ void IpcIntegrator::step(Real dt) {
 
   Real E_prev;
   {
-    SIM_PROFILE_SCOPE_COLOR("InitialEnergy", sim::core::profiler_colors::kEnergy);
+    SIM_PROFILE_SCOPE_COLOR("InitialEnergy", ksk::core::profiler_colors::kEnergy);
     E_prev = barrierAugmentedIncrementalPotentialEnergy(x_t, h);
   }
   spdlog::info("[IPC] E_prev = {}", E_prev);
@@ -67,7 +67,7 @@ void IpcIntegrator::step(Real dt) {
     // Compute negative gradient directly as BlockVector<3>
     maths::BlockVector<3> negG;
     {
-      SIM_PROFILE_SCOPE_COLOR("Gradient", sim::core::profiler_colors::kGradient);
+      SIM_PROFILE_SCOPE_COLOR("Gradient", ksk::core::profiler_colors::kGradient);
       negG = barrierAugmentedIncrementalPotentialEnergyGradient(x_t, h);
       negG *= -1.0;
       system().constraints().zeroConstrainedGradient(negG);
@@ -76,13 +76,13 @@ void IpcIntegrator::step(Real dt) {
     // Compute Hessian directly as BlockSparseMatrix<3>
     maths::BlockSparseMatrix<3> H;
     {
-      SIM_PROFILE_SCOPE_COLOR("HessianAssembly", sim::core::profiler_colors::kHessian);
+      SIM_PROFILE_SCOPE_COLOR("HessianAssembly", ksk::core::profiler_colors::kHessian);
       H = spdProjectHessian(h);
     }
 
     // Linear solve
     {
-      SIM_PROFILE_SCOPE_COLOR("LinearSolve", sim::core::profiler_colors::kSolver);
+      SIM_PROFILE_SCOPE_COLOR("LinearSolve", ksk::core::profiler_colors::kSolver);
       p.setZero();
       auto result = solver->solve(H, negG, p);
       if (!result.converged)
@@ -107,7 +107,7 @@ void IpcIntegrator::step(Real dt) {
     // CCD + line search
     Real alpha;
     {
-      SIM_PROFILE_SCOPE_COLOR("CCD", sim::core::profiler_colors::kCollision);
+      SIM_PROFILE_SCOPE_COLOR("CCD", ksk::core::profiler_colors::kCollision);
       Real alphaElastic = computeStepSizeUpperBound(p);
       Real alphaKinematic = 1.0;
       if (!system().colliders().empty()) {
@@ -122,7 +122,7 @@ void IpcIntegrator::step(Real dt) {
           "Invalid state: collision happened within an integration step");
 
     {
-      SIM_PROFILE_SCOPE_COLOR("LineSearch", sim::core::profiler_colors::kLineSearch);
+      SIM_PROFILE_SCOPE_COLOR("LineSearch", ksk::core::profiler_colors::kLineSearch);
       precomputeCollisionPairs(p, alpha);
       Real E;
       do {
@@ -626,4 +626,4 @@ Real IpcIntegrator::barrierEnergy() const {
   return energy;
 }
 
-} // namespace sim::fem
+} // namespace ksk::fem

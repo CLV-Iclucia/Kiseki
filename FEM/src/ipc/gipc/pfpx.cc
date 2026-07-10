@@ -14,7 +14,7 @@
 #include "glm/gtx/quaternion.hpp"
 
 
-namespace sim::fem::ipc::gipc {
+namespace ksk::fem::ipc::gipc {
 
 // ============================================================================
 // Edge-Edge Mollifier (PEE) PFPx
@@ -297,4 +297,4 @@ Eigen::Matrix<Real, 3, 6> computePFPx3x1(Real DmInv) {
 
 } // namespace detail
 
-} // namespace sim::fem::ipc::gipc
+} // namespace ksk::fem::ipc::gipc

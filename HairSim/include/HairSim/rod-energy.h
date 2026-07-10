@@ -4,7 +4,7 @@
 
 #include <Eigen/Core>
 
-namespace sim::hairsim {
+namespace ksk::hairsim {
 
 struct RodAssembly {
   RodEnergyComponents& energy;
@@ -51,4 +51,4 @@ class TwistingEnergy {
   const RodMaterial& material_;
 };
 
-}  // namespace sim::hairsim
+}  // namespace ksk::hairsim

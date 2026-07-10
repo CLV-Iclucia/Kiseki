@@ -19,7 +19,7 @@
 #include <stdexcept>
 #include <string>
 
-using namespace sim::rhi;
+using namespace ksk::rhi;
 
 // ---------- A typical SHADER_PARAMS block --------------------------------
 //

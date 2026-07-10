@@ -7,7 +7,7 @@
 #include "vk-device.h"
 #include "vk-internals.h"
 
-namespace sim::rhi::vulkan {
+namespace ksk::rhi::vulkan {
 
 VulkanShader::VulkanShader(VulkanDevice* device,
                            std::span<const std::byte> bytecode,
@@ -55,4 +55,4 @@ void VulkanShader::destroy() noexcept {
   delete this;
 }
 
-}  // namespace sim::rhi::vulkan
+}  // namespace ksk::rhi::vulkan

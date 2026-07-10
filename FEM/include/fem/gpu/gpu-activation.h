@@ -28,24 +28,24 @@
 #include <filesystem>
 #include <memory>
 
-namespace sim::fem::gpu {
+namespace ksk::fem::gpu {
 
 SHADER_PARAMS_BEGIN(ActClassifyParams)
-    SHADER_PARAM_UAV   (sim::rhi::BufferRef, keyOut);
-    SHADER_PARAM_UAV   (sim::rhi::BufferRef, valOut);
-    SHADER_PARAM_UAV   (sim::rhi::BufferRef, idxOut);
-    SHADER_PARAM_UAV   (sim::rhi::BufferRef, countOut);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, x);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, cand);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, dHatSqrBuf);
+    SHADER_PARAM_UAV   (ksk::rhi::BufferRef, keyOut);
+    SHADER_PARAM_UAV   (ksk::rhi::BufferRef, valOut);
+    SHADER_PARAM_UAV   (ksk::rhi::BufferRef, idxOut);
+    SHADER_PARAM_UAV   (ksk::rhi::BufferRef, countOut);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, x);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, cand);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, dHatSqrBuf);
     SHADER_PARAM_SCALAR(uint32_t,            num);
     SHADER_PARAM_SCALAR(uint32_t,            streamOffset);
 SHADER_PARAMS_END();
 
 SHADER_PARAMS_BEGIN(ActScatterParams)
-    SHADER_PARAM_UAV   (sim::rhi::BufferRef, outIdx);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, valSorted);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, idxTmp);
+    SHADER_PARAM_UAV   (ksk::rhi::BufferRef, outIdx);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, valSorted);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, idxTmp);
     SHADER_PARAM_SCALAR(uint32_t,            total);
 SHADER_PARAMS_END();
 
@@ -97,4 +97,4 @@ private:
     void readbackUints(const rhi::BufferRef& src, uint32_t n, uint32_t* out);
 };
 
-} // namespace sim::fem::gpu
+} // namespace ksk::fem::gpu

@@ -3,7 +3,7 @@
 #include <Core/core.h>
 #include <random>
 #include <type_traits>
-namespace sim::core {
+namespace ksk::core {
 float randomFloat();
 Real randomReal();
 template <typename T>

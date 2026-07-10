@@ -1,5 +1,5 @@
 """
-SimCraft Example: Twist Test
+Kiseki Example: Twist Test
 =============================
 
 A beam is fixed at one end; the other end is driven by prescribed sinusoidal
@@ -17,28 +17,28 @@ Usage:
 import numpy as np
 
 try:
-    import simcraft
+    import kiseki
 except ImportError:
     raise ImportError(
-        "Cannot import simcraft. Install first:\n"
+        "Cannot import kiseki. Install first:\n"
         "  python dev_setup.py\n"
         "  pip install .\n"
     )
 
 from pathlib import Path
 
-print(f"simcraft {simcraft.__version__}")
+print(f"kiseki {kiseki.__version__}")
 
-# ─── 1. Mesh ────────────────────────────────────────────────────────────────
+# 鈹€鈹€鈹€ 1. Mesh 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 mesh_path = Path(__file__).resolve().parents[2] / "FEM" / "assets" / "tets" / "mat2x2.tobj"
-mesh = simcraft.TetMesh.from_file(str(mesh_path))
+mesh = kiseki.TetMesh.from_file(str(mesh_path))
 print(f"Beam: {mesh.num_vertices} vertices, {mesh.num_elements} tets")
 
-# ─── 2. Material ────────────────────────────────────────────────────────────
-material = simcraft.NeoHookean(young=5e5, poisson=0.35)
+# 鈹€鈹€鈹€ 2. Material 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+material = kiseki.NeoHookean(young=5e5, poisson=0.35)
 
-# ─── 3. System (no gravity, pure twist) ─────────────────────────────────────
-system = simcraft.System()
+# 鈹€鈹€鈹€ 3. System (no gravity, pure twist) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+system = kiseki.System()
 system.add_elastic_body(mesh, material, density=500.0, color=(0.55, 0.45, 0.90))
 system.gravity = np.array([0.0, 0.0, 0.0])
 
@@ -63,11 +63,11 @@ for v_idx in driven_verts:
 
 print(f"Driven end: {len(driven_verts)} vertices, amplitude={amplitude}, freq={freq} Hz")
 
-# ─── 4. Integrator ──────────────────────────────────────────────────────────
-integrator = simcraft.IpcIntegrator(dHat=1e-3, kappa=1e8)
+# 鈹€鈹€鈹€ 4. Integrator 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+integrator = kiseki.IpcIntegrator(dHat=1e-3, kappa=1e8)
 
-# ─── 5. Run with rendering ──────────────────────────────────────────────────
-sim = simcraft.Simulation(system, integrator)
+# 鈹€鈹€鈹€ 5. Run with rendering 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+sim = kiseki.Simulation(system, integrator)
 
 print("Starting... close window to stop.")
 sim.display(dt=0.01, steps=400, title="Twist Test")

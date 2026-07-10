@@ -2,8 +2,8 @@
 // Created by creeper on 23-8-9.
 //
 
-#ifndef SIMCRAFT_HAIRSIM_INCLUDE_HAIRSIM_HAIR_H_
-#define SIMCRAFT_HAIRSIM_INCLUDE_HAIRSIM_HAIR_H_
+#ifndef KISEKI_HAIRSIM_INCLUDE_HAIRSIM_HAIR_H_
+#define KISEKI_HAIRSIM_INCLUDE_HAIRSIM_HAIR_H_
 #include <HairSim/hair-sim.h>
 #include <vector>
 
@@ -146,4 +146,4 @@ struct Hair : core::NonCopyable {
 };
 } // namespace hairsim
 
-#endif // SIMCRAFT_HAIRSIM_INCLUDE_HAIRSIM_HAIR_H_
+#endif // KISEKI_HAIRSIM_INCLUDE_HAIRSIM_HAIR_H_

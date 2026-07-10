@@ -16,7 +16,7 @@
 #include <type_traits>
 #include <utility>
 
-namespace sim::rhi {
+namespace ksk::rhi {
 
 struct ComputeShaderDefinition {
   std::filesystem::path source;
@@ -106,14 +106,14 @@ class ComputeShader : public ComputeShaderBase {
   }
 };
 
-}  // namespace sim::rhi
+}  // namespace ksk::rhi
 
 #define DECLARE_COMPUTE_SHADER(Type)                                          \
-  using Super = ::sim::rhi::ComputeShader<Type>;                              \
+  using Super = ::ksk::rhi::ComputeShader<Type>;                              \
   using Super::Super;                                                         \
-  static ::sim::rhi::ComputeShaderDefinition computeShaderDefinition()
+  static ::ksk::rhi::ComputeShaderDefinition computeShaderDefinition()
 
 #define IMPLEMENT_COMPUTE_SHADER(Type, Source, Entry)                         \
-  ::sim::rhi::ComputeShaderDefinition Type::computeShaderDefinition() {       \
+  ::ksk::rhi::ComputeShaderDefinition Type::computeShaderDefinition() {       \
     return {::std::filesystem::path(Source), Entry};                          \
   }

@@ -12,7 +12,7 @@
 #include <string>
 #include <string_view>
 
-namespace sim::rhi {
+namespace ksk::rhi {
 
 // Creates a device-local buffer suitable for compute workloads and staging
 // transfers.
@@ -31,4 +31,4 @@ inline BufferRef createDeviceLocalBuffer(
     });
 }
 
-} // namespace sim::rhi
+} // namespace ksk::rhi

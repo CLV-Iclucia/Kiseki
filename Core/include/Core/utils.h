@@ -4,7 +4,7 @@
 
 #pragma once
 #include <Core/core.h>
-namespace sim::core {
+namespace ksk::core {
 constexpr Real PI = 3.141592653589793238462643383279502884197169399375105820974;
 constexpr Real PI_2 =
     1.570796326794896619231321691639751442098584699687552910487;

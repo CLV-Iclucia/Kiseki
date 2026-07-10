@@ -14,15 +14,15 @@
 #include <filesystem>
 #include <vector>
 
-namespace sim::fem::gpu {
+namespace ksk::fem::gpu {
 
 class GpuSpdProjector9 {
 public:
     enum class Strategy { Cyclic = 0, Classical = 1 };
     enum class Clamp    { Abs = 0,    Psd = 1 };
 
-    GpuSpdProjector9(sim::rhi::Device& device,
-                     sim::rhi::ShaderCompiler& compiler,
+    GpuSpdProjector9(ksk::rhi::Device& device,
+                     ksk::rhi::ShaderCompiler& compiler,
                      const std::filesystem::path& shaderDir = {},
                      int cyclicSweeps = 10,
                      int classicalRotations = 400);
@@ -36,10 +36,10 @@ public:
                  std::vector<double>& matsOut);
 
 private:
-    sim::rhi::Device& device_;
+    ksk::rhi::Device& device_;
     bool valid_ = false;
-    sim::rhi::PipelineRef pso_[2][2];  // [strategy][clamp]
+    ksk::rhi::PipelineRef pso_[2][2];  // [strategy][clamp]
 
 };
 
-} // namespace sim::fem::gpu
+} // namespace ksk::fem::gpu

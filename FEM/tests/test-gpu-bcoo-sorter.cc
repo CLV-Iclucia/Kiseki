@@ -24,8 +24,8 @@
 #include <random>
 #include <vector>
 
-using namespace sim::rhi;
-using namespace sim::fem::gpu;
+using namespace ksk::rhi;
+using namespace ksk::fem::gpu;
 
 namespace {
 
@@ -90,7 +90,7 @@ struct BcooSorterFixture : public ::testing::Test {
         }
 
         // ---- CPU reference: sortByRow for row order + segment offsets ----
-        sim::maths::BlockSparseMatrix<3> cpu(nVerts, nVerts);
+        ksk::maths::BlockSparseMatrix<3> cpu(nVerts, nVerts);
         for (uint32_t k = 0; k < nnz; ++k) {
             glm::dmat3 b;
             std::memcpy(glm::value_ptr(b), &blocks[k * 9], 9 * sizeof(double));

@@ -14,9 +14,9 @@
 #define FEM_SHADER_DIR "."
 #endif
 
-namespace sim::fem::gpu {
+namespace ksk::fem::gpu {
 
-using namespace sim::rhi;
+using namespace ksk::rhi;
 namespace fs = std::filesystem;
 
 static constexpr uint32_t kWG = 256;
@@ -31,7 +31,7 @@ GpuGradientReduce::GpuGradientReduce(Device& device, ShaderCompiler& compiler,
 {
     fs::path dir = shaderDir.empty() ? fs::path(FEM_SHADER_DIR) : shaderDir;
 
-    sort_ = std::make_unique<sim::rpk::Sort>(device, compiler);
+    sort_ = std::make_unique<ksk::rpk::Sort>(device, compiler);
 
     // iota / flag / segstart are identical to the BCOO sorter's (uint row math).
     psoIota_     = compileComputePipeline(device, compiler, dir / "bcoo-iota.hlsl");
@@ -117,7 +117,7 @@ void GpuGradientReduce::addInto(const BufferRef& g, const BufferRef& row,
         cc(*cmd);
 
         // 5) inclusive scan of flags -> 1-based segment id per entry
-        sort_->scan().inclusive(*cmd, sim::rpk::ScanOp::Sum, sim::rpk::ScalarType::Uint32,
+        sort_->scan().inclusive(*cmd, ksk::rpk::ScanOp::Sum, ksk::rpk::ScalarType::Uint32,
                                 flag_, segId_, n);
         cc(*cmd);
 
@@ -143,4 +143,4 @@ void GpuGradientReduce::addInto(const BufferRef& g, const BufferRef& row,
     }
 }
 
-} // namespace sim::fem::gpu
+} // namespace ksk::fem::gpu

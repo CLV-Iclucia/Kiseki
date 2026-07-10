@@ -2,7 +2,7 @@
 // Created by creeper on 5/23/24.
 //
 #include <Maths/sparse-matrix-builder.h>
-using namespace sim::maths;
+using namespace ksk::maths;
 int main() {
   std::cout << "Input the number of rows and columns: ";
   int n, m;

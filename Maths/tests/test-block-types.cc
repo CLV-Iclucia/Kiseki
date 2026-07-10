@@ -3,7 +3,7 @@
 #include <Maths/block-sparse-matrix.h>
 #include <Eigen/IterativeLinearSolvers>
 
-using namespace sim::maths;
+using namespace ksk::maths;
 
 // ============================================================
 // BlockVector tests

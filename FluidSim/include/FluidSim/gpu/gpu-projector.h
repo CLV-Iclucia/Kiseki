@@ -24,27 +24,27 @@ namespace fluid::gpu {
 // ============================================================================
 class GPUProjector {
 public:
-    GPUProjector(sim::rhi::Device& device,
+    GPUProjector(ksk::rhi::Device& device,
                  const GPUGridState& grid,
                  const SolverConfig& config);
 
     // Build system + run solver + project velocities
-    void solve(sim::rhi::CommandList& cmd, GPUGridState& grid, Real dt);
+    void solve(ksk::rhi::CommandList& cmd, GPUGridState& grid, Real dt);
 
     // Hot-swap solver if config changes (e.g. switch from Jacobi to PCG)
-    void updateConfig(sim::rhi::Device& device,
+    void updateConfig(ksk::rhi::Device& device,
                       const SolverConfig& config);
 
 private:
     SolverConfig config_;
 
     // ===== Owned buffers (build/project phase) =====
-    sim::rhi::BufferRef Adiag_;
-    sim::rhi::BufferRef Aneighbour_[6];
-    sim::rhi::BufferRef rhs_;
-    sim::rhi::BufferRef active_;
-    sim::rhi::BufferRef pressure_;
-    sim::rhi::BufferRef faceWeightsU_, faceWeightsV_, faceWeightsW_;
+    ksk::rhi::BufferRef Adiag_;
+    ksk::rhi::BufferRef Aneighbour_[6];
+    ksk::rhi::BufferRef rhs_;
+    ksk::rhi::BufferRef active_;
+    ksk::rhi::BufferRef pressure_;
+    ksk::rhi::BufferRef faceWeightsU_, faceWeightsV_, faceWeightsW_;
 
     // ===== Delegated solver =====
     std::unique_ptr<GPUPressureSolver> solver_;
@@ -54,9 +54,9 @@ private:
     ProjectCS project_;
 
     // ===== Internal methods =====
-    void buildWeightsAndSystem(sim::rhi::CommandList& cmd,
+    void buildWeightsAndSystem(ksk::rhi::CommandList& cmd,
                                const GPUGridState& grid, Real dt);
-    void projectVelocities(sim::rhi::CommandList& cmd,
+    void projectVelocities(ksk::rhi::CommandList& cmd,
                            GPUGridState& grid, Real dt);
 
     // Helper: assemble PressureSystem view over owned buffers

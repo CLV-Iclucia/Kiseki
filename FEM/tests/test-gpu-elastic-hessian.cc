@@ -21,15 +21,15 @@
 #include <random>
 #include <vector>
 
-using namespace sim;
-using namespace sim::fem::gpu;
+using namespace ksk;
+using namespace ksk::fem::gpu;
 
 namespace {
 
 Eigen::Vector3d toEigen(const glm::dvec3& v) { return {v.x, v.y, v.z}; }
 
 TEST(GpuElasticHessian, MatchesCpuDeform) {
-    auto device = sim::rhi::Device::create({.backend = sim::rhi::Backend::Vulkan,
+    auto device = ksk::rhi::Device::create({.backend = ksk::rhi::Backend::Vulkan,
                                             .enableValidation = true});
     if (!device) GTEST_SKIP() << "No Vulkan device";
     auto compiler = device->createShaderCompiler();

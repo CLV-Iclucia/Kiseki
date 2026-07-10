@@ -24,7 +24,7 @@
 #include <random>
 #include <vector>
 
-using namespace sim::fem::gpu;
+using namespace ksk::fem::gpu;
 using Mat9 = Eigen::Matrix<double, 9, 9>;
 
 namespace {
@@ -65,14 +65,14 @@ std::vector<double> flatten(const std::vector<Mat9>& mats) {
 }
 
 struct SpdFixture : public ::testing::Test {
-    std::unique_ptr<sim::rhi::Device> device;
-    std::unique_ptr<sim::rhi::ShaderCompiler> compiler;
+    std::unique_ptr<ksk::rhi::Device> device;
+    std::unique_ptr<ksk::rhi::ShaderCompiler> compiler;
     std::unique_ptr<GpuSpdProjector9> proj;
     std::vector<Mat9> spectrum;   // controlled spectrum, away from zero
     std::vector<Mat9> indefinite; // generic random symmetric
 
     void SetUp() override {
-        device = sim::rhi::Device::create({.backend = sim::rhi::Backend::Vulkan,
+        device = ksk::rhi::Device::create({.backend = ksk::rhi::Backend::Vulkan,
                                            .enableValidation = true});
         if (!device) GTEST_SKIP() << "No Vulkan device";
         compiler = device->createShaderCompiler();

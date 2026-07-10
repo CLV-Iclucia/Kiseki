@@ -1,5 +1,5 @@
 //
-// SimCraft Profiler — thin wrapper over Tracy
+// Kiseki Profiler — thin wrapper over Tracy
 //
 // Usage:
 //   SIM_PROFILE_FUNCTION()          — 标记整个函数
@@ -7,7 +7,7 @@
 //   SIM_PROFILE_FRAME_MARK()        — 标记帧边界（用于 step 结束处）
 //   SIM_PROFILE_VALUE("name", val)  — 追踪标量数值（如能量、迭代次数）
 //
-// 编译时通过 CMake 选项 SIMCRAFT_PROFILE=ON 启用（自动定义 TRACY_ENABLE）。
+// 编译时通过 CMake 选项 KISEKI_PROFILE=ON 启用（自动定义 TRACY_ENABLE）。
 // 关闭时所有宏展开为空语句，零开销。
 //
 
@@ -27,7 +27,7 @@
 #define SIM_PROFILE_SCOPE_COLOR(name, color) ZoneScopedNC(name, color)
 
 // 常用颜色
-namespace sim::core::profiler_colors {
+namespace ksk::core::profiler_colors {
     inline constexpr unsigned int kGradient   = 0xFF6B6B;  // 红
     inline constexpr unsigned int kHessian    = 0x4ECDC4;  // 青
     inline constexpr unsigned int kSolver     = 0x45B7D1;  // 蓝
@@ -44,7 +44,7 @@ namespace sim::core::profiler_colors {
 #define SIM_PROFILE_VALUE(name, val)    (void)0
 #define SIM_PROFILE_SCOPE_COLOR(name, color) (void)0
 
-namespace sim::core::profiler_colors {
+namespace ksk::core::profiler_colors {
     inline constexpr unsigned int kGradient   = 0;
     inline constexpr unsigned int kHessian    = 0;
     inline constexpr unsigned int kSolver     = 0;

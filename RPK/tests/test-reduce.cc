@@ -12,8 +12,8 @@
 #include <numeric>
 #include <vector>
 
-using namespace sim::rhi;
-using namespace sim::rpk;
+using namespace ksk::rhi;
+using namespace ksk::rpk;
 
 namespace {
 

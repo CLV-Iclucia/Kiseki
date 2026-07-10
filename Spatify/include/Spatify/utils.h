@@ -2,8 +2,8 @@
 // Created by creeper on 6/8/24.
 //
 
-#ifndef SIMCRAFT_SPATIFY_INCLUDE_SPATIFY_UTILS_H_
-#define SIMCRAFT_SPATIFY_INCLUDE_SPATIFY_UTILS_H_
+#ifndef KISEKI_SPATIFY_INCLUDE_SPATIFY_UTILS_H_
+#define KISEKI_SPATIFY_INCLUDE_SPATIFY_UTILS_H_
 #include <Spatify/types.h>
 namespace spatify {
 template<typename T, int Dim>
@@ -22,4 +22,4 @@ Vector<T, Dim> cwiseMax(const Vector<T, Dim> &a, const Vector<T, Dim> &b) {
   return result;
 }
 }
-#endif //SIMCRAFT_SPATIFY_INCLUDE_SPATIFY_UTILS_H_
+#endif //KISEKI_SPATIFY_INCLUDE_SPATIFY_UTILS_H_

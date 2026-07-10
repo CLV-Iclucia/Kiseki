@@ -7,7 +7,7 @@
 #include <cmath>
 #include <limits>
 
-namespace sim::renderer {
+namespace ksk::renderer {
 
 // Shader source code
 static const char* vertexShaderSource = R"(
@@ -732,4 +732,4 @@ std::unique_ptr<Renderer> createRenderer(const RendererConfig& config) {
     return renderer;
 }
 
-} // namespace sim::renderer
+} // namespace ksk::renderer

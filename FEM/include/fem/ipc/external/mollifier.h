@@ -2,10 +2,10 @@
 // Created by creeper on 7/20/24.
 //
 
-#ifndef SIMCRAFT_FEM_INCLUDE_FEM_IPC_EXTERNAL_MOLLIFIER_H_
-#define SIMCRAFT_FEM_INCLUDE_FEM_IPC_EXTERNAL_MOLLIFIER_H_
+#ifndef KISEKI_FEM_INCLUDE_FEM_IPC_EXTERNAL_MOLLIFIER_H_
+#define KISEKI_FEM_INCLUDE_FEM_IPC_EXTERNAL_MOLLIFIER_H_
 // These codes are taken from ipc-toolkit symbolically generated derivatives;
-namespace sim::fem::ipc::autogen {
+namespace ksk::fem::ipc::autogen {
 
 inline void edge_edge_cross_squarednorm_gradient(
     double v01,
@@ -337,4 +337,4 @@ inline void edge_edge_mollifier_threshold_gradient(
   grad[11] = -t14;
 }
 }
-#endif //SIMCRAFT_FEM_INCLUDE_FEM_IPC_EXTERNAL_MOLLIFIER_H_
+#endif //KISEKI_FEM_INCLUDE_FEM_IPC_EXTERNAL_MOLLIFIER_H_

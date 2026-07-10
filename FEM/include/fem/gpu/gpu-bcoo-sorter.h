@@ -22,34 +22,34 @@
 #include <filesystem>
 #include <memory>
 
-namespace sim::fem::gpu {
+namespace ksk::fem::gpu {
 
 // ---- SHADER_PARAMS ----
 
 SHADER_PARAMS_BEGIN(BcooIotaParams)
-    SHADER_PARAM_UAV   (sim::rhi::BufferRef, values);
+    SHADER_PARAM_UAV   (ksk::rhi::BufferRef, values);
     SHADER_PARAM_SCALAR(uint32_t,            n);
 SHADER_PARAMS_END();
 
 SHADER_PARAMS_BEGIN(BcooGatherParams)
-    SHADER_PARAM_UAV   (sim::rhi::BufferRef, blocksOut);
-    SHADER_PARAM_UAV   (sim::rhi::BufferRef, colOut);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, blocksIn);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, colIn);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, perm);
+    SHADER_PARAM_UAV   (ksk::rhi::BufferRef, blocksOut);
+    SHADER_PARAM_UAV   (ksk::rhi::BufferRef, colOut);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, blocksIn);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, colIn);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, perm);
     SHADER_PARAM_SCALAR(uint32_t,            n);
 SHADER_PARAMS_END();
 
 SHADER_PARAMS_BEGIN(BcooFlagParams)
-    SHADER_PARAM_UAV   (sim::rhi::BufferRef, flag);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, row);
+    SHADER_PARAM_UAV   (ksk::rhi::BufferRef, flag);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, row);
     SHADER_PARAM_SCALAR(uint32_t,            n);
 SHADER_PARAMS_END();
 
 SHADER_PARAMS_BEGIN(BcooSegStartParams)
-    SHADER_PARAM_UAV   (sim::rhi::BufferRef, segStart);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, flag);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, segId);
+    SHADER_PARAM_UAV   (ksk::rhi::BufferRef, segStart);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, flag);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, segId);
     SHADER_PARAM_SCALAR(uint32_t,            n);
 SHADER_PARAMS_END();
 
@@ -58,8 +58,8 @@ SHADER_PARAMS_END();
 // ============================================================================
 class GPUBCOOSorter {
 public:
-    GPUBCOOSorter(sim::rhi::Device& device,
-                  sim::rhi::ShaderCompiler& compiler,
+    GPUBCOOSorter(ksk::rhi::Device& device,
+                  ksk::rhi::ShaderCompiler& compiler,
                   const std::filesystem::path& shaderDir = {});
 
     [[nodiscard]] bool valid() const { return valid_; }
@@ -70,26 +70,26 @@ public:
     //   col      : uint[nnz]     — permuted in place
     //   segStart : uint[>=nnz+1] — output; first (numSeg+1) entries are valid
     // Submits internally and returns numSeg (number of non-empty row segments).
-    uint32_t sort(const sim::rhi::BufferRef& blocks,
-                  const sim::rhi::BufferRef& row,
-                  const sim::rhi::BufferRef& col,
-                  const sim::rhi::BufferRef& segStart,
+    uint32_t sort(const ksk::rhi::BufferRef& blocks,
+                  const ksk::rhi::BufferRef& row,
+                  const ksk::rhi::BufferRef& col,
+                  const ksk::rhi::BufferRef& segStart,
                   uint32_t nnz);
 
 private:
-    sim::rhi::Device& device_;
+    ksk::rhi::Device& device_;
     bool valid_ = false;
 
-    std::unique_ptr<sim::rpk::Sort> sort_;   // radix sort + internal scan
+    std::unique_ptr<ksk::rpk::Sort> sort_;   // radix sort + internal scan
 
-    sim::rhi::PipelineRef psoIota_, psoGather_, psoFlag_, psoSegStart_;
+    ksk::rhi::PipelineRef psoIota_, psoGather_, psoFlag_, psoSegStart_;
 
     // Scratch (lazily (re)allocated by ensureCapacity)
-    sim::rhi::BufferRef perm_, flag_, segId_, blocksScratch_, colScratch_;
+    ksk::rhi::BufferRef perm_, flag_, segId_, blocksScratch_, colScratch_;
     uint32_t cap_ = 0;
 
     void ensureCapacity(uint32_t nnz);
-    uint32_t readbackUint(const sim::rhi::BufferRef& src, uint32_t index);
+    uint32_t readbackUint(const ksk::rhi::BufferRef& src, uint32_t index);
 };
 
-} // namespace sim::fem::gpu
+} // namespace ksk::fem::gpu

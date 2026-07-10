@@ -8,7 +8,7 @@
 #include <Core/properties.h>
 #include <Maths/tensor.h>
 #include <Maths/linalg-utils.h>
-namespace sim::deform {
+namespace ksk::deform {
 template<typename T>
 struct EigenMatrixSigmas : core::NonCopyable {
   std::array<Matrix<T, 3, 3>, 3> eigenMatrixSigmas;

@@ -99,7 +99,7 @@
 #include <variant>
 #include <vector>
 
-namespace sim::rhi {
+namespace ksk::rhi {
 
 // Forward decl — CommandList is referenced only by the inline _apply impl
 // in commands.h.
@@ -538,7 +538,7 @@ inline void ShaderParamsBase::_resolve(const ReflectionInfo& ri) {
   }
 }
 
-}  // namespace sim::rhi
+}  // namespace ksk::rhi
 
 // ============================================================================
 // 5. User-facing macros
@@ -549,11 +549,11 @@ inline void ShaderParamsBase::_resolve(const ReflectionInfo& ri) {
 //
 // Each SHADER_PARAM_REF expands to:
 //   ParamSlot<Type> FieldName =
-//       ::sim::rhi::ParamSlot<Type>(this, this->_registerRefField(...));
+//       ::ksk::rhi::ParamSlot<Type>(this, this->_registerRefField(...));
 //
 // Each SHADER_PARAM_SCALAR expands to:
 //   ParamSlot<Type> FieldName =
-//       ::sim::rhi::ParamSlot<Type>(this, this->_registerScalarField(...));
+//       ::ksk::rhi::ParamSlot<Type>(this, this->_registerScalarField(...));
 //
 // The DMI calls _registerRefField/_registerScalarField on the partially-
 // constructed leaf. The base sub-object is fully constructed by the time
@@ -563,39 +563,39 @@ inline void ShaderParamsBase::_resolve(const ReflectionInfo& ri) {
 //
 
 #define SHADER_PARAMS_BEGIN(Name)                                              \
-  struct Name : public ::sim::rhi::ShaderParamsBase {                          \
+  struct Name : public ::ksk::rhi::ShaderParamsBase {                          \
     using _Self = Name;
 
 #define SHADER_PARAM_UAV(Type, FieldName)                                      \
-  ::sim::rhi::ParamSlot<Type> FieldName{                                       \
+  ::ksk::rhi::ParamSlot<Type> FieldName{                                       \
       this,                                                                    \
       this->_registerRefField(                                                 \
           #FieldName,                                                          \
-          ::sim::rhi::detail::UAVKindOf<Type>::kind,                           \
+          ::ksk::rhi::detail::UAVKindOf<Type>::kind,                           \
           static_cast<uint32_t>(sizeof(Type)))}
 
 #define SHADER_PARAM_SRV(Type, FieldName)                                      \
-  ::sim::rhi::ParamSlot<Type> FieldName{                                       \
+  ::ksk::rhi::ParamSlot<Type> FieldName{                                       \
       this,                                                                    \
       this->_registerRefField(                                                 \
           #FieldName,                                                          \
-          ::sim::rhi::detail::SRVKindOf<Type>::kind,                           \
+          ::ksk::rhi::detail::SRVKindOf<Type>::kind,                           \
           static_cast<uint32_t>(sizeof(Type)))}
 
 #define SHADER_PARAM_IMAGE(Type, FieldName)                                    \
-  ::sim::rhi::ParamSlot<Type> FieldName{                                       \
+  ::ksk::rhi::ParamSlot<Type> FieldName{                                       \
       this,                                                                    \
       this->_registerRefField(                                                 \
           #FieldName,                                                          \
-          ::sim::rhi::detail::ImageKindOf<Type>::kind,                         \
+          ::ksk::rhi::detail::ImageKindOf<Type>::kind,                         \
           static_cast<uint32_t>(sizeof(Type)))}
 
 #define SHADER_PARAM_SAMPLER(Type, FieldName)                                  \
-  ::sim::rhi::ParamSlot<Type> FieldName{                                       \
+  ::ksk::rhi::ParamSlot<Type> FieldName{                                       \
       this,                                                                    \
       this->_registerRefField(                                                 \
           #FieldName,                                                          \
-          ::sim::rhi::detail::SamplerKindOf<Type>::kind,                       \
+          ::ksk::rhi::detail::SamplerKindOf<Type>::kind,                       \
           static_cast<uint32_t>(sizeof(Type)))}
 
 // SHADER_PARAM_SCALAR — the universal push-constant parameter macro.
@@ -616,12 +616,12 @@ inline void ShaderParamsBase::_resolve(const ReflectionInfo& ri) {
   static_assert(::std::is_trivially_copyable_v<Type>,                          \
                 "SHADER_PARAM_SCALAR(" #Type ", " #FieldName                   \
                 "): Type must be trivially copyable");                         \
-  ::sim::rhi::ParamSlot<Type> FieldName{                                       \
+  ::ksk::rhi::ParamSlot<Type> FieldName{                                       \
       this,                                                                    \
       this->_registerScalarField(                                              \
           #FieldName,                                                          \
           static_cast<uint32_t>(sizeof(Type)),                                 \
-          ::sim::rhi::gpu_align_of_v<Type>)}
+          ::ksk::rhi::gpu_align_of_v<Type>)}
 
 // SHADER_PARAM_VEC — semantic alias for vector push-constant members.
 //
@@ -634,15 +634,15 @@ inline void ShaderParamsBase::_resolve(const ReflectionInfo& ri) {
   static_assert(::std::is_trivially_copyable_v<Type>,                          \
                 "SHADER_PARAM_VEC(" #Type ", " #FieldName                      \
                 "): Type must be trivially copyable");                         \
-  static_assert(::sim::rhi::is_gpu_vector_type_v<Type>,                        \
+  static_assert(::ksk::rhi::is_gpu_vector_type_v<Type>,                        \
                 "SHADER_PARAM_VEC(" #Type ", " #FieldName                      \
                 "): Type must be a recognized GPU vector/matrix type");        \
-  ::sim::rhi::ParamSlot<Type> FieldName{                                       \
+  ::ksk::rhi::ParamSlot<Type> FieldName{                                       \
       this,                                                                    \
       this->_registerScalarField(                                              \
           #FieldName,                                                          \
           static_cast<uint32_t>(sizeof(Type)),                                 \
-          ::sim::rhi::gpu_align_of_v<Type>)}
+          ::ksk::rhi::gpu_align_of_v<Type>)}
 
 // SHADER_PARAM_MAT — semantic alias for matrix push-constant members.
 //
@@ -656,15 +656,15 @@ inline void ShaderParamsBase::_resolve(const ReflectionInfo& ri) {
   static_assert(::std::is_trivially_copyable_v<Type>,                          \
                 "SHADER_PARAM_MAT(" #Type ", " #FieldName                      \
                 "): Type must be trivially copyable");                         \
-  static_assert(::sim::rhi::is_gpu_vector_type_v<Type>,                        \
+  static_assert(::ksk::rhi::is_gpu_vector_type_v<Type>,                        \
                 "SHADER_PARAM_MAT(" #Type ", " #FieldName                      \
                 "): Type must be a recognized GPU vector/matrix type");        \
-  ::sim::rhi::ParamSlot<Type> FieldName{                                       \
+  ::ksk::rhi::ParamSlot<Type> FieldName{                                       \
       this,                                                                    \
       this->_registerScalarField(                                              \
           #FieldName,                                                          \
           static_cast<uint32_t>(sizeof(Type)),                                 \
-          ::sim::rhi::gpu_align_of_v<Type>)}
+          ::ksk::rhi::gpu_align_of_v<Type>)}
 
 #define SHADER_PARAMS_END()                                                    \
   }

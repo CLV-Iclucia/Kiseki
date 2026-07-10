@@ -19,7 +19,7 @@
 #include <cmath>
 #include <algorithm>
 
-namespace sim::fem::ipc::gipc {
+namespace ksk::fem::ipc::gipc {
 
 struct Barrier {
   explicit Barrier(Real dHat) : m_dHat(dHat) {}
@@ -203,4 +203,4 @@ inline Real computeEpsCross(const glm::dvec3& ea0, const glm::dvec3& ea1,
   return 1e-3 * la2 * lb2;
 }
 
-} // namespace sim::fem::ipc::gipc
+} // namespace ksk::fem::ipc::gipc

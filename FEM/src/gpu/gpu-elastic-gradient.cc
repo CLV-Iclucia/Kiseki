@@ -13,9 +13,9 @@
 #define FEM_SHADER_DIR "."
 #endif
 
-namespace sim::fem::gpu {
+namespace ksk::fem::gpu {
 
-using namespace sim::rhi;
+using namespace ksk::rhi;
 namespace fs = std::filesystem;
 
 GpuElasticGradient::GpuElasticGradient(Device& device, ShaderCompiler& compiler,
@@ -158,4 +158,4 @@ void GpuElasticGradient::compute(const std::vector<glm::dvec3>& restVerts,
     download(bGrad, gradBytes.data(), gradBytes.size());
 }
 
-} // namespace sim::fem::gpu
+} // namespace ksk::fem::gpu

@@ -11,7 +11,7 @@
 
 #pragma once
 
-namespace sim::rhi {
+namespace ksk::rhi {
 
 template <class T>
 class RcPtr {
@@ -85,4 +85,4 @@ class RcPtr {
   T* m_p = nullptr;
 };
 
-}  // namespace sim::rhi
+}  // namespace ksk::rhi

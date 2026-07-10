@@ -6,7 +6,7 @@
 
 namespace fluid::gpu {
 
-using namespace sim::rhi;
+using namespace ksk::rhi;
 
 GPUExtrapolatorSolver::GPUExtrapolatorSolver(GPUFluidContext& ctx, int iters)
     : GPUModularSolver("gpu_extrapolator"),

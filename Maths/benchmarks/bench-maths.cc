@@ -7,7 +7,7 @@
 #include <random>
 #include <iomanip>
 
-using namespace sim::maths;
+using namespace ksk::maths;
 using Clock = std::chrono::high_resolution_clock;
 
 // ============================================================
@@ -190,7 +190,7 @@ void benchmarkJacobiSetup(int numBlocks, int avgNnzPerRow) {
 
 int main() {
   std::cout << "========================================" << std::endl;
-  std::cout << "  SimCraft Maths Benchmark (Baseline)   " << std::endl;
+  std::cout << "  Kiseki Maths Benchmark (Baseline)   " << std::endl;
   std::cout << "========================================" << std::endl;
   std::cout << std::endl;
 

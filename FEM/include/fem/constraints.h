@@ -7,7 +7,7 @@
 #include <vector>
 #include <optional>
 
-namespace sim::fem {
+namespace ksk::fem {
 
 /// overloaded helper (C++17 pattern for std::visit)
 template <class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
@@ -129,4 +129,4 @@ private:
   std::vector<glm::bvec3> m_constraintMask;  // size = totalBlocks, false=free
 };
 
-} // namespace sim::fem
+} // namespace ksk::fem

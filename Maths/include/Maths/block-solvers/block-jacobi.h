@@ -4,7 +4,7 @@
 #include <tbb/parallel_for.h>
 #include <tbb/blocked_range.h>
 
-namespace sim::maths {
+namespace ksk::maths {
 
 struct BlockJacobiPreconditioner final : BlockPreconditioner {
   void setup(const BlockSparseMatrix<3>& A) override {
@@ -53,4 +53,4 @@ private:
   std::vector<glm::dmat3> m_invDiag;
 };
 
-} // namespace sim::maths
+} // namespace ksk::maths

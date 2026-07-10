@@ -20,7 +20,7 @@
 #include <cassert>
 #include <cmath>
 
-namespace sim::fem::ipc {
+namespace ksk::fem::ipc {
 using maths::assembleLocalGrad;
 using maths::assembleLocalHessian;
 using namespace gipc;
@@ -1449,5 +1449,5 @@ void colliderConstraintPairBarrierHessian(
 }
 
 
-} // namespace sim::fem::ipc
+} // namespace ksk::fem::ipc
 

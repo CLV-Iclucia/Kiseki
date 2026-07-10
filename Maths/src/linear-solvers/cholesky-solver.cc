@@ -4,7 +4,7 @@
 #include <Maths/linear-solvers/cholesky-solver.h>
 #include <Maths/linear-solver-factory.h>
 
-namespace sim::maths {
+namespace ksk::maths {
 
 int cholesky_auto_reg = ([]() {
     LinearSolverFactory::instance().registerCreator(

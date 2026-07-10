@@ -41,11 +41,11 @@
 #include <memory>
 #include <vector>
 
-namespace sim::fem {
+namespace ksk::fem {
 
 class GPUFEMBackend : public FEMBackend {
 public:
-    GPUFEMBackend(sim::rhi::Device& device, sim::rhi::ShaderCompiler& compiler)
+    GPUFEMBackend(ksk::rhi::Device& device, ksk::rhi::ShaderCompiler& compiler)
         : device_(device), compiler_(compiler) {}
 
     void initialize(const FEMScene& scene) override;
@@ -53,14 +53,14 @@ public:
     void readback(FEMFrame& out) override;
 
 private:
-    sim::rhi::Device&         device_;
-    sim::rhi::ShaderCompiler& compiler_;
+    ksk::rhi::Device&         device_;
+    ksk::rhi::ShaderCompiler& compiler_;
     bool valid_ = false;
 
     // ---- Device utilities (reused) ----
     std::unique_ptr<gpu::GPUBCOOSorter>     sorter_;
     std::unique_ptr<gpu::GpuBlockPCGSolver> pcg_;
-    std::unique_ptr<sim::rpk::Reduce>       reduce_;
+    std::unique_ptr<ksk::rpk::Reduce>       reduce_;
 
     // ---- Contact components (reused; deformable self-contact) ----
     std::unique_ptr<gpu::GpuTrajectoryBounds> traj_;
@@ -72,7 +72,7 @@ private:
     std::unique_ptr<gpu::GPUACCD>              ccd_;
 
     // ---- Backend-owned pipelines (dispatch existing shaders on resident buffers) ----
-    sim::rhi::PipelineRef psoEGrad_, psoEHess_, psoEEnergy_, psoBEnergy_, psoMass_,
+    ksk::rhi::PipelineRef psoEGrad_, psoEHess_, psoEEnergy_, psoBEnergy_, psoMass_,
                           psoAxpy_, psoAbs_, psoMul_;
 
     // ---- Mesh (host copies for rest-data build + per-frame readback energy) ----
@@ -96,46 +96,46 @@ private:
 
     // Vertex positions, resident across steps & Newton iterations.
     struct Positions {
-        sim::rhi::BufferRef rest, cur, vel;   // X / x / xdot   [N*3]
+        ksk::rhi::BufferRef rest, cur, vel;   // X / x / xdot   [N*3]
     } pos_;
 
     // Per-tet rest data + material; constant after initialize().
     struct TetData {
-        sim::rhi::BufferRef conn, dmInv, vol, material;       // [M*4]/[M*9]/[M]/[2]
-        sim::rhi::BufferRef adjStart, adjTet, adjLocal;       // vertex->incident-tet
+        ksk::rhi::BufferRef conn, dmInv, vol, material;       // [M*4]/[M*9]/[M]/[2]
+        ksk::rhi::BufferRef adjStart, adjTet, adjLocal;       // vertex->incident-tet
     } tet_;
 
     // Consistent-mass BCOO (16 blocks/tet); constant after initialize().
     struct MassMatrix {
-        sim::rhi::BufferRef blocks, row, col;
+        ksk::rhi::BufferRef blocks, row, col;
         uint32_t            nnz = 0;
     } mass_;
 
     // Newton-iteration scratch (combined-H grows via ensureHCap).
     struct NewtonWork {
-        sim::rhi::BufferRef ehBlocks, ehRow, ehCol;           // elastic Hessian (16M)
-        sim::rhi::BufferRef hBlocks, hRow, hCol, hSeg;        // combined elastic+barrier+mass BCOO
-        sim::rhi::BufferRef gElastic, xhat, diff, mDiff, rhs, p, tmp, elemE;
-        sim::rhi::BufferRef scalar;                           // reduction output [1]
+        ksk::rhi::BufferRef ehBlocks, ehRow, ehCol;           // elastic Hessian (16M)
+        ksk::rhi::BufferRef hBlocks, hRow, hCol, hSeg;        // combined elastic+barrier+mass BCOO
+        ksk::rhi::BufferRef gElastic, xhat, diff, mDiff, rhs, p, tmp, elemE;
+        ksk::rhi::BufferRef scalar;                           // reduction output [1]
         uint32_t            hCap = 0;
     } work_;
 
     // Deformable self-contact device state (topology const; the rest is scratch).
     struct ContactState {
-        sim::rhi::BufferRef triConn, edgeConn, vertConn;      // topology (global idx)
-        sim::rhi::BufferRef vertLo, vertHi, triLo, triHi,     // trajectory AABBs
+        ksk::rhi::BufferRef triConn, edgeConn, vertConn;      // topology (global idx)
+        ksk::rhi::BufferRef vertLo, vertHi, triLo, triHi,     // trajectory AABBs
                             edgeLo, edgeHi;
-        sim::rhi::BufferRef stepDir;                          // x_hat - x_t (broad-phase traj)
-        sim::rhi::BufferRef alpha1, dHat, dHatSqr, bParams;   // scalar/param buffers [1]/[2]
-        sim::rhi::BufferRef typeOff;                          // uint[5] typeOffsets
-        sim::rhi::BufferRef energy, h2Blocks;                 // per-constraint energy / h^2*barrier blocks
+        ksk::rhi::BufferRef stepDir;                          // x_hat - x_t (broad-phase traj)
+        ksk::rhi::BufferRef alpha1, dHat, dHatSqr, bParams;   // scalar/param buffers [1]/[2]
+        ksk::rhi::BufferRef typeOff;                          // uint[5] typeOffsets
+        ksk::rhi::BufferRef energy, h2Blocks;                 // per-constraint energy / h^2*barrier blocks
         uint32_t            cap = 0;                          // capacity in candidate count
     } contact_;
 
     // Helpers
-    void uploadBytes(const sim::rhi::BufferRef& dst, const void* data, size_t bytes);
-    void downloadBytes(const sim::rhi::BufferRef& src, void* dst, size_t bytes);
-    double readbackScalar(const sim::rhi::BufferRef& src);
+    void uploadBytes(const ksk::rhi::BufferRef& dst, const void* data, size_t bytes);
+    void downloadBytes(const ksk::rhi::BufferRef& src, void* dst, size_t bytes);
+    double readbackScalar(const ksk::rhi::BufferRef& src);
     void buildDeviceState(const FEMScene& scene);
     void ensureHCap(uint32_t needNnz);          // grow combined-H buffers
     void ensureContactCap(uint32_t numCand);    // grow per-candidate contact buffers
@@ -144,7 +144,7 @@ private:
 // Factory overload (option A): create a GPU-capable backend with explicit
 // device/compiler injection. `type` must be "gpu" (or "cpu" for the CPU path).
 std::unique_ptr<FEMBackend> createFEMBackend(const std::string& type,
-                                             sim::rhi::Device& device,
-                                             sim::rhi::ShaderCompiler& compiler);
+                                             ksk::rhi::Device& device,
+                                             ksk::rhi::ShaderCompiler& compiler);
 
-} // namespace sim::fem
+} // namespace ksk::fem

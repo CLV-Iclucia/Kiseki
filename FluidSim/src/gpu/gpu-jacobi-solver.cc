@@ -7,7 +7,7 @@
 
 namespace fluid::gpu
 {
-    using namespace sim::rhi;
+    using namespace ksk::rhi;
 
     GPUJacobiSolver::GPUJacobiSolver(Device& device, const PressureSystem& system,
                                      const SolverConfig& config)

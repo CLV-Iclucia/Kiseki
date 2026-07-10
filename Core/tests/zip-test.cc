@@ -4,7 +4,7 @@
 #include <Core/zip.h>
 #include <gtest/gtest.h>
 
-using namespace sim::core;
+using namespace ksk::core;
 TEST(ZipTest, ZipTwoVectors) {
   std::vector<int> a = {1, 2, 3, 4};
   std::vector<int> b = {4, 5, 6, 7};

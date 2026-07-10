@@ -18,7 +18,7 @@
 #include <string>
 #include <vector>
 
-namespace sim::rhi::vulkan {
+namespace ksk::rhi::vulkan {
 
 // ---- FNV-1a 64-bit hash helper for descriptor cache -------------------------
 static uint64_t fnv1a(const void* data, size_t len, uint64_t seed = 0xcbf29ce484222325ULL) {
@@ -659,4 +659,4 @@ void VulkanCommandList::drawIndexed(uint32_t indexCount, uint32_t instanceCount,
                    firstInstance);
 }
 
-}  // namespace sim::rhi::vulkan
+}  // namespace ksk::rhi::vulkan

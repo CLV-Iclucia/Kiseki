@@ -15,12 +15,12 @@
 #include <Maths/linear-solver.h>
 #include <memory>
 
-using sim::core::JsonNode;
-using sim::core::JsonDict;
-using sim::core::JsonList;
-using namespace sim::fem;
-using namespace sim::deform;
-using namespace sim::maths;
+using ksk::core::JsonNode;
+using ksk::core::JsonDict;
+using ksk::core::JsonList;
+using namespace ksk::fem;
+using namespace ksk::deform;
+using namespace ksk::maths;
 
 TEST(FEMDeserializerTest, TetMeshDeserialization) {
     JsonDict meshDict{

@@ -10,7 +10,7 @@
 namespace fluid::gpu {
 
 std::unique_ptr<GPUPressureSolver> GPUPressureSolver::create(
-    sim::rhi::Device& device,
+    ksk::rhi::Device& device,
     const PressureSystem& system,
     const SolverConfig& config)
 {

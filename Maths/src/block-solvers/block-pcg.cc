@@ -4,6 +4,6 @@
 // This file exists for future unified factory registration.
 // Currently IpcIntegrator::create() directly constructs the block solver.
 
-namespace sim::maths {
+namespace ksk::maths {
 // Reserved for future factory registration if needed.
-} // namespace sim::maths
+} // namespace ksk::maths

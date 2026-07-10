@@ -6,9 +6,9 @@
 
 #include <spdlog/spdlog.h>
 
-namespace sim::fem::gpu
+namespace ksk::fem::gpu
 {
-    using namespace sim::rhi;
+    using namespace ksk::rhi;
 
 #ifndef FEM_SHADER_DIR
 #define FEM_SHADER_DIR "."
@@ -39,7 +39,7 @@ namespace sim::fem::gpu
           boundBlock_(device),
           boundFinal_(device)
     {
-        sort_ = std::make_unique<sim::rpk::Sort>(device, compiler);
+        sort_ = std::make_unique<ksk::rpk::Sort>(device, compiler);
 
         valid_ = morton_.valid() && leaves_.valid() &&
             internal_.valid() && refit_.valid() &&
@@ -181,4 +181,4 @@ namespace sim::fem::gpu
         recordBuild(*cmd, aabbLo, aabbHi, sceneBound_, N);
         device_.submitAndWait(*cmd, QueueType::Compute);
     }
-} // namespace sim::fem::gpu
+} // namespace ksk::fem::gpu

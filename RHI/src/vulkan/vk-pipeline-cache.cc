@@ -6,7 +6,7 @@
 
 #include "vk-internals.h"
 
-namespace sim::rhi::vulkan {
+namespace ksk::rhi::vulkan {
 
 VulkanPipelineCache::VulkanPipelineCache(VkDevice device) : m_device(device) {
   VkPipelineCacheCreateInfo ci{};
@@ -54,4 +54,4 @@ void VulkanPipelineCache::insertGraphics(const GraphicsPipelineDesc& desc,
   m_graphics[desc] = std::move(pipeline);
 }
 
-}  // namespace sim::rhi::vulkan
+}  // namespace ksk::rhi::vulkan

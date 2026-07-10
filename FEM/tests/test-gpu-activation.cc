@@ -27,10 +27,10 @@
 #include <random>
 #include <vector>
 
-using namespace sim::rhi;
-using namespace sim::fem::gpu;
-namespace ipc    = sim::fem::ipc;
-namespace shared = sim::fem::shared;
+using namespace ksk::rhi;
+using namespace ksk::fem::gpu;
+namespace ipc    = ksk::fem::ipc;
+namespace shared = ksk::fem::shared;
 
 namespace {
 

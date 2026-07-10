@@ -14,9 +14,9 @@
 #include <glm/glm.hpp>
 #include <cmath>
 
-using namespace sim::fem;
-using namespace sim::fem::ipc;
-using Real = sim::fem::Real;
+using namespace ksk::fem;
+using namespace ksk::fem::ipc;
+using Real = ksk::fem::Real;
 
 // ============================================================================
 // 测试 1: VT Candidate -> Active ConstraintPair 激活筛选

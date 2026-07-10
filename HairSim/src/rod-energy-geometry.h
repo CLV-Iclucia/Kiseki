@@ -7,7 +7,7 @@
 #include <cmath>
 #include <stdexcept>
 
-namespace sim::hairsim::detail {
+namespace ksk::hairsim::detail {
 
 using Vec3 = Eigen::Vector3d;
 using Mat3 = Eigen::Matrix3d;
@@ -100,4 +100,4 @@ inline void addLocalHessian(Eigen::MatrixXd& hessian, Eigen::Index offset,
   hessian.block<12, 12>(offset, offset) += local;
 }
 
-}  // namespace sim::hairsim::detail
+}  // namespace ksk::hairsim::detail

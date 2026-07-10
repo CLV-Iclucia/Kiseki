@@ -2,7 +2,7 @@
 // Created by creeper on 9/13/24.
 //
 #include <Deform/strain-energy-density.h>
-using namespace sim::deform;
+using namespace ksk::deform;
 
 Matrix<Real, 3, 3> tetDs(const Vector<Real, 12> &x) {
   Matrix<Real, 3, 3> Ds;

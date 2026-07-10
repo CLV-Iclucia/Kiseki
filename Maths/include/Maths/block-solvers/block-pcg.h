@@ -9,7 +9,7 @@
 #include <stdexcept>
 #include <string_view>
 
-namespace sim::maths {
+namespace ksk::maths {
 
 /// Block PCG solver with built-in Block Jacobi preconditioning.
 ///
@@ -208,4 +208,4 @@ private:
   }
 };
 
-} // namespace sim::maths
+} // namespace ksk::maths

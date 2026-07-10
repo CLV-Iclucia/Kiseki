@@ -23,7 +23,7 @@
 #include <memory>
 #include <vector>
 
-namespace sim::fem::gpu {
+namespace ksk::fem::gpu {
 
 class GPUEnergy {
 public:
@@ -59,4 +59,4 @@ private:
     double readbackDouble(const rhi::BufferRef& src);
 };
 
-} // namespace sim::fem::gpu
+} // namespace ksk::fem::gpu

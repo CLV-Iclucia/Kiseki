@@ -3,7 +3,7 @@
 #include <span>
 #include <string_view>
 
-namespace sim::renderer {
+namespace ksk::renderer {
 
 /// Data descriptor for a triangle mesh to be rendered.
 struct MeshData {
@@ -24,4 +24,4 @@ struct FieldData {
   core::Vec3i resolution;
 };
 
-} // namespace sim::renderer
+} // namespace ksk::renderer

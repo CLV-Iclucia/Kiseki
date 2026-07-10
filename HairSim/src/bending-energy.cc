@@ -1,6 +1,6 @@
 #include "rod-energy-geometry.h"
 
-namespace sim::hairsim {
+namespace ksk::hairsim {
 
 BendingEnergy::BendingEnergy(const RodState& state,
                              const RodRestState& rest,
@@ -38,4 +38,4 @@ void BendingEnergy::accumulate(RodAssembly assembly) const {
   }
 }
 
-}  // namespace sim::hairsim
+}  // namespace ksk::hairsim

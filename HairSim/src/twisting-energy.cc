@@ -1,6 +1,29 @@
 #include "rod-energy-geometry.h"
 
-namespace sim::hairsim {
+namespace ksk::hairsim {
+namespace {
+
+detail::Vec12 twistJacobian(const std::vector<RodBlock>& blocks, size_t vertex)
+{
+  const detail::EdgeGeometry previous =
+      detail::edgeGeometry(blocks, vertex - 1);
+  const detail::EdgeGeometry next = detail::edgeGeometry(blocks, vertex);
+  const detail::Vec3 curvature_binormal =
+      detail::curvatureBinormalGeometry(blocks, vertex, false).value;
+
+  detail::Vec12 jacobian = detail::Vec12::Zero();
+  jacobian.segment<3>(0) =
+      -curvature_binormal / (2.0 * previous.length);
+  jacobian[3] = -1.0;
+  jacobian.segment<3>(4) =
+      curvature_binormal / (2.0 * previous.length) -
+      curvature_binormal / (2.0 * next.length);
+  jacobian[7] = 1.0;
+  jacobian.segment<3>(8) = curvature_binormal / (2.0 * next.length);
+  return jacobian;
+}
+
+}  // namespace
 
 TwistingEnergy::TwistingEnergy(
     const RodState& state, const RodRestState& rest,
@@ -16,12 +39,9 @@ void TwistingEnergy::accumulate(RodAssembly assembly) const {
     const double dual_length = rest_.metrics[vertex].z;
     const double twist_weight = material_.twistStiffness() / dual_length;
 
-    detail::Vec12 twist_jacobian = detail::Vec12::Zero();
-    twist_jacobian[3] = -1.0;
-    twist_jacobian[7] = 1.0;
+    const detail::Vec12 twist_jacobian =
+        twistJacobian(state_.blocks, vertex);
 
-    // The Bishop frame is reconstructed for the current centerline, so the
-    // reference-frame twist is a gauge choice rather than an explicit term.
     assembly.energy.twisting += 0.5 * twist_weight * twist * twist;
 
     const Eigen::Index offset =
@@ -34,4 +54,4 @@ void TwistingEnergy::accumulate(RodAssembly assembly) const {
   }
 }
 
-}  // namespace sim::hairsim
+}  // namespace ksk::hairsim

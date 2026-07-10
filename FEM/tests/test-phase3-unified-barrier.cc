@@ -16,7 +16,7 @@
 #include <glm/glm.hpp>
 #include <cmath>
 
-namespace sim::fem::ipc {
+namespace ksk::fem::ipc {
 
 using maths::BlockVector;
 
@@ -234,4 +234,4 @@ TEST_F(Phase3UnifiedBarrierTest, ColliderPEConstraintEnergy) {
   EXPECT_GT(energy, 0.0);
 }
 
-}  // namespace sim::fem::ipc
+}  // namespace ksk::fem::ipc

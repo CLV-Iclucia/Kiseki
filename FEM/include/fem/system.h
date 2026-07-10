@@ -14,7 +14,7 @@
 #include <fem/constraints.h>
 #include <fem/primitive.h>
 
-namespace sim {
+namespace ksk {
 namespace fem::ipc {
 struct CollisionDetector;
 }

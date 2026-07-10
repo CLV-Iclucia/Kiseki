@@ -6,7 +6,7 @@
 #include <RHI/rhi.h>
 #include <gtest/gtest.h>
 
-using namespace sim::rhi;
+using namespace ksk::rhi;
 
 TEST(DeviceTest, CreateAndDestroy) {
   DeviceDesc desc{};

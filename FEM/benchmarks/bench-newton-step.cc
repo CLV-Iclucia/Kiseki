@@ -7,9 +7,9 @@
 #include <iostream>
 #include <iomanip>
 
-using namespace sim;
-using namespace sim::fem;
-using namespace sim::maths;
+using namespace ksk;
+using namespace ksk::fem;
+using namespace ksk::maths;
 using Clock = std::chrono::high_resolution_clock;
 
 /// Simple timer for profiling individual operations
@@ -130,7 +130,7 @@ void benchmarkFullSolve(System &system) {
 
 int main(int argc, char *argv[]) {
   std::cout << "========================================" << std::endl;
-  std::cout << "  SimCraft FEM Newton Step Benchmark    " << std::endl;
+  std::cout << "  Kiseki FEM Newton Step Benchmark    " << std::endl;
   std::cout << "========================================" << std::endl;
 
   // Try to load a mesh from FEM assets

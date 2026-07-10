@@ -6,7 +6,7 @@
 #include <fem/primitives/elastic-tet-mesh.h>
 #include <tbb/parallel_for.h>
 #include <tbb/enumerable_thread_specific.h>
-namespace sim::fem {
+namespace ksk::fem {
 using maths::vectorize;
 
 void ElasticTetMesh::init(const SubVector<Real>& x, const SubVector<Real>& xdot, const SubVector<Real>& X) {

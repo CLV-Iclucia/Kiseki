@@ -11,7 +11,7 @@
 #include <tbb/parallel_for.h>
 #include <tbb/blocked_range.h>
 
-namespace sim::maths {
+namespace ksk::maths {
 
 /// Block Sparse Matrix in BCOO format, SOA layout.
 ///
@@ -241,4 +241,4 @@ private:
 
 using BlockSparseMatrix3 = BlockSparseMatrix<3>;
 
-} // namespace sim::maths
+} // namespace ksk::maths

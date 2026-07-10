@@ -5,7 +5,7 @@
 #include <cmath>
 #include <utility>
 
-namespace sim::hairsim {
+namespace ksk::hairsim {
 namespace {
 
 Eigen::VectorXd flatten(const std::vector<RodBlock>& blocks) {
@@ -156,4 +156,4 @@ bool ImplicitRodIntegrator::step(double dt, const glm::dvec3& gravity) {
   return true;
 }
 
-}  // namespace sim::hairsim
+}  // namespace ksk::hairsim

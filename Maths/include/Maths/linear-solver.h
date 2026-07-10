@@ -7,7 +7,7 @@
 #include "types.h"
 #include <Core/json.h>
 
-namespace sim::maths {
+namespace ksk::maths {
 
 struct LinearSolver {
   virtual void reset() {};

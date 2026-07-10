@@ -13,7 +13,7 @@
 
 namespace fluid::gpu {
 
-using namespace sim::rhi;
+using namespace ksk::rhi;
 // ============================================================================
 // Constructor
 // ============================================================================
@@ -104,7 +104,7 @@ void GPUProjector::buildWeightsAndSystem(CommandList& cmd,
     if (buildWeights_.valid()) {
         BuildWeightsCS::Params p;
         p.faceWeightsU = faceWeightsU_; p.faceWeightsV = faceWeightsV_; p.faceWeightsW = faceWeightsW_;
-        p.colliderSdf  = sim::rhi::ImageBinding{grid.colliderSdfImg, grid.sdfSampler};
+        p.colliderSdf  = ksk::rhi::ImageBinding{grid.colliderSdfImg, grid.sdfSampler};
         p.sdfSampler   = grid.sdfSampler;
         p.gridSizeX = nx; p.gridSizeY = ny; p.gridSizeZ = nz;
         p.gridSpacing = grid.gridSpacing;

@@ -7,7 +7,7 @@
 #include <string>
 #include <variant>
 
-namespace sim::renderer {
+namespace ksk::renderer {
 
 /// 从 FEM System 构建渲染帧（公共工具函数）。
 /// 遍历所有 Primitive + Collider，统一提取渲染数据。
@@ -80,4 +80,4 @@ inline std::unique_ptr<SceneProxy> buildSceneProxyFromSystem(
   return proxy;
 }
 
-} // namespace sim::renderer
+} // namespace ksk::renderer

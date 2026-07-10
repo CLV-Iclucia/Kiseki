@@ -21,9 +21,9 @@
 #include <cmath>
 #include <functional>
 
-using namespace sim::fem::ipc::gipc;
-using namespace sim::maths;
-using Real = sim::fem::Real;
+using namespace ksk::fem::ipc::gipc;
+using namespace ksk::maths;
+using Real = ksk::fem::Real;
 
 // ============================================================================
 // 辅助: 有限差分
@@ -62,7 +62,7 @@ Eigen::Matrix<Real, N, N> finiteDiffHessian(
 // 辅助: LocalHessian → Eigen 矩阵
 template <int N>
 Eigen::Matrix<Real, N * 3, N * 3> localHessianToEigen(
-    const sim::maths::LocalHessian<N>& localH) {
+    const ksk::maths::LocalHessian<N>& localH) {
   Eigen::Matrix<Real, N * 3, N * 3> H;
   for (int bi = 0; bi < N; bi++)
     for (int bj = 0; bj < N; bj++)

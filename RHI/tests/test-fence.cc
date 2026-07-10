@@ -6,7 +6,7 @@
 #include <RHI/rhi.h>
 #include <gtest/gtest.h>
 
-using namespace sim::rhi;
+using namespace ksk::rhi;
 
 TEST(FenceTest, SignalAfterSubmit) {
   auto device = Device::create({.backend = Backend::Vulkan, .enableValidation = true});

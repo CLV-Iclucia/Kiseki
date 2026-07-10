@@ -6,7 +6,7 @@
 #include <glm/geometric.hpp>
 #include <memory>
 
-using namespace sim::fem;
+using namespace ksk::fem;
 
 // ─── 辅助函数 ───
 

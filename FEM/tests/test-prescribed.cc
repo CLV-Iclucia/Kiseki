@@ -6,7 +6,7 @@
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-using namespace sim::fem;
+using namespace ksk::fem;
 
 // 辅助函数：创建一个简单的四面体网格用于测试
 static std::vector<Primitive> createTetrahedron() {

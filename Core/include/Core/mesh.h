@@ -5,7 +5,7 @@
 #pragma once
 #include <Core/core.h>
 #include <string>
-namespace sim::core {
+namespace ksk::core {
 struct Mesh {
   int triangleCount;
   std::vector<Vec3d> vertices;

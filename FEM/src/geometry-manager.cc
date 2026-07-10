@@ -2,7 +2,7 @@
 
 #include "fem/colliders.h"
 
-namespace sim::fem {
+namespace ksk::fem {
 
 void GeometryManager::collectGeometryReferences(
     const std::vector<Primitive> &primitives,
@@ -165,4 +165,4 @@ BBox<Real, 3> GeometryManager::TrajectoryAccessor::vertexBBox(int idx) const {
       .expand({endPos.x, endPos.y, endPos.z});
 }
 
-} // namespace sim::fem
+} // namespace ksk::fem

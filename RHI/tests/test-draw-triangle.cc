@@ -11,7 +11,7 @@
 
 #include <cstring>
 
-using namespace sim::rhi;
+using namespace ksk::rhi;
 
 TEST(DrawTriangle, RedTriangleOffscreen) {
   auto device = Device::create({.backend = Backend::Vulkan,

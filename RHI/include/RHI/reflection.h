@@ -36,7 +36,7 @@
 #include <string_view>
 #include <vector>
 
-namespace sim::rhi {
+namespace ksk::rhi {
 
 // One entry per descriptor binding declared in the shader. Multiple stages
 // (vertex + fragment) can list the same (set, binding) — reflection is per
@@ -98,4 +98,4 @@ ReflectionInfo reflectSpirv(std::span<const std::byte> spirv,
                             ShaderStage stage,
                             std::string_view entryPoint);
 
-}  // namespace sim::rhi
+}  // namespace ksk::rhi

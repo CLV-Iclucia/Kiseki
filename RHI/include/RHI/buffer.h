@@ -15,7 +15,7 @@
 #include <span>
 #include <string>
 
-namespace sim::rhi {
+namespace ksk::rhi {
 
 struct BufferDesc {
   size_t sizeBytes = 0;
@@ -49,7 +49,7 @@ struct BufferDesc {
 // boilerplate below — there is intentionally no shared base class or CRTP
 // (see plan §3.0 / R21).
 //
-class Buffer : public sim::core::NonCopyable {
+class Buffer : public ksk::core::NonCopyable {
  public:
   // ---- Refcount (hand-written; six lines per resource class) -------------
   void addRef() noexcept { m_rc.fetch_add(1, std::memory_order_relaxed); }
@@ -80,4 +80,4 @@ class Buffer : public sim::core::NonCopyable {
 
 using BufferRef = RcPtr<Buffer>;
 
-}  // namespace sim::rhi
+}  // namespace ksk::rhi

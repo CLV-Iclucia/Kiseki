@@ -2,7 +2,7 @@
 #include <fem/constraints.h>
 #include <Maths/block-vector.h>
 
-using namespace sim::fem;
+using namespace ksk::fem;
 
 // 测试 1: projectToFreeSpace 单元测试
 TEST(Constraints, ProjectToFreeSpace) {

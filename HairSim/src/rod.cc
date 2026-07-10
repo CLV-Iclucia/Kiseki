@@ -7,7 +7,7 @@
 #include <numbers>
 #include <stdexcept>
 
-namespace sim::hairsim {
+namespace ksk::hairsim {
 namespace {
 
 using Vec3 = Eigen::Vector3d;
@@ -338,4 +338,4 @@ Eigen::VectorXd Rod::massDiagonal() const {
   return mass;
 }
 
-}  // namespace sim::hairsim
+}  // namespace ksk::hairsim

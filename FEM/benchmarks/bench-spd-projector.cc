@@ -21,7 +21,7 @@
 #include <random>
 #include <vector>
 
-using namespace sim::fem::gpu;
+using namespace ksk::fem::gpu;
 using Clock = std::chrono::high_resolution_clock;
 
 namespace {
@@ -52,7 +52,7 @@ double timeVariant(GpuSpdProjector9& proj, GpuSpdProjector9::Strategy strat,
     return std::chrono::duration<double, std::milli>(t1 - t0).count() / repeats;
 }
 
-void runConfig(sim::rhi::Device& device, sim::rhi::ShaderCompiler& compiler,
+void runConfig(ksk::rhi::Device& device, ksk::rhi::ShaderCompiler& compiler,
                const std::vector<double>& in, int count, int repeats,
                int cyclicSweeps, int classicalRots) {
     GpuSpdProjector9 proj(device, compiler, {}, cyclicSweeps, classicalRots);
@@ -78,7 +78,7 @@ void runConfig(sim::rhi::Device& device, sim::rhi::ShaderCompiler& compiler,
 } // namespace
 
 int main() {
-    auto device = sim::rhi::Device::create({.backend = sim::rhi::Backend::Vulkan,
+    auto device = ksk::rhi::Device::create({.backend = ksk::rhi::Backend::Vulkan,
                                             .enableValidation = false});
     if (!device) { std::cerr << "No Vulkan device\n"; return 0; }
     auto compiler = device->createShaderCompiler();

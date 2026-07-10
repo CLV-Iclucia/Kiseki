@@ -20,7 +20,7 @@
 
 namespace fluid::gpu {
 
-using namespace sim::rhi;
+using namespace ksk::rhi;
 
 // ============================================================================
 // Construction / Destruction
@@ -178,7 +178,7 @@ void GPUFluidBackend::readbackParticles(FluidFrame& out) {
     cmd->end();
     device_.submitAndWait(*cmd, QueueType::Transfer);
 
-    static_assert(sim::rhi::is_direct_structured_data_v<Vec3f>);
+    static_assert(ksk::rhi::is_direct_structured_data_v<Vec3f>);
     auto posData = readbackPos_->mapTyped<Vec3f>();
     auto velData = readbackVel_->mapTyped<Vec3f>();
     out.particlePositions.resize(grid_.numParticles);
@@ -289,7 +289,7 @@ void GPUFluidBackend::createSharedBuffers(const FluidScene& scene) {
 void GPUFluidBackend::uploadParticles(const FluidScene& scene) {
     size_t bufSize = particleBufferSize(grid_.numParticles);
 
-    static_assert(sim::rhi::is_direct_structured_data_v<Vec3f>);
+    static_assert(ksk::rhi::is_direct_structured_data_v<Vec3f>);
     std::vector<Vec3f> positions(grid_.numParticles, Vec3f(0.0f));
     std::vector<Vec3f> velocities(grid_.numParticles, Vec3f(0.0f));
     for (uint32_t i = 0; i < grid_.numParticles; ++i) {
@@ -298,9 +298,9 @@ void GPUFluidBackend::uploadParticles(const FluidScene& scene) {
             velocities[i] = Vec3f(scene.initialFluid.velocities[i]);
         }
     }
-    const auto positionBytes = sim::rhi::asStructuredBytes(
+    const auto positionBytes = ksk::rhi::asStructuredBytes(
         std::span<const Vec3f>(positions));
-    const auto velocityBytes = sim::rhi::asStructuredBytes(
+    const auto velocityBytes = ksk::rhi::asStructuredBytes(
         std::span<const Vec3f>(velocities));
     assert(positionBytes.size() == bufSize);
     assert(velocityBytes.size() == bufSize);

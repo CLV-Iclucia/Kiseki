@@ -16,12 +16,12 @@
 #include <filesystem>
 #include <vector>
 
-namespace sim::fem::gpu {
+namespace ksk::fem::gpu {
 
 class GpuElasticGradient {
 public:
-    GpuElasticGradient(sim::rhi::Device& device,
-                       sim::rhi::ShaderCompiler& compiler,
+    GpuElasticGradient(ksk::rhi::Device& device,
+                       ksk::rhi::ShaderCompiler& compiler,
                        const std::filesystem::path& shaderDir = {});
 
     [[nodiscard]] bool valid() const { return valid_; }
@@ -40,12 +40,12 @@ public:
                  std::vector<glm::dvec3>& gradOut);
 
 private:
-    sim::rhi::Device& device_;
+    ksk::rhi::Device& device_;
     bool valid_ = false;
-    sim::rhi::PipelineRef pso_;
+    ksk::rhi::PipelineRef pso_;
 
-    void uploadBytes(const sim::rhi::BufferRef& dst, const void* data, size_t bytes);
-    void download(const sim::rhi::BufferRef& src, void* dst, size_t bytes);
+    void uploadBytes(const ksk::rhi::BufferRef& dst, const void* data, size_t bytes);
+    void download(const ksk::rhi::BufferRef& src, void* dst, size_t bytes);
 };
 
-} // namespace sim::fem::gpu
+} // namespace ksk::fem::gpu

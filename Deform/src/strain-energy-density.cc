@@ -2,7 +2,7 @@
 // Created by CreeperIclucia-Vader on 25-5-28.
 //
 #include <Deform/strain-energy-density-factory.h>
-namespace sim::deform {
+namespace ksk::deform {
 
 template <typename T>
   static int snh_auto_reg = ([]() {
@@ -50,4 +50,4 @@ createStrainEnergyDensity(const core::JsonNode &node) {
 
 template std::unique_ptr<StrainEnergyDensity<double>>
 createStrainEnergyDensity<double>(const core::JsonNode &node);
-} // namespace sim::deform
+} // namespace ksk::deform

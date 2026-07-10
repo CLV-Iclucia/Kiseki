@@ -16,21 +16,21 @@ namespace fluid::gpu {
 // ---- Shared GPU grid buffer set (POD, all components share) ----
 struct GPUGridState {
     // Staggered velocity faces (SSBO, R32_FLOAT per element)
-    sim::rhi::BufferRef uGrid, vGrid, wGrid;
+    ksk::rhi::BufferRef uGrid, vGrid, wGrid;
     // Saved velocity after P2G (before forces/projection), for FLIP delta
-    sim::rhi::BufferRef uGridOld, vGridOld, wGridOld;
+    ksk::rhi::BufferRef uGridOld, vGridOld, wGridOld;
     // Ping-pong buffers for extrapolation
-    sim::rhi::BufferRef uGridBuf, vGridBuf, wGridBuf;
+    ksk::rhi::BufferRef uGridBuf, vGridBuf, wGridBuf;
     // Validity flags (SSBO, uint32 per element)
-    sim::rhi::BufferRef uValid, vValid, wValid;
-    sim::rhi::BufferRef uValidBuf, vValidBuf, wValidBuf;
+    ksk::rhi::BufferRef uValid, vValid, wValid;
+    ksk::rhi::BufferRef uValidBuf, vValidBuf, wValidBuf;
     // SDF images (3D, hardware trilinear sampling)
-    sim::rhi::ImageRef  fluidSdfImg;
-    sim::rhi::ImageRef  colliderSdfImg;
-    sim::rhi::SamplerRef sdfSampler;
+    ksk::rhi::ImageRef  fluidSdfImg;
+    ksk::rhi::ImageRef  colliderSdfImg;
+    ksk::rhi::SamplerRef sdfSampler;
     // Particles (SOA: separate position and velocity buffers, tightly-packed float3)
-    sim::rhi::BufferRef particlePositions;
-    sim::rhi::BufferRef particleVelocities;
+    ksk::rhi::BufferRef particlePositions;
+    ksk::rhi::BufferRef particleVelocities;
     // Dimensions
     Vec3i    gridSize{64, 64, 64};
     float    gridSpacing{0.015625f};
@@ -45,7 +45,7 @@ class GPUReconstructor;
 
 class GPUFluidBackend : public FluidBackend {
 public:
-    explicit GPUFluidBackend(sim::rhi::Device& device);
+    explicit GPUFluidBackend(ksk::rhi::Device& device);
     ~GPUFluidBackend() override;
 
     // ---- FluidBackend interface ----
@@ -56,13 +56,13 @@ public:
     void updateSolverConfig(const SolverConfig& config) override;
 
     // ---- GPU-specific queries (NOT in base class) ----
-    [[nodiscard]] sim::rhi::BufferRef particlePositionBuffer()  const { return grid_.particlePositions; }
-    [[nodiscard]] sim::rhi::BufferRef particleVelocityBuffer()  const { return grid_.particleVelocities; }
-    [[nodiscard]] sim::rhi::ImageRef  fluidSdfImage()   const { return grid_.fluidSdfImg; }
-    [[nodiscard]] sim::rhi::ImageRef  colliderSdfImage() const { return grid_.colliderSdfImg; }
+    [[nodiscard]] ksk::rhi::BufferRef particlePositionBuffer()  const { return grid_.particlePositions; }
+    [[nodiscard]] ksk::rhi::BufferRef particleVelocityBuffer()  const { return grid_.particleVelocities; }
+    [[nodiscard]] ksk::rhi::ImageRef  fluidSdfImage()   const { return grid_.fluidSdfImg; }
+    [[nodiscard]] ksk::rhi::ImageRef  colliderSdfImage() const { return grid_.colliderSdfImg; }
 
 private:
-    sim::rhi::Device& device_;
+    ksk::rhi::Device& device_;
 
     // ===== Shared state =====
     GPUGridState grid_;
@@ -80,14 +80,14 @@ private:
     // ===== CFL reduction =====
     CflReduceCS cflReduce_;
     CflReduceFinalCS cflReduceFinal_;
-    sim::rhi::BufferRef   cflPartialBuf_;
-    sim::rhi::BufferRef   cflResultBuf_;       // 1 float on device
-    sim::rhi::BufferRef   cflReadbackBuf_;     // 1 float, host-visible
+    ksk::rhi::BufferRef   cflPartialBuf_;
+    ksk::rhi::BufferRef   cflResultBuf_;       // 1 float on device
+    ksk::rhi::BufferRef   cflReadbackBuf_;     // 1 float, host-visible
     float                 cachedMaxSpeed_ = 0.0f;
 
     // ===== Readback (SOA) =====
-    sim::rhi::BufferRef readbackPos_;
-    sim::rhi::BufferRef readbackVel_;
+    ksk::rhi::BufferRef readbackPos_;
+    ksk::rhi::BufferRef readbackVel_;
 
     // ===== Config =====
     SolverConfig config_;
@@ -97,7 +97,7 @@ private:
     void uploadParticles(const FluidScene& scene);
     void uploadColliderToImage(const Mesh& mesh);
     void computeCFL();
-    void substep(sim::rhi::CommandList& cmd, Real dt);
+    void substep(ksk::rhi::CommandList& cmd, Real dt);
 };
 
 } // namespace fluid::gpu

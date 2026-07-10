@@ -14,8 +14,8 @@
 //   return: a toi in (0, toi] if a contact limits the step, else `toi`
 //           (no limit) — so a global min reduction yields the step bound.
 //
-#ifndef SIMCRAFT_FEM_INCLUDE_FEM_SHARED_IPC_CCD_H_
-#define SIMCRAFT_FEM_INCLUDE_FEM_SHARED_IPC_CCD_H_
+#ifndef KISEKI_FEM_INCLUDE_FEM_SHARED_IPC_CCD_H_
+#define KISEKI_FEM_INCLUDE_FEM_SHARED_IPC_CCD_H_
 
 #include <fem/shared/ipc-distance.h>
 
@@ -84,4 +84,4 @@ SH_NS_BEGIN
 
 SH_NS_END
 
-#endif  // SIMCRAFT_FEM_INCLUDE_FEM_SHARED_IPC_CCD_H_
+#endif  // KISEKI_FEM_INCLUDE_FEM_SHARED_IPC_CCD_H_

@@ -12,7 +12,7 @@
 #include <cstring>
 #include <fstream>
 
-using namespace sim::rhi;
+using namespace ksk::rhi;
 
 namespace {
 

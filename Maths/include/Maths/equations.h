@@ -2,13 +2,13 @@
 // Created by creeper on 5/28/24.
 //
 
-#ifndef SIMCRAFT_MATHS_INCLUDE_MATHS_EQUATIONS_H_
-#define SIMCRAFT_MATHS_INCLUDE_MATHS_EQUATIONS_H_
+#ifndef KISEKI_MATHS_INCLUDE_MATHS_EQUATIONS_H_
+#define KISEKI_MATHS_INCLUDE_MATHS_EQUATIONS_H_
 
 #include <optional>
 #include <iostream>
 #include <Maths/types.h>
-namespace sim::maths {
+namespace ksk::maths {
 struct QuadraticPolynomial {
   Real a, b, c;
 };
@@ -61,4 +61,4 @@ inline bool hasInfiniteSolutions(const BinaryLinearSystem &sys) {
   return sys.a00 * sys.a11 == sys.a01 * sys.a10 && sys.a00 * sys.b1 == sys.a10 * sys.b0;
 }
 }
-#endif //SIMCRAFT_MATHS_INCLUDE_MATHS_EQUATIONS_H_
+#endif //KISEKI_MATHS_INCLUDE_MATHS_EQUATIONS_H_

@@ -9,7 +9,7 @@
 #include <tbb/parallel_reduce.h>
 #include <tbb/blocked_range.h>
 
-namespace sim::maths {
+namespace ksk::maths {
 
 /// Contiguous array of glm::vec<N, Real> blocks.
 /// Memory layout: [x0 y0 z0 | x1 y1 z1 | ...] — identical to double[numBlocks*N].
@@ -156,4 +156,4 @@ private:
 
 using BlockVector3 = BlockVector<3>;
 
-} // namespace sim::maths
+} // namespace ksk::maths

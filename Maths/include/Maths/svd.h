@@ -2,10 +2,10 @@
 // Created by creeper on 5/25/24.
 //
 
-#ifndef SIMCRAFT_MATHS_INCLUDE_MATHS_SVD_H_
-#define SIMCRAFT_MATHS_INCLUDE_MATHS_SVD_H_
+#ifndef KISEKI_MATHS_INCLUDE_MATHS_SVD_H_
+#define KISEKI_MATHS_INCLUDE_MATHS_SVD_H_
 #include <Maths/types.h>
-namespace sim::maths {
+namespace ksk::maths {
 // modified from HOBAKv1
 template <typename T, int Dim>
 struct SVDResult {
@@ -32,4 +32,4 @@ SVDResult<T, Dim> SVD(const Matrix<T, Dim, Dim> &A) {
   return {U, V, S};
 }
 }
-#endif //SIMCRAFT_MATHS_INCLUDE_MATHS_SVD_H_
+#endif //KISEKI_MATHS_INCLUDE_MATHS_SVD_H_

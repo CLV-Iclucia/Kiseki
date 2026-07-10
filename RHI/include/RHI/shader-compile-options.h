@@ -15,7 +15,7 @@
 #include <utility>
 #include <vector>
 
-namespace sim::rhi {
+namespace ksk::rhi {
 
 struct ShaderCompileOptions {
   std::string entryPoint = "main";
@@ -39,4 +39,4 @@ struct ShaderCompileOptions {
   bool enableDebugInfo = false;
 };
 
-}  // namespace sim::rhi
+}  // namespace ksk::rhi

@@ -29,7 +29,7 @@
 #include <cstdint>
 #include <string_view>
 
-namespace sim::rhi {
+namespace ksk::rhi {
 
 enum class ShaderStage : uint32_t {
   Compute,
@@ -42,7 +42,7 @@ enum class ShaderStage : uint32_t {
 // .cc that overrides reflection() must include <RHI/reflection.h>.
 struct ReflectionInfo;
 
-class Shader : public sim::core::NonCopyable {
+class Shader : public ksk::core::NonCopyable {
  public:
   // 6-line refcount boilerplate — plan §3.0 / R21: NEVER replace with CRTP.
   void addRef() noexcept { m_rc.fetch_add(1, std::memory_order_relaxed); }
@@ -70,4 +70,4 @@ class Shader : public sim::core::NonCopyable {
 
 using ShaderRef = RcPtr<Shader>;
 
-}  // namespace sim::rhi
+}  // namespace ksk::rhi

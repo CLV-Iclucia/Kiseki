@@ -2,8 +2,8 @@
 // Created by creeper on 6/13/24.
 //
 
-#ifndef SIMCRAFT_SPATIFY_INCLUDE_SPATIFY_SPATIAL_HASH_H_
-#define SIMCRAFT_SPATIFY_INCLUDE_SPATIFY_SPATIAL_HASH_H_
+#ifndef KISEKI_SPATIFY_INCLUDE_SPATIFY_SPATIAL_HASH_H_
+#define KISEKI_SPATIFY_INCLUDE_SPATIFY_SPATIAL_HASH_H_
 #include <Spatify/spatial-hashable.h>
 #include <Spatify/arrays.h>
 #include <Spatify/mortons.h>
@@ -128,4 +128,4 @@ class SpatialHash {
 };
 
 }
-#endif //SIMCRAFT_SPATIFY_INCLUDE_SPATIFY_SPATIAL_HASH_H_
+#endif //KISEKI_SPATIFY_INCLUDE_SPATIFY_SPATIAL_HASH_H_

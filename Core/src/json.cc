@@ -6,7 +6,7 @@
 #include <fstream>
 #include <regex>
 
-namespace sim::core {
+namespace ksk::core {
 
 template <typename T> std::optional<T> tryParseNumber(std::string_view str) {
   T value;

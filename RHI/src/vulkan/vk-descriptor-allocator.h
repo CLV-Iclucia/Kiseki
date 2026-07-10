@@ -27,7 +27,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace sim::rhi::vulkan {
+namespace ksk::rhi::vulkan {
 
 class DescriptorSetAllocator {
  public:
@@ -94,4 +94,4 @@ class DescriptorSetAllocator {
   uint32_t m_activePoolIdx = 0;
 };
 
-}  // namespace sim::rhi::vulkan
+}  // namespace ksk::rhi::vulkan

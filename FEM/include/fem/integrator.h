@@ -7,7 +7,7 @@
 #include <fem/system.h>
 #include <Core/json.h>
 
-namespace sim::fem {
+namespace ksk::fem {
 struct Integrator {
   virtual void step(Real dt) = 0;
   explicit Integrator(System &system_) : system_to_integrate(system_) {}

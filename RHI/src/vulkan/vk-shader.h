@@ -16,7 +16,7 @@
 #include <string>
 #include <string_view>
 
-namespace sim::rhi::vulkan {
+namespace ksk::rhi::vulkan {
 
 class VulkanDevice;
 
@@ -47,4 +47,4 @@ class VulkanShader final : public Shader {
   ReflectionInfo m_reflection;
 };
 
-}  // namespace sim::rhi::vulkan
+}  // namespace ksk::rhi::vulkan

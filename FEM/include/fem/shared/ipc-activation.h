@@ -7,8 +7,8 @@
 // CollisionPair::appendConstraintPair, lifted to a single shared source so the
 // GPU activation kernel emits byte-identical constraints.
 //
-#ifndef SIMCRAFT_FEM_INCLUDE_FEM_SHARED_IPC_ACTIVATION_H_
-#define SIMCRAFT_FEM_INCLUDE_FEM_SHARED_IPC_ACTIVATION_H_
+#ifndef KISEKI_FEM_INCLUDE_FEM_SHARED_IPC_ACTIVATION_H_
+#define KISEKI_FEM_INCLUDE_FEM_SHARED_IPC_ACTIVATION_H_
 
 #include <fem/shared/ipc-distance-type.h>
 
@@ -88,4 +88,4 @@ SH_INLINE ShConstraintPair shActivateEE(int type, int a0, int a1, int b0, int b1
 
 SH_NS_END
 
-#endif  // SIMCRAFT_FEM_INCLUDE_FEM_SHARED_IPC_ACTIVATION_H_
+#endif  // KISEKI_FEM_INCLUDE_FEM_SHARED_IPC_ACTIVATION_H_

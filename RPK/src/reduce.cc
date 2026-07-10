@@ -8,9 +8,9 @@
 #define RPK_SHADER_DIR "."
 #endif
 
-namespace sim::rpk {
+namespace ksk::rpk {
 
-using namespace sim::rhi;
+using namespace ksk::rhi;
 
 // Helper: compile compute pipeline with custom defines (compileComputePipeline
 // in shader-utils.h doesn't accept ShaderCompileOptions).
@@ -139,4 +139,4 @@ void Reduce::run(CommandList& cmd, ReduceOp op, ScalarType type,
     }
 }
 
-}  // namespace sim::rpk
+}  // namespace ksk::rpk

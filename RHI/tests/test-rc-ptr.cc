@@ -1,6 +1,6 @@
 //
 // test-rc-ptr.cc
-// Pure CPU test for sim::rhi::RcPtr<T>. No Vulkan device needed.
+// Pure CPU test for ksk::rhi::RcPtr<T>. No Vulkan device needed.
 //
 
 #include <RHI/rc-ptr.h>
@@ -10,7 +10,7 @@
 #include <thread>
 #include <vector>
 
-using sim::rhi::RcPtr;
+using ksk::rhi::RcPtr;
 
 namespace {
 

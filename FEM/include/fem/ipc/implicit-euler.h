@@ -6,7 +6,7 @@
 #include <fem/integrator.h>
 #include <fem/ipc/integrator.h>
 
-namespace sim::fem {
+namespace ksk::fem {
 
 struct IpcImplicitEuler final : public IpcIntegrator {
   explicit IpcImplicitEuler(System &system, const Config &config = {})

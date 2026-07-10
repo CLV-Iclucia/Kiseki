@@ -34,7 +34,7 @@
 #include <format>
 #include <vector>
 
-using namespace sim;
+using namespace ksk;
 
 // ─── Helper: build a flat triangulated ground quad (grid) ───────────────────
 static fem::FEMScene::ColliderDesc::MeshData

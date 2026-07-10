@@ -8,7 +8,7 @@
 #include <tuple>
 #include <type_traits>
 #include <vector>
-namespace sim::core {
+namespace ksk::core {
 template<typename T>
 concept Iterator = requires(T it) {
   requires std::is_convertible_v<std::decay_t<decltype(*it)>, typename T::value_type>;

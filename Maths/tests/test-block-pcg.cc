@@ -2,7 +2,7 @@
 #include <Maths/block-solvers/block-pcg.h>
 #include <Eigen/IterativeLinearSolvers>
 
-using namespace sim::maths;
+using namespace ksk::maths;
 
 // ============================================================
 // Test 1: Diagonal SPD system

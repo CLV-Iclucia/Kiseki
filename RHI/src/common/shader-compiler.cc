@@ -52,7 +52,7 @@
 #include <sstream>
 #include <unordered_map>
 
-namespace sim::rhi {
+namespace ksk::rhi {
 namespace {
 
 // ---- Local RAII for DXC IUnknown-derived COM-style pointers -----------------
@@ -423,4 +423,4 @@ std::unique_ptr<ShaderCompiler> ShaderCompiler::create(Backend defaultBackend) {
   return c;
 }
 
-}  // namespace sim::rhi
+}  // namespace ksk::rhi

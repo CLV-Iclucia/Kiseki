@@ -2,10 +2,10 @@
 // Created by creeper on 5/25/24.
 //
 
-#ifndef SIMCRAFT_MATHS_INCLUDE_MATHS_TENSOR_H_
-#define SIMCRAFT_MATHS_INCLUDE_MATHS_TENSOR_H_
+#ifndef KISEKI_MATHS_INCLUDE_MATHS_TENSOR_H_
+#define KISEKI_MATHS_INCLUDE_MATHS_TENSOR_H_
 #include <Maths/types.h>
-namespace sim::maths {
+namespace ksk::maths {
 template<typename T, int N, int M>
 auto vectorize(const Matrix<T, N, M> &A) {
   return A.reshaped(N * M, 1).eval();
@@ -46,4 +46,4 @@ Matrix<T, 3, 3> determinantGradient(const Matrix<T, 3, 3> &F) {
   return result;
 }
 }
-#endif //SIMCRAFT_MATHS_INCLUDE_MATHS_TENSOR_H_
+#endif //KISEKI_MATHS_INCLUDE_MATHS_TENSOR_H_

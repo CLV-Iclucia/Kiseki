@@ -2,8 +2,8 @@
 // Created by creeper on 10/25/23.
 //
 
-#ifndef SIMCRAFT_CORE_INCLUDE_CORE_DATA_STRUCTURES_NS_UTIL_H_
-#define SIMCRAFT_CORE_INCLUDE_CORE_DATA_STRUCTURES_NS_UTIL_H_
+#ifndef KISEKI_CORE_INCLUDE_CORE_DATA_STRUCTURES_NS_UTIL_H_
+#define KISEKI_CORE_INCLUDE_CORE_DATA_STRUCTURES_NS_UTIL_H_
 
 #include <Spatify/types.h>
 #include <Spatify/arrays.h>
@@ -119,4 +119,4 @@ class ParticleNeighbourSearcher<T, 3> {
   std::vector<int> cell_end_idx;
 };
 }
-#endif //SIMCRAFT_CORE_INCLUDE_CORE_DATA_STRUCTURES_NS_UTIL_H_
+#endif //KISEKI_CORE_INCLUDE_CORE_DATA_STRUCTURES_NS_UTIL_H_

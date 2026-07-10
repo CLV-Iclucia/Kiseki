@@ -6,8 +6,8 @@
 // `dHatSqr` = d̂² (Barrier::dHatSqr()), `I5` = d²/d̂² in (0,1) when active.
 // Matches GIPC.cu; sHat2 = d̂⁴.
 //
-#ifndef SIMCRAFT_FEM_INCLUDE_FEM_SHARED_GIPC_BARRIER_H_
-#define SIMCRAFT_FEM_INCLUDE_FEM_SHARED_GIPC_BARRIER_H_
+#ifndef KISEKI_FEM_INCLUDE_FEM_SHARED_GIPC_BARRIER_H_
+#define KISEKI_FEM_INCLUDE_FEM_SHARED_GIPC_BARRIER_H_
 
 #include <fem/shared/cross-lang.h>
 
@@ -55,4 +55,4 @@ SH_INLINE sh_real shBarrierClampedLambda0(sh_real I5, sh_real dHatSqr) {
 
 SH_NS_END
 
-#endif  // SIMCRAFT_FEM_INCLUDE_FEM_SHARED_GIPC_BARRIER_H_
+#endif  // KISEKI_FEM_INCLUDE_FEM_SHARED_GIPC_BARRIER_H_

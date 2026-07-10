@@ -3,7 +3,7 @@
 //
 #include <Deform/strain-energy-density-factory.h>
 #include <spdlog/spdlog.h>
-namespace sim::deform {
+namespace ksk::deform {
 template <typename T>
 StrainEnergyDensityFactory<T>& StrainEnergyDensityFactory<T>::instance() {
   static StrainEnergyDensityFactory<T> instance;

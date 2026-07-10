@@ -23,7 +23,7 @@
 #include <cstdint>
 #include <vector>
 
-using namespace sim::rhi;
+using namespace ksk::rhi;
 
 // ---- HLSL kernel ----------------------------------------------------------
 //

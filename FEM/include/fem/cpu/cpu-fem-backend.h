@@ -10,7 +10,7 @@
 #include <Maths/block-linear-solver.h>
 #include <memory>
 
-namespace sim::fem {
+namespace ksk::fem {
 
 class CPUFEMBackend : public FEMBackend {
 public:
@@ -43,4 +43,4 @@ protected:
     makeLinearSolver(const FEMScene& scene);
 };
 
-} // namespace sim::fem
+} // namespace ksk::fem

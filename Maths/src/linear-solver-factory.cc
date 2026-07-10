@@ -4,7 +4,7 @@
 #include <Maths/linear-solver-factory.h>
 #include <spdlog/spdlog.h>
 
-namespace sim::maths {
+namespace ksk::maths {
 
 LinearSolverFactory& LinearSolverFactory::instance() {
   static LinearSolverFactory instance;

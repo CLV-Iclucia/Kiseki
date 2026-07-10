@@ -4,7 +4,7 @@
 #include <map>
 #include <set>
 
-namespace sim::fem {
+namespace ksk::fem {
 std::optional<TetMesh> readTetMeshFromTOBJ(const std::filesystem::path &path) {
   // open file
   std::ifstream file(path);

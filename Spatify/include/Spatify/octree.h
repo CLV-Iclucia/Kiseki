@@ -2,8 +2,8 @@
 // Created by creeper on 6/16/24.
 //
 
-#ifndef SIMCRAFT_SPATIFY_INCLUDE_SPATIFY_OCTREE_H_
-#define SIMCRAFT_SPATIFY_INCLUDE_SPATIFY_OCTREE_H_
+#ifndef KISEKI_SPATIFY_INCLUDE_SPATIFY_OCTREE_H_
+#define KISEKI_SPATIFY_INCLUDE_SPATIFY_OCTREE_H_
 #include <array>
 #include <memory>
 #include <optional>
@@ -37,4 +37,4 @@ class Octree {
   std::unique_ptr<Node> root;
 };
 }
-#endif //SIMCRAFT_SPATIFY_INCLUDE_SPATIFY_OCTREE_H_
+#endif //KISEKI_SPATIFY_INCLUDE_SPATIFY_OCTREE_H_

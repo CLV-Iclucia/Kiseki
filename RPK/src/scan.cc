@@ -8,9 +8,9 @@
 #define RPK_SHADER_DIR "."
 #endif
 
-namespace sim::rpk {
+namespace ksk::rpk {
 
-using namespace sim::rhi;
+using namespace ksk::rhi;
 
 static PipelineRef compilePso(Device& device, ShaderCompiler& compiler,
                               const std::filesystem::path& path,
@@ -152,4 +152,4 @@ void Scan::inclusive(CommandList& cmd, ScanOp op, ScalarType type,
     scanRecursive(cmd, op, type, input, output, count, false, 0);
 }
 
-}  // namespace sim::rpk
+}  // namespace ksk::rpk

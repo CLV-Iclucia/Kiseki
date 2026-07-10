@@ -35,6 +35,7 @@ if(NOT rhi_common)
 endif()
 
 add_library(RHI STATIC ${rhi_common} ${rhi_vulkan} ${rhi_headers})
+add_library(Kiseki::RHI ALIAS RHI)
 
 target_compile_definitions(RHI PRIVATE
     RHI_SHADER_INCLUDE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/shaders"
@@ -46,7 +47,7 @@ target_include_directories(RHI
 )
 
 target_link_libraries(RHI
-    PUBLIC  Core
+    PUBLIC  Kiseki::Core
             Vulkan::Vulkan
     PRIVATE GPUOpen::VulkanMemoryAllocator
             vk-bootstrap::vk-bootstrap
@@ -62,7 +63,7 @@ file(GLOB test_srcs CONFIGURE_DEPENDS tests/*.cc)
 foreach(test_src ${test_srcs})
     get_filename_component(test_name ${test_src} NAME_WE)
     add_executable(${test_name} ${test_src})
-    target_link_libraries(${test_name} PUBLIC RHI GTest::gtest GTest::gtest_main)
+    target_link_libraries(${test_name} PUBLIC Kiseki::RHI GTest::gtest GTest::gtest_main)
     add_test(NAME ${test_name} COMMAND ${test_name})
 
     # Deploy runtime DLLs alongside the test exe on Windows.

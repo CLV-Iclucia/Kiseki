@@ -4,7 +4,7 @@
 
 #include <RHI/compute-shader.h>
 
-namespace sim::rhi {
+namespace ksk::rhi {
 
 void ComputeShaderBase::initialize(Device& device,
                                    ComputeShaderDefinition definition,
@@ -13,4 +13,4 @@ void ComputeShaderBase::initialize(Device& device,
   m_pipeline = device.resolveTypedComputePipeline(m_source, options);
 }
 
-}  // namespace sim::rhi
+}  // namespace ksk::rhi

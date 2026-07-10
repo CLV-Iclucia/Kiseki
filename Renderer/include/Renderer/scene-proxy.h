@@ -5,15 +5,15 @@
 #include <string>
 #include <memory>
 
-namespace sim::renderer {
+namespace ksk::renderer {
 
 struct MeshProxy {
   std::string name;
-  std::vector<core::Vec3f> positions;    // 顶点位置 (float, 渲染精度足够)
-  std::vector<core::Vec3u> triangles;    // 三角形索引
-  std::vector<core::Vec3f> normals;      // 逐顶点法线 (可为空, 渲染时自动计算面法线)
-  std::vector<core::Vec3f> colors;       // 逐顶点颜色 (可为空)
-  core::Vec3f objectColor{-1.0f};        // Per-object 颜色; 负值 = 使用全局默认色
+  std::vector<core::Vec3f> positions;
+  std::vector<core::Vec3u> triangles;
+  std::vector<core::Vec3f> normals;
+  std::vector<core::Vec3f> colors;
+  core::Vec3f objectColor{-1.0f};
 };
 
 struct WireframeProxy {
@@ -69,4 +69,4 @@ inline void computeSmoothNormals(MeshProxy& mesh) {
   }
 }
 
-} // namespace sim::renderer
+} // namespace ksk::renderer

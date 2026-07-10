@@ -20,7 +20,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace sim::rhi::vulkan {
+namespace ksk::rhi::vulkan {
 
 namespace {
 
@@ -477,4 +477,4 @@ const ReflectionInfo& VulkanPipeline::reflection() const {
   return m_shader->reflection();
 }
 
-}  // namespace sim::rhi::vulkan
+}  // namespace ksk::rhi::vulkan

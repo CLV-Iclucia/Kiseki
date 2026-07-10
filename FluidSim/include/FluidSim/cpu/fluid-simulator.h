@@ -2,8 +2,8 @@
 // Created by creeper on 23-9-1.
 //
 
-#ifndef SIMCRAFT_FLUIDSIM_INCLUDE_FLUIDSIM_FLUID_SIMULATOR_H_
-#define SIMCRAFT_FLUIDSIM_INCLUDE_FLUIDSIM_FLUID_SIMULATOR_H_
+#ifndef KISEKI_FLUIDSIM_INCLUDE_FLUIDSIM_FLUID_SIMULATOR_H_
+#define KISEKI_FLUIDSIM_INCLUDE_FLUIDSIM_FLUID_SIMULATOR_H_
 #include <Core/animation.h>
 #include <Core/error.h>
 #include <Core/timer.h>
@@ -272,4 +272,4 @@ class FluidSimulator final : public FluidComputeBackend {
   std::unique_ptr<HybridAdvectionSolver3D> advector{};
 };
 } // namespace fluid::cpu
-#endif  // SIMCRAFT_FLUIDSIM_INCLUDE_FLUIDSIM_FLUID_SIMULATOR_H_
+#endif  // KISEKI_FLUIDSIM_INCLUDE_FLUIDSIM_FLUID_SIMULATOR_H_

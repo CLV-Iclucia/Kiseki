@@ -3,7 +3,7 @@
 //
 #pragma once
 #include <memory>
-namespace sim::core {
+namespace ksk::core {
 template <typename T>
 using arc = std::shared_ptr<const T>;
 }

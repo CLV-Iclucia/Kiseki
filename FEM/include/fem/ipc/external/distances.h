@@ -2,11 +2,11 @@
 // Created by creeper on 6/2/24.
 //
 
-#ifndef SIMCRAFT_FEM_INCLUDE_FEM_IPC_EXTERNAL_DISTANCES_H_
-#define SIMCRAFT_FEM_INCLUDE_FEM_IPC_EXTERNAL_DISTANCES_H_
+#ifndef KISEKI_FEM_INCLUDE_FEM_IPC_EXTERNAL_DISTANCES_H_
+#define KISEKI_FEM_INCLUDE_FEM_IPC_EXTERNAL_DISTANCES_H_
 
 // These codes are taken from ipc-toolkit symbolically generated derivatives
-namespace sim::fem::ipc::autogen {
+namespace ksk::fem::ipc::autogen {
 inline void point_line_distance_gradient_3D(
     double v01,
     double v02,
@@ -1390,4 +1390,4 @@ inline void line_line_distance_hessian(
 }
 } // namespace fem::ipc::autogen
 
-#endif //SIMCRAFT_FEM_INCLUDE_FEM_IPC_EXTERNAL_DISTANCES_H_
+#endif //KISEKI_FEM_INCLUDE_FEM_IPC_EXTERNAL_DISTANCES_H_

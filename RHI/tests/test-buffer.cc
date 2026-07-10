@@ -10,7 +10,7 @@
 #include <cstring>
 #include <numeric>
 
-using namespace sim::rhi;
+using namespace ksk::rhi;
 
 TEST(BufferTest, HostVisibleRoundtrip) {
   auto device = Device::create({.backend = Backend::Vulkan, .enableValidation = true});

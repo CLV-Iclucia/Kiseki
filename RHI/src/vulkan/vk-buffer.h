@@ -8,7 +8,7 @@
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 
-namespace sim::rhi::vulkan {
+namespace ksk::rhi::vulkan {
 
 class VulkanDevice;
 
@@ -40,4 +40,4 @@ class VulkanBuffer final : public Buffer {
   bool m_userMapped = false;
 };
 
-}  // namespace sim::rhi::vulkan
+}  // namespace ksk::rhi::vulkan

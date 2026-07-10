@@ -5,7 +5,7 @@
 #include <condition_variable>
 #include <memory>
 
-namespace sim::renderer {
+namespace ksk::renderer {
 
 class FrameQueue {
 public:
@@ -65,4 +65,4 @@ private:
   bool m_shutdown = false;
 };
 
-} // namespace sim::renderer
+} // namespace ksk::renderer

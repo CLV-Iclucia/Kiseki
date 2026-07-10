@@ -24,7 +24,7 @@
 #include <filesystem>
 #include <memory>
 
-namespace sim::rpk {
+namespace ksk::rpk {
 
 // Sort — LSB radix sort engine (32-bit keys, 4 bits/pass, 8 passes).
 //
@@ -84,4 +84,4 @@ private:
     void ensureBuffers(uint32_t count, bool needValues);
 };
 
-}  // namespace sim::rpk
+}  // namespace ksk::rpk

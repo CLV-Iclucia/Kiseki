@@ -11,7 +11,7 @@
 // Usage:
 //   #include <RHI/shader-utils.h>      // or just #include <RHI/rhi.h>
 //
-//   auto pso = sim::rhi::compileComputePipeline(device, compiler,
+//   auto pso = ksk::rhi::compileComputePipeline(device, compiler,
 //                  "kernels/advect.hlsl");
 //   if (!pso.valid())  /* handle error */;
 //
@@ -26,7 +26,7 @@
 #include <string>
 #include <string_view>
 
-namespace sim::rhi {
+namespace ksk::rhi {
 
 // ---------------------------------------------------------------------------
 // compileComputePipeline
@@ -76,4 +76,4 @@ inline PipelineRef compileComputePipeline(
     return compileComputePipeline(device, compiler, path, options);
 }
 
-} // namespace sim::rhi
+} // namespace ksk::rhi

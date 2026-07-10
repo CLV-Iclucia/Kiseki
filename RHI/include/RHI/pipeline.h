@@ -27,7 +27,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace sim::rhi {
+namespace ksk::rhi {
 
 struct ComputePipelineDesc {
   ShaderRef shader;
@@ -112,7 +112,7 @@ inline bool GraphicsPipelineDesc::operator<(const GraphicsPipelineDesc& o) const
   return vertexBindings < o.vertexBindings;
 }
 
-class Pipeline : public sim::core::NonCopyable {
+class Pipeline : public ksk::core::NonCopyable {
  public:
   void addRef() noexcept { m_rc.fetch_add(1, std::memory_order_relaxed); }
   void release() noexcept {
@@ -139,4 +139,4 @@ class Pipeline : public sim::core::NonCopyable {
 
 using PipelineRef = RcPtr<Pipeline>;
 
-}  // namespace sim::rhi
+}  // namespace ksk::rhi

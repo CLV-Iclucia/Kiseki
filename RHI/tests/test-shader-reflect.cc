@@ -19,7 +19,7 @@
 #include <string>
 #include <vector>
 
-using namespace sim::rhi;
+using namespace ksk::rhi;
 
 namespace {
 

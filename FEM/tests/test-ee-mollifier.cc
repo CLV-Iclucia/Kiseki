@@ -24,9 +24,9 @@
 #include <array>
 #include <vector>
 
-using namespace sim;
-namespace shared = sim::fem::shared;
-namespace gipc = sim::fem::ipc::gipc;
+using namespace ksk;
+namespace shared = ksk::fem::shared;
+namespace gipc = ksk::fem::ipc::gipc;
 
 namespace {
 

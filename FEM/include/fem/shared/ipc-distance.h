@@ -7,8 +7,8 @@
 // would be classified differently. All math stays in full double (the shDot/
 // shCross helpers avoid the float-only HLSL intrinsics).
 //
-#ifndef SIMCRAFT_FEM_INCLUDE_FEM_SHARED_IPC_DISTANCE_H_
-#define SIMCRAFT_FEM_INCLUDE_FEM_SHARED_IPC_DISTANCE_H_
+#ifndef KISEKI_FEM_INCLUDE_FEM_SHARED_IPC_DISTANCE_H_
+#define KISEKI_FEM_INCLUDE_FEM_SHARED_IPC_DISTANCE_H_
 
 #include <fem/shared/ipc-distance-type.h>
 
@@ -91,4 +91,4 @@ SH_INLINE sh_real shDistanceSqrEdgeEdge(sh_real3 ea0, sh_real3 ea1,
 
 SH_NS_END
 
-#endif  // SIMCRAFT_FEM_INCLUDE_FEM_SHARED_IPC_DISTANCE_H_
+#endif  // KISEKI_FEM_INCLUDE_FEM_SHARED_IPC_DISTANCE_H_

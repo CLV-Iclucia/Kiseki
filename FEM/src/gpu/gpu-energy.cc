@@ -15,9 +15,9 @@
 #define FEM_SHADER_DIR "."
 #endif
 
-namespace sim::fem::gpu
+namespace ksk::fem::gpu
 {
-    using namespace sim::rhi;
+    using namespace ksk::rhi;
     namespace fs = std::filesystem;
 
     static constexpr uint32_t kWG = 256;
@@ -38,7 +38,7 @@ namespace sim::fem::gpu
         : device_(device)
     {
         fs::path dir = shaderDir.empty() ? fs::path(FEM_SHADER_DIR) : shaderDir;
-        reduce_ = std::make_unique<sim::rpk::Reduce>(device, compiler);
+        reduce_ = std::make_unique<ksk::rpk::Reduce>(device, compiler);
         psoElastic_ = compileComputePipeline(device, compiler, dir / "energy-elastic.hlsl");
         valid_ = psoElastic_.valid();
         if (!valid_) spdlog::error("[GpuEnergy] pipeline compilation failed");
@@ -155,4 +155,4 @@ namespace sim::fem::gpu
         }
         return readbackDouble(bResult_);
     }
-} // namespace sim::fem::gpu
+} // namespace ksk::fem::gpu

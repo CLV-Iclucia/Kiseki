@@ -12,9 +12,9 @@
 #define FEM_SHADER_DIR "."
 #endif
 
-namespace sim::fem::gpu
+namespace ksk::fem::gpu
 {
-    using namespace sim::rhi;
+    using namespace ksk::rhi;
     namespace fs = std::filesystem;
 
     static constexpr uint32_t kWG = 256;
@@ -154,7 +154,7 @@ namespace sim::fem::gpu
         cc(*cmd);
 
         // 6) inclusive scan of flags -> 1-based segment id per entry
-        sort_->scan().inclusive(*cmd, sim::rpk::ScanOp::Sum, sim::rpk::ScalarType::Uint32,
+        sort_->scan().inclusive(*cmd, ksk::rpk::ScanOp::Sum, ksk::rpk::ScalarType::Uint32,
                                 flag_, segId_, nnz);
         cc(*cmd);
 
@@ -173,4 +173,4 @@ namespace sim::fem::gpu
         // numSeg = inclusive-scan value of the last entry
         return readbackUint(segId_, nnz - 1);
     }
-} // namespace sim::fem::gpu
+} // namespace ksk::fem::gpu

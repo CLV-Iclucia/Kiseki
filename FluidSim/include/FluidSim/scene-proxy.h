@@ -5,7 +5,7 @@
 #include <memory>
 #include <string>
 
-namespace sim::renderer {
+namespace ksk::renderer {
 
 /// 从 FluidBackend 构建渲染帧。
 ///
@@ -91,4 +91,4 @@ inline std::unique_ptr<SceneProxy> buildSceneProxyFromFluid(
     return proxy;
 }
 
-} // namespace sim::renderer
+} // namespace ksk::renderer

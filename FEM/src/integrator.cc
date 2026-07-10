@@ -5,7 +5,7 @@
 #include <fem/integrator-factory.h>
 #include <fem/ipc/integrator.h>
 
-namespace sim::fem {
+namespace ksk::fem {
 
 std::unique_ptr<Integrator>
 createIntegrator(System& system, const core::JsonNode &node) {

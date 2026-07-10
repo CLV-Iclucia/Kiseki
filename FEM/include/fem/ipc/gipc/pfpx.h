@@ -16,7 +16,7 @@
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-namespace sim::fem::ipc::gipc {
+namespace ksk::fem::ipc::gipc {
 
 // ============================================================================
 // 结果结构：存储 PFPx + 归一化特征向量 q₀ + I₅
@@ -107,4 +107,4 @@ Eigen::Matrix<Real, 3, 6> computePFPx3x1(Real DmInv);
 
 } // namespace detail
 
-} // namespace sim::fem::ipc::gipc
+} // namespace ksk::fem::ipc::gipc

@@ -3,7 +3,7 @@
 #include <string>
 #include <spdlog/spdlog.h>
 
-namespace sim::core {
+namespace ksk::core {
 
 class Timer {
 public:
@@ -25,4 +25,4 @@ private:
   clock::time_point m_start{clock::now()};
 };
 
-} // namespace sim::core
+} // namespace ksk::core

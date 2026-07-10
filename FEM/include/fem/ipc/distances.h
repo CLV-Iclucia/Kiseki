@@ -2,8 +2,8 @@
 // Created by creeper on 6/2/24.
 //
 
-#ifndef SIMCRAFT_FEM_INCLUDE_FEM_IPC_DISTANCES_H_
-#define SIMCRAFT_FEM_INCLUDE_FEM_IPC_DISTANCES_H_
+#ifndef KISEKI_FEM_INCLUDE_FEM_IPC_DISTANCES_H_
+#define KISEKI_FEM_INCLUDE_FEM_IPC_DISTANCES_H_
 #include <cstdint>
 #include <fem/types.h>
 #include <fem/ipc/external/distances.h>
@@ -12,7 +12,7 @@
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-namespace sim::fem::ipc {
+namespace ksk::fem::ipc {
 
 using maths::LocalGrad;
 using maths::LocalHessian;
@@ -230,5 +230,5 @@ LocalHessian<4> localDistanceSqrEdgeEdgeHessian(const glm::dvec3 &a,
                                                      const glm::dvec3 &c,
                                                      const glm::dvec3 &d);
 
-} // namespace sim::fem::ipc
-#endif // SIMCRAFT_FEM_INCLUDE_FEM_IPC_DISTANCES_H_
+} // namespace ksk::fem::ipc
+#endif // KISEKI_FEM_INCLUDE_FEM_IPC_DISTANCES_H_

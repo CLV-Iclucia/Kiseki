@@ -18,7 +18,7 @@
 #include <cstdint>
 #include <filesystem>
 
-namespace sim::rpk {
+namespace ksk::rpk {
 
 // Supported reduction operators.
 enum class ReduceOp : uint32_t {
@@ -78,4 +78,4 @@ private:
     void ensureTempBuffer(uint32_t sizeBytes);
 };
 
-}  // namespace sim::rpk
+}  // namespace ksk::rpk

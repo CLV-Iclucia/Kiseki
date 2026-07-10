@@ -10,7 +10,7 @@
 #include <optional>
 #include <span>
 
-namespace sim::fem {
+namespace ksk::fem {
 struct TetMesh {
   TetMesh() = default;
   TetMesh(const std::vector<Vector<Real, 3>> &vertices,
@@ -98,4 +98,4 @@ private:
 };
 
 std::optional<TetMesh> readTetMeshFromTOBJ(const std::filesystem::path &path);
-} // namespace sim::fem
+} // namespace ksk::fem

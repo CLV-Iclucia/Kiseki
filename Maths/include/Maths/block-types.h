@@ -7,7 +7,7 @@
 #include <Maths/block-vector.h>
 #include <Maths/block-sparse-matrix.h>
 
-namespace sim::maths {
+namespace ksk::maths {
 
 using Real = double;
 
@@ -41,7 +41,7 @@ struct LocalHessian {
   const std::array<glm::dmat3, N>& operator[](int i) const noexcept { return v[i]; }
 };
 
-// ── 算符重载（类型在 sim::maths 中，ADL 对所有 sim:: 子命名空间均可见）───────────
+// ── 算符重载（类型在 ksk::maths 中，ADL 对所有 ksk:: 子命名空间均可见）───────────
 
 template<int N>
 inline LocalGrad<N> operator*(Real s, const LocalGrad<N>& g) {
@@ -159,4 +159,4 @@ LocalHessian<N> outerProductMatrix(const LocalGrad<N>& grad) {
   return result;
 }
 
-} // namespace sim::maths
+} // namespace ksk::maths

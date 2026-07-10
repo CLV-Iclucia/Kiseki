@@ -23,7 +23,7 @@
 #include <format>
 #include <random>
 
-using namespace sim;
+using namespace ksk;
 
 // Generate initial particle positions by rejection sampling in a box region
 static fluid::InitialFluid generateDamBreakParticles(

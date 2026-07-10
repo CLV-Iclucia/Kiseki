@@ -7,7 +7,7 @@
 #include "vk-device.h"
 #include "vk-internals.h"
 
-namespace sim::rhi::vulkan {
+namespace ksk::rhi::vulkan {
 
 VulkanBuffer::VulkanBuffer(VulkanDevice* device, const BufferDesc& desc)
     : m_device(device), m_desc(desc), m_sizeBytes(desc.sizeBytes) {
@@ -80,4 +80,4 @@ void VulkanBuffer::destroy() noexcept {
   delete this;
 }
 
-}  // namespace sim::rhi::vulkan
+}  // namespace ksk::rhi::vulkan

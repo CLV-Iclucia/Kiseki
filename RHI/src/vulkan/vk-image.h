@@ -8,7 +8,7 @@
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 
-namespace sim::rhi::vulkan {
+namespace ksk::rhi::vulkan {
 
 class VulkanDevice;
 
@@ -59,4 +59,4 @@ class VulkanSampler final : public Sampler {
   VkSampler m_sampler = VK_NULL_HANDLE;
 };
 
-}  // namespace sim::rhi::vulkan
+}  // namespace ksk::rhi::vulkan

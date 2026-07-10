@@ -12,7 +12,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace sim::fem::ipc::gipc {
+namespace ksk::fem::ipc::gipc {
 
 // ============================================================================
 // makePD2x2: 2×2 对称矩阵的 SPD 投影
@@ -125,4 +125,4 @@ maths::LocalGrad<N> eigenToLocalGrad(
   return result;
 }
 
-} // namespace sim::fem::ipc::gipc
+} // namespace ksk::fem::ipc::gipc

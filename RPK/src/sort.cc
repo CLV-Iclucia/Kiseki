@@ -8,9 +8,9 @@
 #define RPK_SHADER_DIR "."
 #endif
 
-namespace sim::rpk {
+namespace ksk::rpk {
 
-using namespace sim::rhi;
+using namespace ksk::rhi;
 
 // ---- SHADER_PARAMS ----
 SHADER_PARAMS_BEGIN(HistogramParams)
@@ -191,4 +191,4 @@ void Sort::keys(CommandList& cmd, const BufferRef& keysBuf, uint32_t count) {
     static_assert(kNumPasses % 2 == 0);
 }
 
-}  // namespace sim::rpk
+}  // namespace ksk::rpk

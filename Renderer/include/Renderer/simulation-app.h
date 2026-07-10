@@ -7,7 +7,7 @@
 #include <iostream>
 #include <format>
 
-namespace sim::renderer {
+namespace ksk::renderer {
 
 /// SimulationApp: 将"模拟循环 + 渲染器 + 线程管理 + 帧推送"全部内聚。
 ///
@@ -126,4 +126,4 @@ struct SimulationApp {
   }
 };
 
-} // namespace sim::renderer
+} // namespace ksk::renderer

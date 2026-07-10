@@ -9,7 +9,7 @@
 #include <Maths/block-vector.h>
 #include <Maths/block-sparse-matrix.h>
 
-namespace sim::fem {
+namespace ksk::fem {
 struct Primitive {
   explicit Primitive(ElasticTetMesh &&data) : impl(std::move(data)) {}
   void init(const SubVector<Real>& x, const SubVector<Real>& xdot, const SubVector<Real>& X) {

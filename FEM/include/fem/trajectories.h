@@ -8,7 +8,7 @@
 #include <fem/simplex.h>
 #include <Maths/block-vector.h>
 
-namespace sim::fem {
+namespace ksk::fem {
 
 struct PointTrajectory {
   const maths::BlockVector<3> &x;

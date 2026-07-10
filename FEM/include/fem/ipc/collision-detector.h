@@ -14,7 +14,7 @@
 #include <memory>
 #include <span>
 
-namespace sim::fem::ipc {
+namespace ksk::fem::ipc {
 constexpr Real kTCCD_EpsilonEE = 6.217248937900877e-15;
 constexpr Real kTCCD_EpsilonVT = 6.661338147750939e-15;
 

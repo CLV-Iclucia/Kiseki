@@ -12,7 +12,7 @@
 #include <functional>
 #include <optional>
 
-namespace sim::fem {
+namespace ksk::fem {
 
 using Real = double;
 
@@ -120,4 +120,4 @@ struct FEMBackend {
 /// Factory: create backend by name ("cpu" or "gpu")
 std::unique_ptr<FEMBackend> createFEMBackend(const std::string& type);
 
-} // namespace sim::fem
+} // namespace ksk::fem

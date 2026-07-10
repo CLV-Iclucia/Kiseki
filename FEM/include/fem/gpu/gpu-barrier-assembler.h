@@ -21,19 +21,19 @@
 #include <cstdint>
 #include <filesystem>
 
-namespace sim::fem::gpu {
+namespace ksk::fem::gpu {
 
 SHADER_PARAMS_BEGIN(BarrierAssembleParams)
-    SHADER_PARAM_UAV   (sim::rhi::BufferRef, hessBlocks);
-    SHADER_PARAM_UAV   (sim::rhi::BufferRef, hessRow);
-    SHADER_PARAM_UAV   (sim::rhi::BufferRef, hessCol);
-    SHADER_PARAM_UAV   (sim::rhi::BufferRef, gradRow);
-    SHADER_PARAM_UAV   (sim::rhi::BufferRef, gradVal);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, pairs);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, x);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, uParams);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, dParams);
-    SHADER_PARAM_SRV   (sim::rhi::BufferRef, xRest);
+    SHADER_PARAM_UAV   (ksk::rhi::BufferRef, hessBlocks);
+    SHADER_PARAM_UAV   (ksk::rhi::BufferRef, hessRow);
+    SHADER_PARAM_UAV   (ksk::rhi::BufferRef, hessCol);
+    SHADER_PARAM_UAV   (ksk::rhi::BufferRef, gradRow);
+    SHADER_PARAM_UAV   (ksk::rhi::BufferRef, gradVal);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, pairs);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, x);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, uParams);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, dParams);
+    SHADER_PARAM_SRV   (ksk::rhi::BufferRef, xRest);
     SHADER_PARAM_SCALAR(uint32_t,            total);
 SHADER_PARAMS_END();
 
@@ -44,8 +44,8 @@ public:
         uint32_t numGradEntries = 0;  // PP*2 + PE*3 + (PT+EE)*4
     };
 
-    GpuBarrierAssembler(sim::rhi::Device& device,
-                        sim::rhi::ShaderCompiler& compiler,
+    GpuBarrierAssembler(ksk::rhi::Device& device,
+                        ksk::rhi::ShaderCompiler& compiler,
                         const std::filesystem::path& shaderDir = {});
 
     [[nodiscard]] bool valid() const { return valid_; }
@@ -57,30 +57,30 @@ public:
     //   kappa, dHat: barrier stiffness / distance threshold
     //   xRest      : double[nVerts*3] rest positions (EE mollifier eps_x); the
     //                near-parallel edge-edge mollifier is applied when provided.
-    Result assemble(const sim::rhi::BufferRef& x,
-                    const sim::rhi::BufferRef& pairs,
+    Result assemble(const ksk::rhi::BufferRef& x,
+                    const ksk::rhi::BufferRef& pairs,
                     const std::array<uint32_t, 5>& typeOffsets,
                     uint32_t total, double kappa, double dHat,
-                    const sim::rhi::BufferRef& xRest);
+                    const ksk::rhi::BufferRef& xRest);
 
     // Hessian BCOO (row-major append order); blocks are column-major dmat3.
-    [[nodiscard]] const sim::rhi::BufferRef& hessBlocks() const { return hessBlocks_; }
-    [[nodiscard]] const sim::rhi::BufferRef& hessRow()    const { return hessRow_; }
-    [[nodiscard]] const sim::rhi::BufferRef& hessCol()    const { return hessCol_; }
+    [[nodiscard]] const ksk::rhi::BufferRef& hessBlocks() const { return hessBlocks_; }
+    [[nodiscard]] const ksk::rhi::BufferRef& hessRow()    const { return hessRow_; }
+    [[nodiscard]] const ksk::rhi::BufferRef& hessCol()    const { return hessCol_; }
     // Gradient contributions: row[i] vertex, val[i*3..] the dvec3.
-    [[nodiscard]] const sim::rhi::BufferRef& gradRow() const { return gradRow_; }
-    [[nodiscard]] const sim::rhi::BufferRef& gradVal() const { return gradVal_; }
+    [[nodiscard]] const ksk::rhi::BufferRef& gradRow() const { return gradRow_; }
+    [[nodiscard]] const ksk::rhi::BufferRef& gradVal() const { return gradVal_; }
 
 private:
-    sim::rhi::Device& device_;
+    ksk::rhi::Device& device_;
     bool valid_ = false;
-    sim::rhi::PipelineRef pso_;
+    ksk::rhi::PipelineRef pso_;
 
-    sim::rhi::BufferRef hessBlocks_, hessRow_, hessCol_, gradRow_, gradVal_;
-    sim::rhi::BufferRef uParams_, dParams_;
+    ksk::rhi::BufferRef hessBlocks_, hessRow_, hessCol_, gradRow_, gradVal_;
+    ksk::rhi::BufferRef uParams_, dParams_;
     uint32_t capH_ = 0, capG_ = 0;
 
-    void uploadBytes(const sim::rhi::BufferRef& dst, const void* data, size_t bytes);
+    void uploadBytes(const ksk::rhi::BufferRef& dst, const void* data, size_t bytes);
 };
 
-} // namespace sim::fem::gpu
+} // namespace ksk::fem::gpu

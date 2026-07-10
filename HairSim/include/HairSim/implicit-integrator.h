@@ -6,7 +6,7 @@
 
 #include <string>
 
-namespace sim::hairsim {
+namespace ksk::hairsim {
 
 class ImplicitRodIntegrator {
  public:
@@ -27,4 +27,4 @@ class ImplicitRodIntegrator {
   std::string diagnostic_;
 };
 
-}  // namespace sim::hairsim
+}  // namespace ksk::hairsim

@@ -6,7 +6,7 @@
 #include <Maths/linear-solver.h>
 #include <mutex>
 
-namespace sim::maths {
+namespace ksk::maths {
 
 struct LinearSolverFactory {
   using Creator = std::function<std::unique_ptr<LinearSolver>(const core::JsonNode&)>;

@@ -7,7 +7,7 @@
 #include <fem/integrator.h>
 #include <mutex>
 
-namespace sim::fem {
+namespace ksk::fem {
 
 struct IntegratorFactory {
   using Creator = std::function<std::unique_ptr<Integrator>(System&, const core::JsonNode&)>;

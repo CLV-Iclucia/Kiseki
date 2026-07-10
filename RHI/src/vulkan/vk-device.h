@@ -17,7 +17,7 @@
 
 #include "vk-pipeline-cache.h"
 
-namespace sim::rhi::vulkan {
+namespace ksk::rhi::vulkan {
 
 class DescriptorSetAllocator;
 
@@ -123,4 +123,4 @@ class VulkanDevice final : public Device {
   bool m_frameLoopActive = false;  // R0–R2: never set
 };
 
-}  // namespace sim::rhi::vulkan
+}  // namespace ksk::rhi::vulkan

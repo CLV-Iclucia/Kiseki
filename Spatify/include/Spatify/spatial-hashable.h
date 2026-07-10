@@ -2,8 +2,8 @@
 // Created by creeper on 6/13/24.
 //
 
-#ifndef SIMCRAFT_SPATIFY_INCLUDE_SPATIFY_SPATIAL_HASHABLE_H_
-#define SIMCRAFT_SPATIFY_INCLUDE_SPATIFY_SPATIAL_HASHABLE_H_
+#ifndef KISEKI_SPATIFY_INCLUDE_SPATIFY_SPATIAL_HASHABLE_H_
+#define KISEKI_SPATIFY_INCLUDE_SPATIFY_SPATIAL_HASHABLE_H_
 #include <Spatify/bbox.h>
 namespace spatify {
 
@@ -30,4 +30,4 @@ concept SpatialHashablePrimitiveAccessor = requires(T t, size_t index, const Sin
 };
 
 }
-#endif //SIMCRAFT_SPATIFY_INCLUDE_SPATIFY_SPATIAL_HASHABLE_H_
+#endif //KISEKI_SPATIFY_INCLUDE_SPATIFY_SPATIAL_HASHABLE_H_

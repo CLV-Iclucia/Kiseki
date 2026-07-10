@@ -8,7 +8,7 @@
 #include <variant>
 #include <vector>
 
-namespace sim::fem {
+namespace ksk::fem {
 
 /// 运动剖面基类 — 描述运动学体的时变变换
 struct MotionProfile {
@@ -148,4 +148,4 @@ struct Collider {
   }
 };
 
-} // namespace sim::fem
+} // namespace ksk::fem

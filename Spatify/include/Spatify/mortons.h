@@ -2,8 +2,8 @@
 // Created by creeper on 5/31/24.
 //
 
-#ifndef SIMCRAFT_SPATIFY_INCLUDE_SPATIFY_MORTONS_H_
-#define SIMCRAFT_SPATIFY_INCLUDE_SPATIFY_MORTONS_H_
+#ifndef KISEKI_SPATIFY_INCLUDE_SPATIFY_MORTONS_H_
+#define KISEKI_SPATIFY_INCLUDE_SPATIFY_MORTONS_H_
 #include <cstdint>
 #include <tuple>
 #include <cassert>
@@ -68,4 +68,4 @@ inline uint64_t encodeMorton21bit(int x, int y, int z) {
   return (morton21BitEncode(x) << 2) | (morton21BitEncode(y) << 1) | morton21BitEncode(z);
 }
 }
-#endif //SIMCRAFT_SPATIFY_INCLUDE_SPATIFY_MORTONS_H_
+#endif //KISEKI_SPATIFY_INCLUDE_SPATIFY_MORTONS_H_

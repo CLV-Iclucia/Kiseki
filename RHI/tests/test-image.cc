@@ -10,7 +10,7 @@
 #include <array>
 #include <cstdint>
 
-using namespace sim::rhi;
+using namespace ksk::rhi;
 
 TEST(ImageTest, ClearAndReadback3D) {
   auto device = Device::create({.backend = Backend::Vulkan, .enableValidation = true});

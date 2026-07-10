@@ -15,7 +15,7 @@
 #include <optional>
 #include <span>
 
-namespace sim::rhi::vulkan {
+namespace ksk::rhi::vulkan {
 
 class VulkanDevice;
 
@@ -84,4 +84,4 @@ class VulkanPipeline final : public Pipeline {
   VkShaderStageFlags m_pushStages = 0;
 };
 
-}  // namespace sim::rhi::vulkan
+}  // namespace ksk::rhi::vulkan

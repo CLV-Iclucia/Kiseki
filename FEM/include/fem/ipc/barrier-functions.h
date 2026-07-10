@@ -2,11 +2,11 @@
 // Created by creeper on 5/28/24.
 //
 
-#ifndef SIMCRAFT_FEM_INCLUDE_FEM_IPC_BARRIER_FUNCTIONS_H_
-#define SIMCRAFT_FEM_INCLUDE_FEM_IPC_BARRIER_FUNCTIONS_H_
+#ifndef KISEKI_FEM_INCLUDE_FEM_IPC_BARRIER_FUNCTIONS_H_
+#define KISEKI_FEM_INCLUDE_FEM_IPC_BARRIER_FUNCTIONS_H_
 #include <fem/types.h>
 #include <cmath>
-namespace sim::fem::ipc {
+namespace ksk::fem::ipc {
 
 struct LogBarrier {
   explicit LogBarrier(Real dHat) : m_dHat(dHat) {}
@@ -30,4 +30,4 @@ struct LogBarrier {
 };
 
 }
-#endif //SIMCRAFT_FEM_INCLUDE_FEM_IPC_BARRIER_FUNCTIONS_H_
+#endif //KISEKI_FEM_INCLUDE_FEM_IPC_BARRIER_FUNCTIONS_H_
