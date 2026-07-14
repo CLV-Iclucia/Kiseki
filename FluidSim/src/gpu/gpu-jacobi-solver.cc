@@ -3,6 +3,7 @@
 // ============================================================================
 
 #include <FluidSim/gpu/gpu-jacobi-solver.h>
+#include <Core/profiler.h>
 #include <RHI/rhi.h>
 
 namespace fluid::gpu
@@ -23,6 +24,8 @@ namespace fluid::gpu
 
     void GPUJacobiSolver::solve(CommandList& cmd, const PressureSystem& system)
     {
+        SIM_PROFILE_FUNCTION();
+
         if (!jacobi_.valid()) return;
 
         uint32_t nc = static_cast<uint32_t>(system.gridSize.x) *
@@ -40,8 +43,10 @@ namespace fluid::gpu
         // Even iterations: ping(in) → pressure(out)
         // Odd  iterations: pressure(in) → ping(out)
         int iters = std::max(1, iterations_);
+        SIM_PROFILE_VALUE("GPUJacobi/Iterations", iters);
         for (int i = 0; i < iters; ++i)
         {
+            SIM_PROFILE_SCOPE("GPUJacobi/Iteration");
             bool even = (i % 2 == 0);
             JacobiIterCS::Params p;
             p.pressureIn = even ? pressurePing_ : system.pressure;

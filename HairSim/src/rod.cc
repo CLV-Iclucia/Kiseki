@@ -81,6 +81,10 @@ Vec3 orthonormalizeDirector(const Vec3& director, const Vec3& tangent) {
   return result / length;
 }
 
+double signedAngleAround(const Vec3& from, const Vec3& to, const Vec3& axis) {
+  return std::atan2(axis.dot(from.cross(to)), from.dot(to));
+}
+
 CurvatureBinormalGeometry curvatureBinormalGeometry(
     const std::vector<RodBlock>& blocks, size_t vertex,
     bool compute_jacobian) {
@@ -125,6 +129,41 @@ std::vector<RodBlock> unflatten(const Eigen::VectorXd& values) {
   return result;
 }
 
+std::vector<glm::dvec3> transportedReferenceDirectors(
+    const std::vector<glm::dvec3>& reference_directors,
+    const RodState& previous_state, const RodState& current_state) {
+  std::vector<glm::dvec3> result(reference_directors.size());
+  for (size_t edge = 0; edge + 1 < current_state.blocks.size(); ++edge) {
+    const EdgeGeometry previous = edgeGeometry(previous_state.blocks, edge);
+    const EdgeGeometry current = edgeGeometry(current_state.blocks, edge);
+    const Vec3 old_director =
+        orthonormalizeDirector(toEigen(reference_directors.at(edge)),
+                               previous.tangent);
+    const Vec3 transported =
+        parallelTransport(old_director, previous.tangent, current.tangent);
+    result[edge] = toGlm(orthonormalizeDirector(transported, current.tangent));
+  }
+  return result;
+}
+
+double referenceTwistFromDirectors(const RodState& state,
+                                   const std::vector<glm::dvec3>& directors,
+                                   size_t vertex) {
+  if (vertex == 0 || vertex + 1 >= state.blocks.size())
+    return 0.0;
+  const EdgeGeometry previous = edgeGeometry(state.blocks, vertex - 1);
+  const EdgeGeometry current = edgeGeometry(state.blocks, vertex);
+  const Vec3 previous_director =
+      orthonormalizeDirector(toEigen(directors.at(vertex - 1)),
+                             previous.tangent);
+  const Vec3 current_director =
+      orthonormalizeDirector(toEigen(directors.at(vertex)), current.tangent);
+  const Vec3 transported =
+      parallelTransport(previous_director, previous.tangent,
+                        current.tangent);
+  return signedAngleAround(transported, current_director, current.tangent);
+}
+
 void accumulateGravityEnergy(const RodState& state,
                              const Eigen::VectorXd& mass,
                              const glm::dvec3& gravity,
@@ -151,24 +190,6 @@ void accumulateRootConstraintEnergy(const RodState& state,
   assembly.hessian.block<3, 3>(0, 0).diagonal().array() +=
       material.rootStiffness;
 
-  const Vec3 root_edge_offset =
-      (position(state.blocks[1]) - position(state.blocks[0])) -
-      (position(rest.blocks[1]) - position(rest.blocks[0]));
-  assembly.energy.constraint +=
-      0.5 * material.rootStiffness * root_edge_offset.squaredNorm();
-  assembly.gradient.segment<3>(0) -=
-      material.rootStiffness * root_edge_offset;
-  assembly.gradient.segment<3>(4) +=
-      material.rootStiffness * root_edge_offset;
-  assembly.hessian.block<3, 3>(0, 0).diagonal().array() +=
-      material.rootStiffness;
-  assembly.hessian.block<3, 3>(0, 4).diagonal().array() -=
-      material.rootStiffness;
-  assembly.hessian.block<3, 3>(4, 0).diagonal().array() -=
-      material.rootStiffness;
-  assembly.hessian.block<3, 3>(4, 4).diagonal().array() +=
-      material.rootStiffness;
-
   if (material.pinRootTwist) {
     const double twist = state.blocks.front().w - rest.blocks.front().w;
     assembly.energy.constraint +=
@@ -176,6 +197,38 @@ void accumulateRootConstraintEnergy(const RodState& state,
     assembly.gradient[3] += material.rootStiffness * twist;
     assembly.hessian(3, 3) += material.rootStiffness;
   }
+}
+
+void accumulatePinnedTipEnergy(const RodState& state,
+                               const RodRestState& rest,
+                               const RodMaterial& material,
+                               RodAssembly assembly) {
+  const size_t tip = state.size() - 1;
+  const Eigen::Index offset = static_cast<Eigen::Index>(4 * tip);
+  const Vec3 tip_offset =
+      position(state.blocks.at(tip)) - position(rest.blocks.at(tip));
+
+  assembly.energy.constraint +=
+      0.5 * material.rootStiffness * tip_offset.squaredNorm();
+  assembly.gradient.segment<3>(offset) +=
+      material.rootStiffness * tip_offset;
+  assembly.hessian.block<3, 3>(offset, offset).diagonal().array() +=
+      material.rootStiffness;
+}
+
+void accumulateTerminalThetaEnergy(const RodState& state,
+                                   const RodMaterial& material,
+                                   double target,
+                                   RodAssembly assembly) {
+  const size_t terminal_edge = state.size() - 2;
+  const Eigen::Index theta =
+      static_cast<Eigen::Index>(4 * terminal_edge + 3);
+  const double theta_offset = state.blocks.at(terminal_edge).w - target;
+
+  assembly.energy.constraint +=
+      0.5 * material.rootStiffness * theta_offset * theta_offset;
+  assembly.gradient[theta] += material.rootStiffness * theta_offset;
+  assembly.hessian(theta, theta) += material.rootStiffness;
 }
 
 }  // namespace
@@ -250,10 +303,12 @@ Rod::Rod(std::vector<RodBlock> restBlocks, RodMaterial material)
         curvatureBinormalGeometry(restBlocks, vertex, false).value;
     rest_.curvature.emplace_back(
         curvature.x(), curvature.y(), curvature.z(), 0.0);
-    rest_.metrics[vertex].w =
-        restBlocks[vertex].w - restBlocks[vertex - 1].w;
   }
   resetReferenceFrames();
+  for (size_t vertex = 1; vertex + 1 < restBlocks.size(); ++vertex)
+    rest_.metrics[vertex].w =
+        restBlocks[vertex].w - restBlocks[vertex - 1].w +
+        referenceTwist(vertex);
 }
 
 void Rod::resetReferenceFrames() {
@@ -278,20 +333,55 @@ void Rod::transportReferenceFrames(const RodState& previous_state) {
   if (state_.blocks.size() < 2) return;
   if (reference_directors_.size() != state_.blocks.size() - 1)
     resetReferenceFrames();
-  for (size_t edge = 0; edge + 1 < state_.blocks.size(); ++edge) {
-    const EdgeGeometry previous = edgeGeometry(previous_state.blocks, edge);
-    const EdgeGeometry current = edgeGeometry(state_.blocks, edge);
-    const Vec3 old_director =
-        orthonormalizeDirector(toEigen(reference_directors_[edge]),
-                               previous.tangent);
-    const Vec3 transported =
-        parallelTransport(old_director, previous.tangent, current.tangent);
-    reference_directors_[edge] =
-        toGlm(orthonormalizeDirector(transported, current.tangent));
-  }
+  reference_directors_ = transportedReferenceDirectors(
+      reference_directors_, previous_state, state_);
+}
+
+double Rod::referenceTwist(size_t vertex) const {
+  if (vertex == 0 || vertex + 1 >= state_.blocks.size())
+    return 0.0;
+  if (reference_directors_.size() != state_.blocks.size() - 1)
+    throw std::runtime_error("rod reference frames are not initialized");
+
+  return referenceTwistFromDirectors(state_, reference_directors_, vertex);
+}
+
+double Rod::materialTwist(size_t vertex) const {
+  if (vertex == 0 || vertex + 1 >= state_.blocks.size())
+    return 0.0;
+  return state_.blocks[vertex].w - state_.blocks[vertex - 1].w +
+         referenceTwist(vertex);
+}
+
+void Rod::setTipPositionPinned(bool pinned) noexcept {
+  pin_tip_position_ = pinned;
+}
+
+void Rod::setTerminalThetaTarget(std::optional<double> target) noexcept {
+  terminal_theta_target_ = target;
 }
 
 RodEvaluation Rod::evaluate(const glm::dvec3& gravity) const {
+  std::vector<double> reference_twists(state_.size(), 0.0);
+  for (size_t vertex = 1; vertex + 1 < state_.size(); ++vertex)
+    reference_twists[vertex] = referenceTwist(vertex);
+  return evaluate(gravity, reference_twists);
+}
+
+RodEvaluation Rod::evaluate(const glm::dvec3& gravity,
+                            const RodState& referencePreviousState) const {
+  const std::vector<glm::dvec3> transported_directors =
+      transportedReferenceDirectors(reference_directors_,
+                                    referencePreviousState, state_);
+  std::vector<double> reference_twists(state_.size(), 0.0);
+  for (size_t vertex = 1; vertex + 1 < state_.size(); ++vertex)
+    reference_twists[vertex] =
+        referenceTwistFromDirectors(state_, transported_directors, vertex);
+  return evaluate(gravity, reference_twists);
+}
+
+RodEvaluation Rod::evaluate(const glm::dvec3& gravity,
+                            const std::vector<double>& reference_twists) const {
   RodEvaluation result;
   const size_t n = state_.size();
   const Eigen::Index dofs = static_cast<Eigen::Index>(4 * n);
@@ -305,9 +395,15 @@ RodEvaluation Rod::evaluate(const glm::dvec3& gravity) const {
 
     StretchingEnergy(state_, rest_, material_).accumulate(assembly);
     BendingEnergy(state_, rest_, material_).accumulate(assembly);
-    TwistingEnergy(state_, rest_, material_).accumulate(assembly);
+    TwistingEnergy(state_, rest_, material_, reference_twists)
+        .accumulate(assembly);
     accumulateGravityEnergy(state_, massDiagonal(), gravity, assembly);
     accumulateRootConstraintEnergy(state_, rest_, material_, assembly);
+    if (pin_tip_position_)
+      accumulatePinnedTipEnergy(state_, rest_, material_, assembly);
+    if (terminal_theta_target_)
+      accumulateTerminalThetaEnergy(state_, material_, *terminal_theta_target_,
+                                    assembly);
 
     result.gradient = unflatten(gradient);
     result.hessian = hessian.sparseView(0.0, 1e-14);

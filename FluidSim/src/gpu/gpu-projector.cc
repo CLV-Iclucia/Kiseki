@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include <FluidSim/gpu/gpu-projector.h>
+#include <Core/profiler.h>
 #include <RHI/rhi.h>
 
 #include <algorithm>
@@ -60,14 +61,25 @@ GPUProjector::GPUProjector(Device& device, const GPUGridState& grid,
 // Public API
 // ============================================================================
 void GPUProjector::solve(CommandList& cmd, GPUGridState& grid, Real dt) {
-    buildWeightsAndSystem(cmd, grid, dt);
+    SIM_PROFILE_FUNCTION();
+
+    {
+        SIM_PROFILE_SCOPE_COLOR("GPUProjector/BuildSystem", ksk::core::profiler_colors::kHessian);
+        buildWeightsAndSystem(cmd, grid, dt);
+    }
     cmd.memoryBarrier(BarrierDesc::StageComputeShader, BarrierDesc::StageComputeShader);
 
     auto ps = makePressureSystem(grid.gridSize);
-    solver_->solve(cmd, ps);
+    {
+        SIM_PROFILE_SCOPE_COLOR("GPUProjector/LinearSolve", ksk::core::profiler_colors::kSolver);
+        solver_->solve(cmd, ps);
+    }
     cmd.memoryBarrier(BarrierDesc::StageComputeShader, BarrierDesc::StageComputeShader);
 
-    projectVelocities(cmd, grid, dt);
+    {
+        SIM_PROFILE_SCOPE("GPUProjector/ProjectVelocities");
+        projectVelocities(cmd, grid, dt);
+    }
 }
 
 void GPUProjector::updateConfig(Device& device, const SolverConfig& config)
@@ -92,6 +104,8 @@ void GPUProjector::updateConfig(Device& device, const SolverConfig& config)
 void GPUProjector::buildWeightsAndSystem(CommandList& cmd,
                                          const GPUGridState& grid, Real dt)
 {
+    SIM_PROFILE_FUNCTION();
+
     int nx = grid.gridSize.x, ny = grid.gridSize.y, nz = grid.gridSize.z;
     uint32_t nc         = static_cast<uint32_t>(nx) * ny * nz;
     uint32_t totalFaces = static_cast<uint32_t>(
@@ -102,6 +116,7 @@ void GPUProjector::buildWeightsAndSystem(CommandList& cmd,
     auto barrier = [&]() { cmd.memoryBarrier(BarrierDesc::StageComputeShader, BarrierDesc::StageComputeShader); };
 
     if (buildWeights_.valid()) {
+        SIM_PROFILE_SCOPE("GPUProjector/BuildWeights");
         BuildWeightsCS::Params p;
         p.faceWeightsU = faceWeightsU_; p.faceWeightsV = faceWeightsV_; p.faceWeightsW = faceWeightsW_;
         p.colliderSdf  = ksk::rhi::ImageBinding{grid.colliderSdfImg, grid.sdfSampler};
@@ -115,6 +130,7 @@ void GPUProjector::buildWeightsAndSystem(CommandList& cmd,
     }
 
     if (buildSystem_.valid()) {
+        SIM_PROFILE_SCOPE("GPUProjector/BuildPressureMatrix");
         BuildSystemCS::Params p;
         p.Adiag = Adiag_;
         p.Aneighbour0 = Aneighbour_[0]; p.Aneighbour1 = Aneighbour_[1];
@@ -139,6 +155,8 @@ void GPUProjector::buildWeightsAndSystem(CommandList& cmd,
 void GPUProjector::projectVelocities(CommandList& cmd,
                                      GPUGridState& grid, Real dt)
 {
+    SIM_PROFILE_FUNCTION();
+
     int nx = grid.gridSize.x, ny = grid.gridSize.y, nz = grid.gridSize.z;
     uint32_t totalFaces = static_cast<uint32_t>(
         (nx+1)*ny*nz + nx*(ny+1)*nz + nx*ny*(nz+1));

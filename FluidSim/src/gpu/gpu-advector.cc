@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include <FluidSim/gpu/gpu-advector.h>
+#include <Core/profiler.h>
 #include <RHI/rhi.h>
 
 #include <iostream>
@@ -42,6 +43,8 @@ GPUAdvector::GPUAdvector(Device& device, const GPUGridState& grid)
 // scatterP2G: clear → P2G scatter → normalize
 // ============================================================================
 void GPUAdvector::scatterP2G(CommandList& cmd, GPUGridState& grid, Real dt) {
+    SIM_PROFILE_FUNCTION();
+
     int nx = grid.gridSize.x, ny = grid.gridSize.y, nz = grid.gridSize.z;
     uint32_t particleGroups = (grid.numParticles + 255) / 256;
     uint32_t totalFaces = static_cast<uint32_t>(
@@ -49,20 +52,24 @@ void GPUAdvector::scatterP2G(CommandList& cmd, GPUGridState& grid, Real dt) {
     uint32_t faceGroups = (totalFaces + 255) / 256;
 
     // Step 1: Clear velocity faces + weights + valid flags
-    cmd.fillBuffer(grid.uGrid, 0u);
-    cmd.fillBuffer(grid.vGrid, 0u);
-    cmd.fillBuffer(grid.wGrid, 0u);
-    cmd.fillBuffer(uWeights_, 0u);
-    cmd.fillBuffer(vWeights_, 0u);
-    cmd.fillBuffer(wWeights_, 0u);
-    cmd.fillBuffer(grid.uValid, 0u);
-    cmd.fillBuffer(grid.vValid, 0u);
-    cmd.fillBuffer(grid.wValid, 0u);
+    {
+        SIM_PROFILE_SCOPE("GPUAdvector/ClearGrid");
+        cmd.fillBuffer(grid.uGrid, 0u);
+        cmd.fillBuffer(grid.vGrid, 0u);
+        cmd.fillBuffer(grid.wGrid, 0u);
+        cmd.fillBuffer(uWeights_, 0u);
+        cmd.fillBuffer(vWeights_, 0u);
+        cmd.fillBuffer(wWeights_, 0u);
+        cmd.fillBuffer(grid.uValid, 0u);
+        cmd.fillBuffer(grid.vValid, 0u);
+        cmd.fillBuffer(grid.wValid, 0u);
+    }
     cmd.memoryBarrier(BarrierDesc::StageTransfer, BarrierDesc::StageComputeShader,
                       BarrierDesc::AccessTransferWrite, BarrierDesc::AccessShaderWrite);
 
     // Step 2: P2G scatter
     if (p2g_.valid()) {
+        SIM_PROFILE_SCOPE("GPUAdvector/P2GScatter");
         P2GScatterCS::Params params;
         params.uGrid       = grid.uGrid;
         params.vGrid       = grid.vGrid;
@@ -87,6 +94,7 @@ void GPUAdvector::scatterP2G(CommandList& cmd, GPUGridState& grid, Real dt) {
 
     // Step 3: Normalize
     if (normalize_.valid()) {
+        SIM_PROFILE_SCOPE("GPUAdvector/P2GNormalize");
         P2GNormalizeCS::Params params;
         params.uGrid     = grid.uGrid;
         params.vGrid     = grid.vGrid;
@@ -111,11 +119,14 @@ void GPUAdvector::scatterP2G(CommandList& cmd, GPUGridState& grid, Real dt) {
 // gatherAndAdvect: G2P → RK3 advect
 // ============================================================================
 void GPUAdvector::gatherAndAdvect(CommandList& cmd, GPUGridState& grid, Real dt) {
+    SIM_PROFILE_FUNCTION();
+
     int nx = grid.gridSize.x, ny = grid.gridSize.y, nz = grid.gridSize.z;
     uint32_t particleGroups = (grid.numParticles + 255) / 256;
 
     // Step 1: G2P (pure PIC: particle velocity = grid velocity)
     if (g2p_.valid()) {
+        SIM_PROFILE_SCOPE("GPUAdvector/G2PGather");
         G2PGatherCS::Params params;
         params.positions   = grid.particlePositions;
         params.velocities  = grid.particleVelocities;
@@ -137,6 +148,7 @@ void GPUAdvector::gatherAndAdvect(CommandList& cmd, GPUGridState& grid, Real dt)
 
     // Step 2: Advect (RK2 semi-Lagrangian position update)
     if (advect_.valid()) {
+        SIM_PROFILE_SCOPE("GPUAdvector/AdvectParticles");
         AdvectCS::Params params;
         params.positions    = grid.particlePositions;
         params.velocities   = grid.particleVelocities;

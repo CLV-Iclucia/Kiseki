@@ -27,14 +27,19 @@ detail::Vec12 twistJacobian(const std::vector<RodBlock>& blocks, size_t vertex)
 
 TwistingEnergy::TwistingEnergy(
     const RodState& state, const RodRestState& rest,
-    const RodMaterial& material)
-    : state_(state), rest_(rest), material_(material) {}
+    const RodMaterial& material,
+    const std::vector<double>& referenceTwists)
+    : state_(state),
+      rest_(rest),
+      material_(material),
+      reference_twists_(referenceTwists) {}
 
 void TwistingEnergy::accumulate(RodAssembly assembly) const {
   const size_t n = state_.size();
   for (size_t vertex = 1; vertex + 1 < n; ++vertex) {
     const double twist =
-        state_.blocks[vertex].w - state_.blocks[vertex - 1].w -
+        state_.blocks[vertex].w - state_.blocks[vertex - 1].w +
+        reference_twists_[vertex] -
         rest_.metrics[vertex].w;
     const double dual_length = rest_.metrics[vertex].z;
     const double twist_weight = material_.twistStiffness() / dual_length;

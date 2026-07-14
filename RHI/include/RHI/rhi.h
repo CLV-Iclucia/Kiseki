@@ -23,4 +23,5 @@
 #include <RHI/structured-buffer-layout.h>
 #include <RHI/shader-params.h>
 #include <RHI/swapchain.h>
+#include <RHI/swapchain-frame.h>
 #include <RHI/sync.h>

@@ -329,11 +329,43 @@ class CommandList : public ksk::core::NonCopyable {
   virtual void bindIndexBuffer(BufferRef buf, IndexFormat fmt,
                                size_t offset = 0) = 0;
 
+  template <class P>
+    requires std::is_base_of_v<ShaderParamsBase, P>
+  void applyGraphicsParams(PipelineRef pso, P& params) {
+    bindGraphicsPipeline(pso);
+    const void* sig = pso.get();
+    if (params._resolvedFor != sig) [[unlikely]] {
+      params._resolve(pso->reflection());
+      params._resolvedFor = sig;
+    }
+    params._apply(*this);
+  }
+
   virtual void draw(uint32_t vertexCount, uint32_t instanceCount = 1,
                     uint32_t firstVertex = 0, uint32_t firstInstance = 0) = 0;
   virtual void drawIndexed(uint32_t indexCount, uint32_t instanceCount = 1,
                            uint32_t firstIndex = 0, int32_t vertexOffset = 0,
                            uint32_t firstInstance = 0) = 0;
+
+  template <class P>
+    requires std::is_base_of_v<ShaderParamsBase, P>
+  void draw(PipelineRef pso, P& params,
+            uint32_t vertexCount, uint32_t instanceCount = 1,
+            uint32_t firstVertex = 0, uint32_t firstInstance = 0) {
+    applyGraphicsParams(pso, params);
+    draw(vertexCount, instanceCount, firstVertex, firstInstance);
+  }
+
+  template <class P>
+    requires std::is_base_of_v<ShaderParamsBase, P>
+  void drawIndexed(PipelineRef pso, P& params,
+                   uint32_t indexCount, uint32_t instanceCount = 1,
+                   uint32_t firstIndex = 0, int32_t vertexOffset = 0,
+                   uint32_t firstInstance = 0) {
+    applyGraphicsParams(pso, params);
+    drawIndexed(indexCount, instanceCount, firstIndex, vertexOffset,
+                firstInstance);
+  }
 
   // ============ End recording ============
   virtual void end() = 0;

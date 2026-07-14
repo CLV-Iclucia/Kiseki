@@ -30,12 +30,16 @@ add_executable(fem-showcase fem-showcase/main.cc)
 target_link_libraries(fem-showcase PUBLIC Kiseki::FEM cxxopts Kiseki::Renderer)
 target_compile_features(fem-showcase PUBLIC cxx_std_20)
 
+# DER Hair runtime smoke scene
+add_executable(der-hair der-hair/main.cc)
+    target_link_libraries(der-hair PUBLIC Kiseki::DER Kiseki::Scene cxxopts Kiseki::Renderer)
+
 # Fluid Dam Break simulation
 add_executable(fluid-sim fluid-sim/main.cc)
 target_link_libraries(fluid-sim PUBLIC Kiseki::Fluid cxxopts Kiseki::Renderer)
 target_compile_features(fluid-sim PUBLIC cxx_std_20)
 
-message(STATUS "Apps configured: ipc-fem, cube-drop, multi-body, prescribed-motion, energy-check, fem-showcase, fluid-sim")
+message(STATUS "Apps configured: ipc-fem, cube-drop, multi-body, prescribed-motion, energy-check, fem-showcase, der-hair, fluid-sim")
 
 # ---- RHI demo apps (require Vulkan + GLFW, no OpenGL Renderer) ----
 if(KISEKI_BUILD_RHI)

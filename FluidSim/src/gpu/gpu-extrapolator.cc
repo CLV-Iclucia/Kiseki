@@ -3,6 +3,7 @@
 // ============================================================================
 
 #include <FluidSim/gpu/gpu-extrapolator.h>
+#include <Core/profiler.h>
 
 namespace fluid::gpu {
 
@@ -15,6 +16,8 @@ GPUExtrapolatorSolver::GPUExtrapolatorSolver(GPUFluidContext& ctx, int iters)
 {}
 
 void GPUExtrapolatorSolver::solve(GPUFluidContext& ctx, Real dt) {
+    SIM_PROFILE_FUNCTION();
+
     (void)dt;
     // Extrapolation passes for u, v, w
     // Each axis: ping-pong between grid/gridBuf and valid/validBuf

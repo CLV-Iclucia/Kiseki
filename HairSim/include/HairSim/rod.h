@@ -4,6 +4,7 @@
 #include <glm/glm.hpp>
 
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -76,10 +77,17 @@ class Rod {
   [[nodiscard]] RodVelocity& velocity() noexcept { return velocity_; }
   [[nodiscard]] const RodRestState& restState() const noexcept { return rest_; }
   [[nodiscard]] const RodMaterial& material() const noexcept { return material_; }
+  [[nodiscard]] double referenceTwist(size_t vertex) const;
+  [[nodiscard]] double materialTwist(size_t vertex) const;
+  void setTipPositionPinned(bool pinned) noexcept;
+  void setTerminalThetaTarget(std::optional<double> target) noexcept;
 
   void resetReferenceFrames();
   void transportReferenceFrames(const RodState& previous_state);
   [[nodiscard]] RodEvaluation evaluate(const glm::dvec3& gravity) const;
+  [[nodiscard]] RodEvaluation evaluate(
+      const glm::dvec3& gravity,
+      const RodState& referencePreviousState) const;
   [[nodiscard]] Eigen::VectorXd massDiagonal() const;
 
  private:
@@ -88,6 +96,12 @@ class Rod {
   RodRestState rest_;
   std::vector<glm::dvec3> reference_directors_;
   RodMaterial material_;
+  bool pin_tip_position_ = false;
+  std::optional<double> terminal_theta_target_;
+
+  [[nodiscard]] RodEvaluation evaluate(
+      const glm::dvec3& gravity,
+      const std::vector<double>& referenceTwists) const;
 };
 
 }  // namespace ksk::hairsim

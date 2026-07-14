@@ -4,6 +4,7 @@
 
 #include <FluidSim/gpu/gpu-modular-reconstructor.h>
 #include <FluidSim/gpu/gpu-backend.h>
+#include <Core/profiler.h>
 
 namespace fluid::gpu {
 
@@ -36,6 +37,8 @@ static GPUGridState makeGridView(GPUFluidContext& ctx) {
 }
 
 void GPUReconstructorSolver::solve(GPUFluidContext& ctx, Real dt) {
+    SIM_PROFILE_FUNCTION();
+
     (void)dt;
     GPUGridState grid = makeGridView(ctx);
     impl_->execute(ctx.cmd(), grid);

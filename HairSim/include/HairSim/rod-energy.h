@@ -4,6 +4,8 @@
 
 #include <Eigen/Core>
 
+#include <vector>
+
 namespace ksk::hairsim {
 
 struct RodAssembly {
@@ -41,7 +43,8 @@ class BendingEnergy {
 class TwistingEnergy {
  public:
   TwistingEnergy(const RodState& state, const RodRestState& rest,
-                 const RodMaterial& material);
+                 const RodMaterial& material,
+                 const std::vector<double>& referenceTwists);
 
   void accumulate(RodAssembly assembly) const;
 
@@ -49,6 +52,7 @@ class TwistingEnergy {
   const RodState& state_;
   const RodRestState& rest_;
   const RodMaterial& material_;
+  const std::vector<double>& reference_twists_;
 };
 
 }  // namespace ksk::hairsim

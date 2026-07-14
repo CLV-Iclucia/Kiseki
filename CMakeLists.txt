@@ -39,17 +39,18 @@ add_subdirectory(Spatify)
 add_subdirectory(Maths)
 add_subdirectory(Deform)
 
-# Kiseki-level runtime layer. Keep it before physics modules so FEM/HairSim
-# adapters can depend on Kiseki::Runtime without creating reverse dependencies.
-add_subdirectory(Runtime)
-
-# RHI (Vulkan) module — gated behind option so users without Vulkan SDK
-# can still build the rest of the project.
+# Runtime buffers use RHI-owned GPU storage for device-resident data.
 option(KISEKI_BUILD_RHI "Build RHI module" ON)
 if(KISEKI_BUILD_RHI)
   add_subdirectory(RHI)
   add_subdirectory(RPK)
+else()
+  message(FATAL_ERROR "Kiseki Runtime buffers currently require RHI.")
 endif()
+
+# Kiseki-level runtime layer. Keep it before physics modules so FEM/HairSim
+# adapters can depend on Kiseki::Runtime without creating reverse dependencies.
+add_subdirectory(Engine)
 
 # FEM has an optional GPU backend (RHI + RPK), so it must come after them.
 add_subdirectory(FEM)

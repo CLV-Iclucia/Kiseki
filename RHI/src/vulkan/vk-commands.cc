@@ -554,8 +554,8 @@ void VulkanCommandList::bindGraphicsPipeline(PipelineRef pipeline) {
   m_boundLayout = vkPso->vkPipelineLayout();
   clearPending();
 
-  // Clear vertex buffer tracking
-  m_vertexBuffers.clear();
+  // Vertex/index bindings are independent dynamic state in Vulkan and may be
+  // recorded before the graphics pipeline helper binds its PSO.
 }
 
 void VulkanCommandList::setViewport(const Viewport& vp) {

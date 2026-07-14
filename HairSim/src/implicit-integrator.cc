@@ -3,6 +3,8 @@
 #include <Eigen/SparseCholesky>
 
 #include <cmath>
+#include <format>
+#include <limits>
 #include <utility>
 
 namespace ksk::hairsim {
@@ -54,9 +56,10 @@ bool ImplicitRodIntegrator::step(double dt, const glm::dvec3& gravity) {
   static constexpr int MAX_LINE_SEARCH_ITERATIONS = 12;
   static constexpr double FORCE_TOLERANCE = 1e-8;
   static constexpr double STEP_TOLERANCE = 1e-10;
+  static constexpr double OBJECTIVE_TOLERANCE = 1e-12;
   for (int iteration = 0; iteration < MAX_NEWTON_ITERATIONS; ++iteration) {
     assign(next_state, rod_.state().blocks);
-    last_evaluation_ = rod_.evaluate(gravity);
+    last_evaluation_ = rod_.evaluate(gravity, reference_previous_state);
     if (!last_evaluation_.valid) {
       diagnostic_ = last_evaluation_.diagnostic;
       assign(previous_state, rod_.state().blocks);
@@ -104,9 +107,13 @@ bool ImplicitRodIntegrator::step(double dt, const glm::dvec3& gravity) {
       assign(previous_state, rod_.state().blocks);
       return false;
     }
+    if (step.norm() < STEP_TOLERANCE) break;
 
     bool accepted = false;
     double alpha = 1.0;
+    double best_objective = std::numeric_limits<double>::infinity();
+    double best_alpha = 0.0;
+    std::string last_reject_reason = "no candidate evaluated";
     Eigen::VectorXd accepted_state = next_state;
     RodEvaluation accepted_evaluation;
     for (int line_search = 0; line_search < MAX_LINE_SEARCH_ITERATIONS;
@@ -114,24 +121,43 @@ bool ImplicitRodIntegrator::step(double dt, const glm::dvec3& gravity) {
       Eigen::VectorXd candidate_state = next_state + alpha * step;
       candidate_state[dummy] = 0.0;
       assign(candidate_state, rod_.state().blocks);
-      RodEvaluation candidate_evaluation = rod_.evaluate(gravity);
+      RodEvaluation candidate_evaluation =
+          rod_.evaluate(gravity, reference_previous_state);
       if (candidate_evaluation.valid) {
         const double candidate_objective =
             implicitObjective(candidate_state, predicted_state, mass, dt,
                               candidate_evaluation);
         if (std::isfinite(candidate_objective) &&
-            candidate_objective <= current_objective) {
+            candidate_objective < best_objective) {
+          best_objective = candidate_objective;
+          best_alpha = alpha;
+        }
+        if (std::isfinite(candidate_objective) &&
+            candidate_objective <=
+                current_objective +
+                    OBJECTIVE_TOLERANCE *
+                        (1.0 + std::abs(current_objective))) {
           accepted = true;
           accepted_state = std::move(candidate_state);
           accepted_evaluation = std::move(candidate_evaluation);
           break;
         }
+        last_reject_reason =
+            std::isfinite(candidate_objective)
+                ? "candidate did not decrease objective"
+                : "candidate objective is not finite";
+      } else {
+        last_reject_reason = candidate_evaluation.diagnostic;
       }
       alpha *= 0.5;
     }
 
     if (!accepted) {
-      diagnostic_ = "implicit rod line search failed";
+      diagnostic_ = std::format(
+          "implicit rod line search failed: iteration={} current={:.17g} "
+          "best={:.17g} best_alpha={:.3g} step_norm={:.17g} reason={}",
+          iteration, current_objective, best_objective, best_alpha,
+          step.norm(), last_reject_reason);
       assign(previous_state, rod_.state().blocks);
       assign(old_velocity, rod_.velocity().blocks);
       return false;

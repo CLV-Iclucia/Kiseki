@@ -8,12 +8,19 @@
 
 namespace ksk::renderer {
 
+enum class RenderBackendKind {
+  Default,
+  OpenGL,
+  RHI,
+};
+
 struct RendererConfig {
   int windowWidth = 1280;
   int windowHeight = 720;
   std::string windowTitle = "Kiseki";
   bool vsync = true;
   bool headless = false;
+  RenderBackendKind backend = RenderBackendKind::Default;
 };
 
 class Renderer {

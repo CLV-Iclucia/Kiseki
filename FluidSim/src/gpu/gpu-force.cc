@@ -3,6 +3,7 @@
 // ============================================================================
 
 #include <FluidSim/gpu/gpu-force.h>
+#include <Core/profiler.h>
 
 namespace fluid::gpu {
 
@@ -15,6 +16,8 @@ GPUForceSolver::GPUForceSolver(GPUFluidContext& ctx, GPUForceConfig config)
 {}
 
 void GPUForceSolver::solve(GPUFluidContext& ctx, Real dt) {
+    SIM_PROFILE_FUNCTION();
+
     auto& cmd = ctx.cmd();
     int ny = ctx.gridSize.y;
     int nx = ctx.gridSize.x;

@@ -4,6 +4,7 @@
 
 #include <FluidSim/gpu/gpu-modular-projector.h>
 #include <FluidSim/gpu/gpu-backend.h>
+#include <Core/profiler.h>
 
 namespace fluid::gpu {
 
@@ -36,6 +37,8 @@ static GPUGridState makeGridView(GPUFluidContext& ctx) {
 }
 
 void GPUProjectorSolver::solve(GPUFluidContext& ctx, Real dt) {
+    SIM_PROFILE_FUNCTION();
+
     GPUGridState grid = makeGridView(ctx);
     impl_->solve(ctx.cmd(), grid, dt);
 }

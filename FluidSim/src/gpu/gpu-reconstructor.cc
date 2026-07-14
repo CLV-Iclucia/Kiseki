@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include <FluidSim/gpu/gpu-reconstructor.h>
+#include <Core/profiler.h>
 #include <RHI/rhi.h>
 
 #include <iostream>
@@ -32,6 +33,8 @@ GPUReconstructor::GPUReconstructor(Device& device, const GPUGridState& grid)
 }
 
 void GPUReconstructor::execute(CommandList& cmd, GPUGridState& grid) {
+    SIM_PROFILE_FUNCTION();
+
     if (!grid.fluidSdfImg || !grid.particlePositions) return;
     if (!reconstruct_.valid()) return;
     if (grid.numParticles == 0) return;
@@ -42,6 +45,7 @@ void GPUReconstructor::execute(CommandList& cmd, GPUGridState& grid) {
 
     // Step 1: Reconstruct SDF
     {
+        SIM_PROFILE_SCOPE("GPUReconstructor/ReconstructSDF");
         ReconstructSdfCS::Params params;
         params.fluidSdf       = grid.fluidSdfImg;
         params.positions      = grid.particlePositions;
@@ -59,7 +63,9 @@ void GPUReconstructor::execute(CommandList& cmd, GPUGridState& grid) {
 
     // Step 2: Smooth (3 iterations, ping-pong)
     if (smooth_.valid()) {
+        SIM_PROFILE_SCOPE("GPUReconstructor/SmoothSDF");
         for (int i = 0; i < 3; ++i) {
+            SIM_PROFILE_SCOPE("GPUReconstructor/SmoothIteration");
             SmoothSdfCS::Params params;
             params.srcSdf   = ImageBinding{grid.fluidSdfImg, grid.sdfSampler};
             params.dstSdf   = sdfBuf_;

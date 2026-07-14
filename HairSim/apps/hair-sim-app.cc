@@ -49,15 +49,37 @@ std::vector<RodBlock> helicalRod(int vertices, const glm::dvec3& origin,
   return blocks;
 }
 
+std::vector<RodBlock> bentRod(int vertices, const glm::dvec3& origin,
+                              double length, double amplitude) {
+  std::vector<RodBlock> blocks;
+  blocks.reserve(static_cast<size_t>(vertices));
+  for (int i = 0; i < vertices; ++i) {
+    const double u = static_cast<double>(i) / static_cast<double>(vertices - 1);
+    const double x = origin.x + length * u;
+    const double y = origin.y + amplitude * std::sin(std::numbers::pi * u);
+    const double z = origin.z + 0.25 * amplitude *
+                                    std::sin(2.0 * std::numbers::pi * u);
+    blocks.emplace_back(x, y, z, 0.0);
+  }
+  return blocks;
+}
+
 std::unique_ptr<Rod> makeRod(const std::string& scenario, int vertices,
-                             const glm::dvec3& origin, int index) {
+                             const glm::dvec3& origin, int index,
+                             double terminal_bend_amplitude) {
   RodMaterial material;
   material.rootStiffness = 2e3;
+  if (scenario == "terminal-twist") {
+    material.rootStiffness = 2e5;
+    material.pinRootTwist = true;
+  }
 
   std::vector<RodBlock> rest_blocks =
       scenario == "helix"
           ? helicalRod(vertices, origin, 0.012, 0.012, 3.0)
-          : straightRod(vertices, origin, 1.2);
+          : scenario == "terminal-twist"
+                ? bentRod(vertices, origin, 1.2, terminal_bend_amplitude)
+                : straightRod(vertices, origin, 1.2);
   auto rod = std::make_unique<Rod>(std::move(rest_blocks), material);
   if (scenario == "stretch") {
     for (int i = 1; i < vertices; ++i) {
@@ -83,6 +105,8 @@ std::unique_ptr<Rod> makeRod(const std::string& scenario, int vertices,
       const double u = static_cast<double>(i) / (vertices - 1);
       rod->state().setTheta(static_cast<size_t>(i), 200.0 * u);
     }
+  } else if (scenario == "terminal-twist") {
+    rod->setTerminalThetaTarget(0.0);
   }
   rod->resetReferenceFrames();
   return rod;
@@ -178,15 +202,23 @@ std::unique_ptr<ksk::renderer::SceneProxy> buildProxy(
 int main(int argc, char** argv) {
   cxxopts::Options options("hair-sim", "CPU discrete elastic rod validation app");
   options.add_options()
-      ("scenario", "hanging, stretch, bend, twist, helix, or multi",
-       cxxopts::value<std::string>()->default_value("helix"))
+      ("scenario", "hanging, stretch, bend, twist, helix, terminal-twist, or multi",
+       cxxopts::value<std::string>()->default_value("terminal-twist"))
       ("vertices", "Vertices per rod",
-       cxxopts::value<int>()->default_value("32"))
-      ("dt", "Time step", cxxopts::value<double>()->default_value("0.00001"))
+       cxxopts::value<int>()->default_value("128"))
+      ("dt", "Time step", cxxopts::value<double>()->default_value("0.001"))
       ("steps", "Number of steps", cxxopts::value<int>()->default_value("10000"))
       ("no-render", "Disable rendering",
        cxxopts::value<bool>()->default_value("false"))
       ("show-frames", "Show material-frame directors",
+       cxxopts::value<bool>()->default_value("true"))
+      ("terminal-twist-rate", "Terminal twist target angular speed",
+       cxxopts::value<double>()->default_value("6.283185307179586"))
+      ("terminal-bend-amplitude", "Initial bend amplitude for terminal-twist",
+       cxxopts::value<double>()->default_value("0.08"))
+      ("pin-tip", "Pin terminal-twist tip position",
+       cxxopts::value<bool>()->default_value("false"))
+      ("no-gravity", "Disable gravity force",
        cxxopts::value<bool>()->default_value("true"))
       ("h,help", "Print help");
   const auto args = options.parse(argc, argv);
@@ -201,13 +233,24 @@ int main(int argc, char** argv) {
   const int steps = std::max(0, args["steps"].as<int>());
   const bool no_render = args["no-render"].as<bool>();
   const bool show_frames = args["show-frames"].as<bool>();
+  const double terminal_twist_rate =
+      args["terminal-twist-rate"].as<double>();
+  const double terminal_bend_amplitude =
+      args["terminal-bend-amplitude"].as<double>();
+  const bool pin_tip = args["pin-tip"].as<bool>();
+  const bool no_gravity = args["no-gravity"].as<bool>();
+  const glm::dvec3 gravity = no_gravity ? glm::dvec3(0.0)
+                                        : glm::dvec3(0.0, -9.81, 0.0);
 
-  const int rod_count = 4;
+  const int rod_count = scenario == "terminal-twist" ? 1 : 4;
   std::vector<std::unique_ptr<Rod>> rods;
   std::vector<std::unique_ptr<ImplicitRodIntegrator>> integrators;
   for (int i = 0; i < rod_count; ++i) {
     const glm::dvec3 origin(0.0, 0.035 * i, 0.0);
-    rods.push_back(makeRod(scenario, vertices, origin, i));
+    rods.push_back(makeRod(scenario, vertices, origin, i,
+                           terminal_bend_amplitude));
+    if (scenario == "terminal-twist")
+      rods.back()->setTipPositionPinned(pin_tip);
     integrators.push_back(
         std::make_unique<ImplicitRodIntegrator>(*rods.back()));
   }
@@ -219,7 +262,9 @@ int main(int argc, char** argv) {
   });
   app.stepFn = [&](int step) {
     for (size_t i = 0; i < rods.size(); ++i) {
-      if (!integrators[i]->step(dt, {0.0, -9.81, 0.0})) {
+      if (scenario == "terminal-twist")
+        rods[i]->setTerminalThetaTarget(terminal_twist_rate * step * dt);
+      if (!integrators[i]->step(dt, gravity)) {
         std::cerr << std::format(
             "[HairSim] step {} rod {} failed: {}\n", step, i,
             integrators[i]->diagnostic());
