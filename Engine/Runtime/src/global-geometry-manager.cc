@@ -99,7 +99,10 @@ int GlobalGeometryManager::appendEdge(GeometryPointId p0, GeometryPointId p1, Re
   return id;
 }
 
-int GlobalGeometryManager::appendTriangle(GeometryPointId p0, GeometryPointId p1, GeometryPointId p2)
+int GlobalGeometryManager::appendTriangle(GeometryPointId p0,
+                                          GeometryPointId p1,
+                                          GeometryPointId p2,
+                                          Real radius)
 {
   const GeometryPoint& first = checkedPoint(p0);
   const GeometryPoint& second = checkedPoint(p1);
@@ -126,6 +129,7 @@ int GlobalGeometryManager::appendTriangle(GeometryPointId p0, GeometryPointId p1
       .p0 = p0,
       .p1 = p1,
       .p2 = p2,
+      .radius = radius,
   });
   return id;
 }
@@ -214,7 +218,8 @@ GeometryInstanceId GlobalGeometryManager::appendInstance(
   for (const auto& triangle : mesh.triangles) {
     appendTriangle(GeometryPointId{point_range.first + triangle[0]},
                    GeometryPointId{point_range.first + triangle[1]},
-                   GeometryPointId{point_range.first + triangle[2]});
+                   GeometryPointId{point_range.first + triangle[2]},
+                   mesh.radius);
   }
 
   instances.push_back(GeometryInstance{

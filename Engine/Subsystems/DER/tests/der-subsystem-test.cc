@@ -20,12 +20,11 @@ Rod makeStraightRod()
   material.radius = 0.5;
   material.shearModulus = 3.0;
   material.youngsModulus = 0.0;
-  material.rootStiffness = 0.0;
 
   return Rod({
-      RodBlock(0.0, 0.0, 0.0, 0.0),
-      RodBlock(1.0, 0.0, 0.0, 0.0),
-      RodBlock(2.0, 0.0, 0.0, 0.0),
+      RodDof(0.0, 0.0, 0.0, 0.0),
+      RodDof(1.0, 0.0, 0.0, 0.0),
+      RodDof(2.0, 0.0, 0.0, 0.0),
   }, material);
 }
 
@@ -58,9 +57,9 @@ TEST(DERRod, ConstrainsPositionAndTwistProperties)
   material.shearModulus = 0.0;
 
   Rod rod({
-      RodBlock(0.0, 0.0, 0.0, 0.0),
-      RodBlock(1.0, 0.0, 0.0, 0.0),
-      RodBlock(2.0, 0.0, 0.0, 0.0),
+      RodDof(0.0, 0.0, 0.0, 0.0),
+      RodDof(1.0, 0.0, 0.0, 0.0),
+      RodDof(2.0, 0.0, 0.0, 0.0),
   }, material);
   rod.addConstraint(RodConstraint{
       .property = RodConstraintProperty::X,
@@ -200,35 +199,14 @@ TEST(DERSubsystem, UsesRodEvaluationForLocalGradient)
   }
 }
 
-class CountingVisitor final : public runtime::SubsystemBackendVisitor {
- public:
-  void visit(DERSubsystem& subsystem) override
-  {
-    visited = subsystem.id();
-  }
-
-  int visited = -1;
-};
-
-TEST(DERSubsystem, AcceptsSubsystemBackendVisitor)
-{
-  DERSubsystem subsystem(runtime::SubsystemId{9}, {makeStraightRod()});
-  CountingVisitor visitor;
-
-  subsystem.accept(visitor);
-
-  EXPECT_EQ(visitor.visited, 9);
-}
-
 TEST(DERSceneFrontend, BuildsRuntimeAndRunsNoContactNewtonStep)
 {
   DERRodDesc rod;
   rod.restBlocks = {
-      RodBlock(0.0, 0.0, 0.0, 0.0),
-      RodBlock(1.0, 0.0, 0.0, 0.0),
-      RodBlock(2.0, 0.0, 0.0, 0.0),
+      RodDof(0.0, 0.0, 0.0, 0.0),
+      RodDof(1.0, 0.0, 0.0, 0.0),
+      RodDof(2.0, 0.0, 0.0, 0.0),
   };
-  rod.material.rootStiffness = 0.0;
 
   runtime::RuntimeSceneDesc scene;
   scene.gravity = glm::dvec3(0.0);
@@ -249,17 +227,17 @@ TEST(DERSceneFrontend, RodObjectListsConfigurableProperties)
 {
   DERRodDesc rod;
   rod.restBlocks = {
-      RodBlock(0.0, 0.0, 0.0, 0.0),
-      RodBlock(1.0, 0.0, 0.0, 0.0),
-      RodBlock(2.0, 0.0, 0.0, 0.0),
+      RodDof(0.0, 0.0, 0.0, 0.0),
+      RodDof(1.0, 0.0, 0.0, 0.0),
+      RodDof(2.0, 0.0, 0.0, 0.0),
   };
 
   runtime::RuntimeSceneDesc scene;
   const runtime::ObjectRef rodRef = addRod(scene, rod);
-  addConstraint(scene, rodRef, "x", 0, 100.0,
+  scene.addConstraint(rodRef, "x", 0, 100.0,
                 runtime::ScalarConstraintTarget(
                     [](double time) { return time; }));
-  addConstraint(scene, rodRef, "twist", 0, 50.0,
+  scene.addConstraint(rodRef, "twist", 0, 50.0,
                 runtime::ScalarConstraintTarget(
                     [](double) { return 0.0; }));
   const std::vector<runtime::PropertyDescriptor> properties =
@@ -273,8 +251,6 @@ TEST(DERSceneFrontend, RodObjectListsConfigurableProperties)
                        });
   };
 
-  EXPECT_TRUE(hasProperty("material.youngsModulus"));
-  EXPECT_TRUE(hasProperty("material.shearModulus"));
   EXPECT_TRUE(hasProperty("x"));
   EXPECT_TRUE(hasProperty("y"));
   EXPECT_TRUE(hasProperty("z"));

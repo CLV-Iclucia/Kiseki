@@ -13,15 +13,14 @@ namespace ksk::der {
 struct RodObject {};
 
 struct DERRodDesc {
-  std::vector<RodBlock> restBlocks;
+  std::vector<RodDof> restBlocks;
   RodMaterial material;
 };
 
 struct RodObjectDesc final : runtime::SceneObjectDesc {
   using ObjectType = RodObject;
 
-  explicit RodObjectDesc(std::string tag = {})
-      : runtime::SceneObjectDesc(std::move(tag))
+  explicit RodObjectDesc(std::string tag = {}) : SceneObjectDesc(std::move(tag))
   {
   }
 
@@ -51,16 +50,9 @@ struct RodObjectDesc final : runtime::SceneObjectDesc {
     };
   }
 
-  std::vector<RodBlock> restBlocks;
+  std::vector<RodDof> restBlocks;
   RodMaterial material;
 };
 
 runtime::ObjectRef addRod(runtime::RuntimeSceneDesc& scene, DERRodDesc rod);
-void addConstraint(runtime::RuntimeSceneDesc& scene,
-                   runtime::ObjectRef rod,
-                   std::string property,
-                   int sample,
-                   double stiffness,
-                   runtime::ScalarConstraintTarget target);
-
 }  // namespace ksk::der

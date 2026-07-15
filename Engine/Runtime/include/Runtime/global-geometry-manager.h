@@ -75,6 +75,7 @@ struct GeometryTriangle {
   GeometryPointId p0 = -1;
   GeometryPointId p1 = -1;
   GeometryPointId p2 = -1;
+  Real radius = 0.0;
 };
 
 struct GeometryMeshDesc {
@@ -121,7 +122,8 @@ struct GlobalGeometryManager {
                                Real radius = 0.0);
   [[nodiscard]] int appendTriangle(GeometryPointId p0,
                                    GeometryPointId p1,
-                                   GeometryPointId p2);
+                                   GeometryPointId p2,
+                                   Real radius = 0.0);
   [[nodiscard]] GeometryInstanceId appendInstance(
       SubsystemId subsystem,
       int localInstanceId,

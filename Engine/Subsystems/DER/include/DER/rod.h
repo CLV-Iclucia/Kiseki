@@ -3,19 +3,17 @@
 #include <Eigen/SparseCore>
 #include <glm/glm.hpp>
 
-#include <cstddef>
 #include <optional>
 #include <span>
 #include <string>
-#include <string_view>
 #include <vector>
 
 namespace ksk::der {
 
-using RodBlock = glm::dvec4;
+using RodDof = glm::dvec4;
 
 struct RodState {
-  std::span<RodBlock> blocks;
+  std::span<RodDof> blocks;
 
   [[nodiscard]] size_t size() const noexcept { return blocks.size(); }
   [[nodiscard]] glm::dvec3 position(size_t index) const;
@@ -27,7 +25,7 @@ struct RodState {
 using RodVelocity = RodState;
 
 struct RodRestState {
-  std::vector<RodBlock> blocks;
+  std::vector<RodDof> blocks;
   std::vector<glm::dvec4> curvature;
   std::vector<glm::dvec4> metrics;
 };
@@ -37,8 +35,6 @@ struct RodMaterial {
   double radius = 4e-5;
   double youngsModulus = 4e9;
   double shearModulus = 1.5e9;
-  double rootStiffness = 2e6;
-  bool pinRootTwist = false;
 
   [[nodiscard]] double area() const noexcept;
   [[nodiscard]] double areaMoment() const noexcept;
@@ -75,7 +71,7 @@ struct RodEnergyComponents {
 
 struct RodEvaluation {
   RodEnergyComponents energy;
-  std::vector<RodBlock> gradient;
+  std::vector<RodDof> gradient;
   Eigen::SparseMatrix<double> hessian;
   bool valid = false;
   std::string diagnostic;
@@ -83,7 +79,7 @@ struct RodEvaluation {
 
 class Rod {
  public:
-  Rod(std::vector<RodBlock> restBlocks, RodMaterial material = {});
+  Rod(std::vector<RodDof> restBlocks, RodMaterial material = {});
   Rod(const Rod& other);
   Rod(Rod&& other) noexcept;
   Rod& operator=(const Rod& other);
@@ -104,8 +100,8 @@ class Rod {
   void addConstraint(RodConstraint constraint);
   void clearConstraints() noexcept;
   [[nodiscard]] std::span<const RodConstraint> constraints() const noexcept;
-  void bindState(std::span<RodBlock> stateBlocks,
-                 std::span<RodBlock> velocityBlocks);
+  void bindState(std::span<RodDof> stateBlocks,
+                 std::span<RodDof> velocityBlocks);
 
   void resetReferenceFrames();
   void transportReferenceFrames(const RodState& previousState);
@@ -115,8 +111,8 @@ class Rod {
   [[nodiscard]] Eigen::VectorXd massDiagonal() const;
 
  private:
-  std::vector<RodBlock> state_storage_;
-  std::vector<RodBlock> velocity_storage_;
+  std::vector<RodDof> state_storage_;
+  std::vector<RodDof> velocity_storage_;
   RodState state_;
   RodVelocity velocity_;
   RodRestState rest_;

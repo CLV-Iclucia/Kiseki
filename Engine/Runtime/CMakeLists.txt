@@ -2,30 +2,38 @@ project(Runtime LANGUAGES CXX)
 
 set(RUNTIME_SOURCES
     src/dof-layout.cc
-        src/global-geometry-manager.cc
+    src/contact-detection.cc
+    src/cpu/contact-detection-cpu.cc
+    src/gpu/contact-detection-gpu.cc
+    src/contact-potential.cc
+    src/global-geometry-manager.cc
+    src/subsystem-backend.cc
     src/runtime-scene.cc
     src/runtime-simulation.cc
-        src/global-solver.cc
+    src/global-solver.cc
 )
 
 set(RUNTIME_HEADERS
     include/Runtime/types.h
     include/Runtime/buffers.h
+    include/Runtime/contact-detection.h
+    include/Runtime/contact-potential.h
     include/Runtime/dof-layout.h
-        include/Runtime/global-geometry-manager.h
+    include/Runtime/global-geometry-manager.h
+    include/Runtime/subsystem-backend.h
     include/Runtime/contact-table.h
     include/Runtime/subsystem.h
-    include/Runtime/subsystem-backend-visitor.h
     include/Runtime/runtime-scene.h
     include/Runtime/runtime-simulation.h
-        include/Runtime/global-solver.h
-        include/Runtime/solver-config.h
+    include/Runtime/global-solver.h
+    include/Runtime/solver-config.h
+    src/contact-detection-backends.h
 )
 
 add_library(Runtime STATIC ${RUNTIME_SOURCES} ${RUNTIME_HEADERS})
 add_library(Kiseki::Runtime ALIAS Runtime)
 target_include_directories(Runtime PUBLIC include)
-target_link_libraries(Runtime PUBLIC Kiseki::Core Kiseki::RHI Eigen3::Eigen)
+target_link_libraries(Runtime PUBLIC Kiseki::Core Kiseki::RHI Kiseki::Spatify Eigen3::Eigen)
 target_compile_features(Runtime PUBLIC cxx_std_20)
 
 enable_testing()

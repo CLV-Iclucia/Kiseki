@@ -1,11 +1,31 @@
 #include <Runtime/global-solver.h>
 
+#include <Runtime/contact-detection.h>
+#include <Runtime/contact-potential.h>
+
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
 #include <utility>
+#include <vector>
 
 namespace ksk::runtime {
+namespace {
+
+GeometryBuffer makeGeometryDirectionBuffer(const DofBuffer& direction,
+                                           int point_count)
+{
+  if (direction.isCPU()) {
+    return GeometryBuffer::CPU(point_count);
+  }
+  if (rhi::Device* device = direction.device()) {
+    return GeometryBuffer::GPU(*device, point_count);
+  }
+  throw std::runtime_error(
+      "GPU direction buffer does not carry a valid device");
+}
+
+}  // namespace
 
 void GlobalGaussNewtonSolver::prepare(const RuntimeScene& scene)
 {
@@ -41,7 +61,9 @@ RuntimeStepResult GlobalGaussNewtonSolver::step(RuntimeSimulation& simulation,
       subsystem->updateInternalConstraints(time + dt, dt);
       subsystem->prepareLocalOperator(dt);
       subsystem->assembleLocalGradient(gradient);
+      subsystem->updateGeometry(simulation.scene().geometry);
     }
+    assembleContactGradient(simulation, gradient);
 
     result.finalGradientNorm = gradient.norm();
     result.iterations = iteration + 1;
@@ -54,6 +76,7 @@ RuntimeStepResult GlobalGaussNewtonSolver::step(RuntimeSimulation& simulation,
       result.finalStepNorm = 0.0;
       break;
     }
+    updateContactsAlongDirection(simulation, direction);
 
     const DofBuffer q_before = q.clone();
     const double objective_before = evaluateObjective(simulation, dt);
@@ -116,8 +139,92 @@ double GlobalGaussNewtonSolver::evaluateObjective(
   for (const auto& subsystem : simulation.subsystems()) {
     subsystem->readState(q, qdot);
     objective += subsystem->evaluateObjective(q, qdot, dt);
+    subsystem->updateGeometry(simulation.scene().geometry);
   }
+  objective += evaluateContactEnergy(simulation.scene().geometry, simulation.scene().contacts);
   return objective;
+}
+
+void GlobalGaussNewtonSolver::assembleContactGradient(
+    RuntimeSimulation& simulation,
+    DofBuffer& gradient)
+{
+  const ContactTable& contacts = simulation.scene().contacts;
+  if (contacts.stencils.empty()) {
+    return;
+  }
+
+  const ContactPotentialGradient contact_gradient =
+      evaluateContactGradient(simulation.scene().geometry, contacts);
+  if (contact_gradient.points.empty()) {
+    return;
+  }
+
+  for (const auto& subsystem : simulation.subsystems()) {
+    std::vector<GeometryPointId> points;
+    std::vector<glm::dvec3> point_gradient;
+    auto subsystem_id = subsystem->id();
+
+    for (int i = 0; i < contact_gradient.points.size(); i++) {
+      const GeometryPointId point = contact_gradient.points[i];
+      if (simulation.scene().geometry.pointOwner(point).subsystem != subsystem_id) {
+        continue;
+      }
+      points.push_back(point);
+      point_gradient.push_back(contact_gradient.gradient.cpu()[i]);
+    }
+
+    if (points.empty()) {
+      continue;
+    }
+    subsystem->scatterContactGradient(
+        points, GeometryBuffer::FromCPU(std::move(point_gradient)), gradient);
+  }
+}
+
+void GlobalGaussNewtonSolver::updateContactsAlongDirection(
+    RuntimeSimulation& simulation,
+    const DofBuffer& direction)
+{
+  RuntimeScene& scene = simulation.scene();
+  const GlobalSolverConfig& solver_config = scene.solverConfig;
+  const Real barrier_distance =
+      solver_config.contactBarrierDistance > 0.0
+          ? solver_config.contactBarrierDistance
+          : solver_config.contactDetectionDistance;
+  ContactDetectionConfig contact_config{
+      .storage = solver_config.contactDetectionStorage,
+      .detectionDistance = solver_config.contactDetectionDistance,
+      .dHat = barrier_distance,
+      .stiffness = solver_config.contactStiffness,
+      .thickness = solver_config.contactThickness,
+      .toi = 1.0,
+  };
+
+  GeometryBuffer geometry_direction =
+      makeGeometryDirectionBuffer(direction, scene.geometry.pointCount());
+
+  for (const auto& subsystem : simulation.subsystems()) {
+    subsystem->mapDirectionToGeometry(direction, geometry_direction);
+  }
+
+  RoutedContactTables routed =
+      detectContactsAlongDirection(scene.geometry,
+                                   geometry_direction,
+                                   contact_config);
+  scene.contacts = std::move(routed.globalContacts);
+
+  for (const auto& subsystem : simulation.subsystems()) {
+    ContactTable contacts;
+    const SubsystemId subsystem_id = subsystem->id();
+    for (SubsystemContactTable& entry : routed.internalContacts) {
+      if (entry.subsystem == subsystem_id) {
+        contacts = std::move(entry.contacts);
+        break;
+      }
+    }
+    subsystem->setInternalContacts(std::move(contacts));
+  }
 }
 
 bool GlobalGaussNewtonSolver::solveNewtonDirection(

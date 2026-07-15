@@ -28,7 +28,7 @@ struct CurvatureData {
   Mat3x12 derivative = Mat3x12::Zero();
 };
 
-Vec3 xyz(const RodBlock& block)
+Vec3 xyz(const RodDof& block)
 {
   return {block.x, block.y, block.z};
 }
@@ -52,7 +52,7 @@ Mat3 crossMatrix(const Vec3& value)
   return matrix;
 }
 
-EdgeData edgeData(std::span<const RodBlock> blocks, size_t edge)
+EdgeData edgeData(std::span<const RodDof> blocks, size_t edge)
 {
   EdgeData data;
   data.vector = xyz(blocks[edge + 1]) - xyz(blocks[edge]);
@@ -104,7 +104,7 @@ double signedAngle(const Vec3& from, const Vec3& to, const Vec3& axis)
   return std::atan2(axis.dot(from.cross(to)), from.dot(to));
 }
 
-CurvatureData curvatureBinormal(std::span<const RodBlock> blocks,
+CurvatureData curvatureBinormal(std::span<const RodDof> blocks,
                                 size_t vertex,
                                 bool withDerivative)
 {
@@ -141,9 +141,9 @@ CurvatureData curvatureBinormal(std::span<const RodBlock> blocks,
   return data;
 }
 
-std::vector<RodBlock> toBlocks(const Eigen::VectorXd& values)
+std::vector<RodDof> toBlocks(const Eigen::VectorXd& values)
 {
-  std::vector<RodBlock> blocks(static_cast<size_t>(values.size() / 4));
+  std::vector<RodDof> blocks(static_cast<size_t>(values.size() / 4));
   for (size_t i = 0; i < blocks.size(); ++i) {
     for (int lane = 0; lane < 4; ++lane) {
       blocks[i][lane] = values[static_cast<Eigen::Index>(4 * i + lane)];
@@ -210,7 +210,7 @@ void addLocal(Eigen::MatrixXd& matrix,
   matrix.block<12, 12>(offset, offset) += local;
 }
 
-Vec12 twistDerivative(std::span<const RodBlock> blocks, size_t vertex)
+Vec12 twistDerivative(std::span<const RodDof> blocks, size_t vertex)
 {
   const EdgeData left = edgeData(blocks, vertex - 1);
   const EdgeData right = edgeData(blocks, vertex);
@@ -327,65 +327,6 @@ void accumulateGravity(const RodState& state,
   }
 }
 
-void accumulateRootConstraint(const RodState& state,
-                              const RodRestState& rest,
-                              const RodMaterial& material,
-                              bool pinPosition,
-                              RodEnergyComponents& energy,
-                              Eigen::VectorXd& gradient,
-                              Eigen::MatrixXd& hessian)
-{
-  if (pinPosition) {
-    const Vec3 root_offset =
-        xyz(state.blocks.front()) - xyz(rest.blocks.front());
-    energy.constraint +=
-        0.5 * material.rootStiffness * root_offset.squaredNorm();
-    gradient.segment<3>(0) += material.rootStiffness * root_offset;
-    hessian.block<3, 3>(0, 0).diagonal().array() += material.rootStiffness;
-  }
-
-  if (material.pinRootTwist) {
-    const double twist = state.blocks.front().w - rest.blocks.front().w;
-    energy.constraint += 0.5 * material.rootStiffness * twist * twist;
-    gradient[3] += material.rootStiffness * twist;
-    hessian(3, 3) += material.rootStiffness;
-  }
-}
-
-void accumulateTipConstraint(const RodState& state,
-                             const RodRestState& rest,
-                             const RodMaterial& material,
-                             RodEnergyComponents& energy,
-                             Eigen::VectorXd& gradient,
-                             Eigen::MatrixXd& hessian)
-{
-  const size_t tip = state.size() - 1;
-  const Eigen::Index offset = static_cast<Eigen::Index>(4 * tip);
-  const Vec3 tip_offset = xyz(state.blocks[tip]) - xyz(rest.blocks[tip]);
-  energy.constraint +=
-      0.5 * material.rootStiffness * tip_offset.squaredNorm();
-  gradient.segment<3>(offset) += material.rootStiffness * tip_offset;
-  hessian.block<3, 3>(offset, offset).diagonal().array() +=
-      material.rootStiffness;
-}
-
-void accumulateTerminalTheta(const RodState& state,
-                             const RodMaterial& material,
-                             double target,
-                             RodEnergyComponents& energy,
-                             Eigen::VectorXd& gradient,
-                             Eigen::MatrixXd& hessian)
-{
-  const size_t terminal_edge = state.size() - 2;
-  const Eigen::Index theta =
-      static_cast<Eigen::Index>(4 * terminal_edge + 3);
-  const double theta_offset = state.blocks[terminal_edge].w - target;
-  energy.constraint +=
-      0.5 * material.rootStiffness * theta_offset * theta_offset;
-  gradient[theta] += material.rootStiffness * theta_offset;
-  hessian(theta, theta) += material.rootStiffness;
-}
-
 void accumulateConstraint(const RodState& state,
                           const RodConstraint& constraint,
                           RodEnergyComponents& energy,
@@ -420,22 +361,27 @@ void accumulateConstraint(const RodState& state,
 
   const double delta =
       state.blocks[constraint.sample][lane] - constraint.target;
-  energy.constraint += 0.5 * constraint.stiffness * delta * delta;
-  gradient[offset + lane] += constraint.stiffness * delta;
-  hessian(offset + lane, offset + lane) += constraint.stiffness;
+  const double constraint_energy =
+      0.5 * constraint.stiffness * delta * delta;
+  const double gradient_contribution = constraint.stiffness * delta;
+  const double hessian_contribution = constraint.stiffness;
+
+  energy.constraint += constraint_energy;
+  gradient[offset + lane] += gradient_contribution;
+  hessian(offset + lane, offset + lane) += hessian_contribution;
 }
 
 }  // namespace
 
 glm::dvec3 RodState::position(size_t index) const
 {
-  const RodBlock& block = blocks[index];
+  const RodDof& block = blocks[index];
   return {block.x, block.y, block.z};
 }
 
 void RodState::setPosition(size_t index, const glm::dvec3& value)
 {
-  RodBlock& block = blocks[index];
+  RodDof& block = blocks[index];
   block.x = value.x;
   block.y = value.y;
   block.z = value.z;
@@ -486,7 +432,7 @@ double RodEnergyComponents::total() const noexcept
   return stretching + bending + twisting + gravity + constraint;
 }
 
-Rod::Rod(std::vector<RodBlock> restBlocks, RodMaterial material)
+Rod::Rod(std::vector<RodDof> restBlocks, RodMaterial material)
     : material_(material)
 {
   if (restBlocks.size() < 3) {
@@ -495,7 +441,7 @@ Rod::Rod(std::vector<RodBlock> restBlocks, RodMaterial material)
 
   restBlocks.back().w = 0.0;
   state_storage_ = restBlocks;
-  velocity_storage_.assign(restBlocks.size(), RodBlock(0.0));
+  velocity_storage_.assign(restBlocks.size(), RodDof(0.0));
   bindOwnedState();
   rest_.blocks = restBlocks;
   reference_directors_.resize(restBlocks.size() - 1);
@@ -677,8 +623,8 @@ std::span<const RodConstraint> Rod::constraints() const noexcept
   return constraints_;
 }
 
-void Rod::bindState(std::span<RodBlock> stateBlocks,
-                    std::span<RodBlock> velocityBlocks)
+void Rod::bindState(std::span<RodDof> stateBlocks,
+                    std::span<RodDof> velocityBlocks)
 {
   if (stateBlocks.size() != rest_.blocks.size() ||
       velocityBlocks.size() != rest_.blocks.size()) {
@@ -691,9 +637,9 @@ void Rod::bindState(std::span<RodBlock> stateBlocks,
 void Rod::bindOwnedState() noexcept
 {
   state_.blocks =
-      std::span<RodBlock>(state_storage_.data(), state_storage_.size());
+      std::span<RodDof>(state_storage_.data(), state_storage_.size());
   velocity_.blocks =
-      std::span<RodBlock>(velocity_storage_.data(), velocity_storage_.size());
+      std::span<RodDof>(velocity_storage_.data(), velocity_storage_.size());
 }
 
 RodEvaluation Rod::evaluate(const glm::dvec3& gravity) const
@@ -723,7 +669,7 @@ RodEvaluation Rod::evaluate(const glm::dvec3& gravity,
 {
   RodEvaluation result;
   const Eigen::Index dofs = static_cast<Eigen::Index>(4 * state_.size());
-  result.gradient.assign(state_.size(), RodBlock(0.0));
+  result.gradient.assign(state_.size(), RodDof(0.0));
   result.hessian.resize(dofs, dofs);
 
   try {
@@ -737,16 +683,6 @@ RodEvaluation Rod::evaluate(const glm::dvec3& gravity,
     accumulateTwisting(state_, rest_, material_, referenceTwists, result.energy,
                        gradient, hessian);
     accumulateGravity(state_, massDiagonal(), gravity, result.energy, gradient);
-    accumulateRootConstraint(state_, rest_, material_, pin_root_position_,
-                             result.energy, gradient, hessian);
-    if (pin_tip_position_) {
-      accumulateTipConstraint(state_, rest_, material_, result.energy,
-                              gradient, hessian);
-    }
-    if (terminal_theta_target_) {
-      accumulateTerminalTheta(state_, material_, *terminal_theta_target_,
-                              result.energy, gradient, hessian);
-    }
     for (const RodConstraint& constraint : constraints_) {
       accumulateConstraint(state_, constraint, result.energy, gradient,
                            hessian);

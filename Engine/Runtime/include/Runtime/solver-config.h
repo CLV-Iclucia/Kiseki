@@ -1,5 +1,7 @@
 #pragma once
 
+#include <Runtime/contact-detection.h>
+
 namespace ksk::runtime {
 
 struct GlobalSolverConfig {
@@ -11,6 +13,12 @@ struct GlobalSolverConfig {
   double lineSearchArmijo = 1.0e-4;
   double lineSearchShrink = 0.5;
   double pcgTolerance = 1.0e-8;
+  ContactDetectionStorage contactDetectionStorage =
+      ContactDetectionStorage::Host;
+  double contactDetectionDistance = 0.0;
+  double contactBarrierDistance = 0.0;
+  double contactStiffness = 0.0;
+  double contactThickness = 0.0;
 };
 
 }  // namespace ksk::runtime

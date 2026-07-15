@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <stdexcept>
+#include <string>
 #include <utility>
 
 namespace ksk::runtime {
@@ -84,6 +85,35 @@ void RuntimeSceneDesc::addSubsystem(std::unique_ptr<SubsystemDesc> subsystem)
     throw std::runtime_error("cannot add null subsystem description");
   }
   subsystems.push_back(std::move(subsystem));
+}
+
+void RuntimeSceneDesc::assignObjectToSubsystem(
+    std::string subsystemType,
+    ObjectId object,
+    SubsystemDescFactory factory)
+{
+  if (subsystemType.empty()) {
+    throw std::runtime_error("cannot assign object to an empty subsystem type");
+  }
+  if (!findObjectById(object).isValid()) {
+    throw std::runtime_error("cannot assign invalid object to subsystem");
+  }
+  if (!factory) {
+    throw std::runtime_error("cannot assign object with an empty subsystem factory");
+  }
+
+  for (SubsystemObjectGroup& group : subsystemObjectGroups) {
+    if (group.type == subsystemType) {
+      group.objects.push_back(object);
+      return;
+    }
+  }
+
+  subsystemObjectGroups.push_back(SubsystemObjectGroup{
+      .type = std::move(subsystemType),
+      .objects = {object},
+      .factory = std::move(factory),
+  });
 }
 
 void RuntimeSceneDesc::addConstraint(ObjectRef object,
@@ -224,6 +254,17 @@ RuntimeSimulation buildSimulation(const RuntimeSceneDesc& scene)
   for (const auto& subsystem : scene.subsystems) {
     if (!subsystem) {
       throw std::runtime_error("runtime scene contains null subsystem");
+    }
+    subsystem->build(context);
+  }
+  for (const SubsystemObjectGroup& group : scene.subsystemObjectGroups) {
+    if (!group.factory) {
+      throw std::runtime_error("runtime scene contains empty subsystem factory");
+    }
+    std::unique_ptr<SubsystemDesc> subsystem = group.factory(group.objects);
+    if (!subsystem) {
+      throw std::runtime_error(
+          "runtime scene subsystem factory produced null subsystem");
     }
     subsystem->build(context);
   }

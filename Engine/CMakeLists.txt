@@ -3,4 +3,3 @@
 add_subdirectory(Runtime)
 add_subdirectory(SceneObjects)
 add_subdirectory(Subsystems)
-add_subdirectory(Scene)

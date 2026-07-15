@@ -1,8 +1,12 @@
 project(SceneObjects LANGUAGES CXX)
 
-add_library(SceneObjects INTERFACE)
+file (GLOB_RECURSE SCENE_OBJECTS_SOURCES CONFIGURE_DEPENDS src/*.cc)
+file (GLOB_RECURSE SCENE_OBJECTS_HEADERS CONFIGURE_DEPENDS include/*.h)
+
+add_library(SceneObjects STATIC ${SCENE_OBJECTS_SOURCES} ${SCENE_OBJECTS_HEADERS})
 add_library(Kiseki::SceneObjects ALIAS SceneObjects)
 
-target_include_directories(SceneObjects INTERFACE include)
+target_include_directories(SceneObjects PUBLIC include)
 
-target_link_libraries(SceneObjects INTERFACE Kiseki::Runtime)
+target_link_libraries(SceneObjects PUBLIC Kiseki::Runtime Kiseki::DER)
+target_compile_features(SceneObjects PUBLIC cxx_std_20)

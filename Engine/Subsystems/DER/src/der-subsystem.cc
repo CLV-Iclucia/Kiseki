@@ -228,6 +228,13 @@ void DERSubsystem::mapDirectionToGeometry(const runtime::DofBuffer& dq,
   cpu_backend_->mapDirectionToGeometry(dq, dx);
 }
 
+void DERSubsystem::setInternalContacts(runtime::ContactTable contacts)
+{
+  // TODO: assemble DER-local contact energy/gradient/Hessian from these
+  // candidates. The routing path is in place, but DER contact physics is not.
+  internal_contacts_ = std::move(contacts);
+}
+
 void DERSubsystem::scatterContactGradient(
     std::span<const runtime::GeometryPointId> points,
     const runtime::GeometryBuffer& pointGradient,
@@ -251,9 +258,14 @@ void DERSubsystem::applyContactHessian(const runtime::DofBuffer& dq,
   cpu_backend_->applyContactHessian(dq, contacts, y);
 }
 
-void DERSubsystem::accept(runtime::SubsystemBackendVisitor& visitor)
+void DERSubsystem::visit(runtime::CpuSubsystemBackend& backend)
 {
-  visitor.visit(*this);
+  (void)backend;
+}
+
+void DERSubsystem::visit(runtime::GpuSubsystemBackend& backend)
+{
+  (void)backend;
 }
 
 const std::vector<DERGeometrySample>& DERSubsystem::geometrySamples() const noexcept
@@ -305,10 +317,11 @@ void DERSubsystem::updateSceneConstraints(double time)
     if (!scene_constraint.target) {
       throw std::runtime_error("DER rod constraint requires a scalar target");
     }
+    const double target = scene_constraint.target(time);
     rod.addConstraint(RodConstraint{
         .property = *property,
         .sample = static_cast<size_t>(scene_constraint.sample),
-        .target = scene_constraint.target(time),
+        .target = target,
         .stiffness = scene_constraint.stiffness,
     });
   }

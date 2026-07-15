@@ -1,6 +1,7 @@
 #pragma once
 
 #include <RHI/buffer.h>
+#include <RHI/buffer-utils.h>
 
 #include <Eigen/Core>
 #include <glm/glm.hpp>
@@ -191,6 +192,15 @@ class GeometryBuffer {
   {
     return FromCPU(std::vector<glm::dvec3>(
         static_cast<size_t>(pointCount), glm::dvec3(0.0)));
+  }
+
+  [[nodiscard]] static GeometryBuffer GPU(rhi::Device& device, int pointCount)
+  {
+    return FromGPU(device,
+                   rhi::createDeviceLocalBuffer(
+                       device,
+                       sizeof(glm::dvec3) * static_cast<size_t>(pointCount),
+                       "runtime-geometry-buffer"));
   }
 
   [[nodiscard]] static GeometryBuffer FromGPU(rhi::Device& device,

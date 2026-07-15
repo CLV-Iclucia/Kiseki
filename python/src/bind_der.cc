@@ -67,7 +67,7 @@ glm::dvec3 parseVec3(py::array_t<double> values, const char* name)
   return glm::dvec3(buffer(0), buffer(1), buffer(2));
 }
 
-std::vector<der::RodBlock> parseRodBlocks(
+std::vector<der::RodDof> parseRodBlocks(
     py::array_t<double> positions,
     std::optional<py::array_t<double>> theta)
 {
@@ -84,18 +84,18 @@ std::vector<der::RodBlock> parseRodBlocks(
     if (theta_values.shape(0) != pos.shape(0)) {
       throw py::value_error("theta must have shape (N,)");
     }
-    std::vector<der::RodBlock> blocks(static_cast<size_t>(pos.shape(0)));
+    std::vector<der::RodDof> blocks(static_cast<size_t>(pos.shape(0)));
     for (py::ssize_t i = 0; i < pos.shape(0); ++i) {
       blocks[static_cast<size_t>(i)] =
-          der::RodBlock(pos(i, 0), pos(i, 1), pos(i, 2), theta_values(i));
+          der::RodDof(pos(i, 0), pos(i, 1), pos(i, 2), theta_values(i));
     }
     return blocks;
   }
 
-  std::vector<der::RodBlock> blocks(static_cast<size_t>(pos.shape(0)));
+  std::vector<der::RodDof> blocks(static_cast<size_t>(pos.shape(0)));
   for (py::ssize_t i = 0; i < pos.shape(0); ++i) {
     blocks[static_cast<size_t>(i)] =
-        der::RodBlock(pos(i, 0), pos(i, 1), pos(i, 2), 0.0);
+        der::RodDof(pos(i, 0), pos(i, 1), pos(i, 2), 0.0);
   }
   return blocks;
 }
@@ -235,7 +235,7 @@ void bind_der(py::module_& m)
         for (py::ssize_t i = 0;
              i < static_cast<py::ssize_t>(self.desc.restBlocks.size());
              ++i) {
-          const der::RodBlock& block = self.desc.restBlocks[i];
+          const der::RodDof& block = self.desc.restBlocks[i];
           out(i, 0) = block.x;
           out(i, 1) = block.y;
           out(i, 2) = block.z;

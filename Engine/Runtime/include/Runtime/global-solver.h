@@ -28,6 +28,10 @@ class GlobalGaussNewtonSolver {
  private:
   [[nodiscard]] static double evaluateObjective(RuntimeSimulation& simulation,
                                                 double dt);
+  static void assembleContactGradient(RuntimeSimulation& simulation,
+                                      DofBuffer& gradient);
+  static void updateContactsAlongDirection(RuntimeSimulation& simulation,
+                                           const DofBuffer& direction);
   [[nodiscard]] static bool solveNewtonDirection(RuntimeSimulation& simulation,
                                                  const DofBuffer& gradient,
                                                  DofBuffer& direction);

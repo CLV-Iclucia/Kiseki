@@ -149,6 +149,9 @@ class SubsystemDesc {
   virtual void build(SubsystemBuildContext& context) const = 0;
 };
 
+using SubsystemDescFactory =
+    std::function<std::unique_ptr<SubsystemDesc>(std::vector<ObjectId>)>;
+
 class SubsystemBuildContext {
  public:
   explicit SubsystemBuildContext(GlobalSolverConfig solver = {},
@@ -181,15 +184,25 @@ struct SceneObjectEntry {
   std::unique_ptr<SceneObjectDesc> element;
 };
 
+struct SubsystemObjectGroup {
+  std::string type;
+  std::vector<ObjectId> objects;
+  SubsystemDescFactory factory;
+};
+
 struct RuntimeSceneDesc {
   GlobalSolverConfig solverConfig;
   glm::dvec3 gravity{0.0, -9.81, 0.0};
   double timeStep = 1.0 / 60.0;
   std::vector<std::unique_ptr<SubsystemDesc>> subsystems;
+  std::vector<SubsystemObjectGroup> subsystemObjectGroups;
   std::vector<SceneObjectEntry> elements;
   std::vector<SceneConstraintDesc> constraints;
 
   void addSubsystem(std::unique_ptr<SubsystemDesc> subsystem);
+  void assignObjectToSubsystem(std::string subsystemType,
+                               ObjectId object,
+                               SubsystemDescFactory factory);
   void addConstraint(ObjectRef object,
                      std::string property,
                      int sample,

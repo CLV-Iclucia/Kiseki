@@ -58,18 +58,7 @@ struct HairObjectDesc : runtime::SceneObjectDesc {
   std::vector<HairBlock> restBlocks;
 };
 
-struct HairStrandDesc {
-  std::vector<HairBlock> restBlocks;
-  HairMaterial material;
-};
-
 [[nodiscard]] runtime::ObjectRef addHair(runtime::RuntimeSceneDesc& scene,
-                                         HairStrandDesc hair);
-void addConstraint(runtime::RuntimeSceneDesc& scene,
-                   runtime::ObjectRef rod,
-                   std::string property,
-                   int sample,
-                   double stiffness,
-                   runtime::ScalarConstraintTarget target);
+                                         HairObjectDesc hair);
 
 }  // namespace ksk::scene

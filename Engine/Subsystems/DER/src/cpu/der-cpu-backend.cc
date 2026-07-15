@@ -13,7 +13,7 @@ namespace ksk::der
 {
     namespace
     {
-        static_assert(sizeof(RodBlock) == 4 * sizeof(double));
+        static_assert(sizeof(RodDof) == 4 * sizeof(double));
 
         void ensureWritable(Eigen::VectorXd& values, int minimumSize)
         {
@@ -103,12 +103,12 @@ namespace ksk::der
             Rod& rod = rods[rod_index];
             const int base = offsets[rod_index].q;
             const int block_count = static_cast<int>(rod.state().size());
-            auto* q_blocks = reinterpret_cast<RodBlock*>(
+            auto* q_blocks = reinterpret_cast<RodDof*>(
                 q_values.data() + vectorOffset(q_values, base));
-            auto* qdot_blocks = reinterpret_cast<RodBlock*>(
+            auto* qdot_blocks = reinterpret_cast<RodDof*>(
                 qdot_values.data() + vectorOffset(qdot_values, base));
-            rod.bindState(std::span<RodBlock>(q_blocks, block_count),
-                          std::span<RodBlock>(qdot_blocks, block_count));
+            rod.bindState(std::span<RodDof>(q_blocks, block_count),
+                          std::span<RodDof>(qdot_blocks, block_count));
         }
     }
 
@@ -167,14 +167,14 @@ namespace ksk::der
             {
                 continue;
             }
-            std::vector<RodBlock>& previous_blocks =
+            std::vector<RodDof>& previous_blocks =
                 step_previous_states_[rod_index];
             if (previous_blocks.size() != rods[rod_index].state().size())
             {
                 continue;
             }
             RodState previous{
-                std::span<RodBlock>(previous_blocks.data(), previous_blocks.size())
+                std::span<RodDof>(previous_blocks.data(), previous_blocks.size())
             };
             rods[rod_index].transportReferenceFrames(previous);
         }
@@ -210,7 +210,6 @@ namespace ksk::der
 
     void DERCPUBackend::updateInternalConstraints(double time, double dt)
     {
-
     }
 
     void DERCPUBackend::prepareLocalOperator(double dt)
@@ -375,19 +374,24 @@ namespace ksk::der
 
         const Eigen::VectorXd& dq_values = dq.cpu();
         const auto& samples = subsystem_.geometrySamples();
+        const auto& geometry_points = subsystem_.geometryPointIds();
         std::vector<glm::dvec3>& dx_values = dx.cpu();
-        if (dx_values.size() < samples.size())
+        if (geometry_points.size() != samples.size())
         {
-            throw std::invalid_argument("DER geometry direction buffer is too small");
+            throw std::runtime_error("DER geometry point mapping is stale");
         }
 
-        for (int sample = 0; sample < static_cast<int>(samples.size()); ++sample)
+        for (int sample = 0; sample < samples.size(); sample++)
         {
+            auto point = geometry_points[sample];
+            if (point < 0 || point >= static_cast<int>(dx_values.size()))
+            {
+                throw std::invalid_argument("DER global geometry direction buffer is too small");
+            }
             const int offset = samples[sample].qOffset;
-            dx_values[sample] =
-                glm::dvec3(dq_values[vectorOffset(dq_values, offset + 0)],
-                           dq_values[vectorOffset(dq_values, offset + 1)],
-                           dq_values[vectorOffset(dq_values, offset + 2)]);
+            dx_values[point] = glm::dvec3(dq_values[vectorOffset(dq_values, offset + 0)],
+                                          dq_values[vectorOffset(dq_values, offset + 1)],
+                                          dq_values[vectorOffset(dq_values, offset + 2)]);
         }
     }
 
@@ -487,12 +491,12 @@ namespace ksk::der
         if (rodIndex >= 0 &&
             rodIndex < static_cast<int>(step_previous_states_.size()))
         {
-            std::vector<RodBlock>& previous_blocks =
+            std::vector<RodDof>& previous_blocks =
                 step_previous_states_[rodIndex];
             if (previous_blocks.size() == rod.state().size())
             {
                 RodState previous{
-                    std::span<RodBlock>(previous_blocks.data(), previous_blocks.size())
+                    std::span<RodDof>(previous_blocks.data(), previous_blocks.size())
                 };
                 return rod.evaluate(subsystem_.gravity(), previous);
             }

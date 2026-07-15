@@ -15,11 +15,9 @@ namespace {
 
 class DERSubsystemDesc final : public runtime::SubsystemDesc {
  public:
-  std::vector<runtime::ObjectId> rods;
-
-  void addRod(runtime::ObjectId rod)
+  explicit DERSubsystemDesc(std::vector<runtime::ObjectId> rods)
+      : rods(std::move(rods))
   {
-    rods.push_back(rod);
   }
 
   [[nodiscard]] std::string_view typeName() const noexcept override
@@ -28,16 +26,15 @@ class DERSubsystemDesc final : public runtime::SubsystemDesc {
   }
 
   void build(runtime::SubsystemBuildContext& context) const override;
+
+ private:
+  std::vector<runtime::ObjectId> rods;
 };
 
-DERSubsystemDesc* findDERSubsystem(runtime::RuntimeSceneDesc& scene)
+std::unique_ptr<runtime::SubsystemDesc> createDERSubsystemDesc(
+    std::vector<runtime::ObjectId> rods)
 {
-  for (const auto& subsystem : scene.subsystems) {
-    if (subsystem && subsystem->typeName() == "der") {
-      return static_cast<DERSubsystemDesc*>(subsystem.get());
-    }
-  }
-  return nullptr;
+  return std::make_unique<DERSubsystemDesc>(std::move(rods));
 }
 
 }  // namespace
@@ -88,29 +85,8 @@ runtime::ObjectRef addRod(runtime::RuntimeSceneDesc& scene, DERRodDesc rod)
   rodDesc->material = rod.material;
 
   runtime::ObjectRef rodRef = scene.registerObject(std::move(rodDesc));
-
-  DERSubsystemDesc* der = findDERSubsystem(scene);
-  if (der == nullptr) {
-    auto created = std::make_unique<DERSubsystemDesc>();
-    der = created.get();
-    scene.addSubsystem(std::move(created));
-  }
-  der->addRod(rodRef.id);
+  scene.assignObjectToSubsystem("der", rodRef.id, createDERSubsystemDesc);
   return rodRef;
-}
-
-void addConstraint(runtime::RuntimeSceneDesc& scene,
-                   runtime::ObjectRef rod,
-                   std::string property,
-                   int sample,
-                   double stiffness,
-                   runtime::ScalarConstraintTarget target)
-{
-  if (!rod.isA<RodObject>()) {
-    throw std::runtime_error("cannot add DER constraint to non-rod object");
-  }
-  scene.addConstraint(rod, std::move(property), sample, stiffness,
-                      std::move(target));
 }
 
 }  // namespace ksk::der

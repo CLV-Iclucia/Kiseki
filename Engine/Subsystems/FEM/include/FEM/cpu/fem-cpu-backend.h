@@ -1,23 +1,20 @@
 #pragma once
 
-#include <DER/rod.h>
 #include <Runtime/buffers.h>
 #include <Runtime/contact-table.h>
-#include <Runtime/global-geometry-manager.h>
 
 #include <Eigen/Core>
 #include <Eigen/SparseCore>
 
 #include <span>
-#include <vector>
 
-namespace ksk::der {
+namespace ksk::engine::fem {
 
-class DERSubsystem;
+class FEMSubsystem;
 
-class DERCPUBackend {
+class FEMCPUBackend {
  public:
-  explicit DERCPUBackend(DERSubsystem& subsystem);
+  explicit FEMCPUBackend(FEMSubsystem& subsystem);
 
   void writeState(runtime::DofBuffer& q, runtime::DofBuffer& qdot) const;
   void readState(runtime::DofBuffer& q, runtime::DofBuffer& qdot);
@@ -30,6 +27,7 @@ class DERCPUBackend {
   [[nodiscard]] double evaluateObjective(const runtime::DofBuffer& q,
                                          const runtime::DofBuffer& qdot,
                                          double dt);
+
   void updateInternalConstraints(double time, double dt);
   void prepareLocalOperator(double dt);
   void assembleLocalGradient(runtime::DofBuffer& g) const;
@@ -37,6 +35,7 @@ class DERCPUBackend {
                         runtime::DofBuffer& y) const;
   void solveLocalSystem(const runtime::DofBuffer& b,
                         runtime::DofBuffer& x) const;
+
   void mapDirectionToGeometry(const runtime::DofBuffer& dq,
                               runtime::GeometryBuffer& dx) const;
   void scatterContactGradient(
@@ -47,27 +46,15 @@ class DERCPUBackend {
                            const runtime::ContactTable& contacts,
                            runtime::DofBuffer& y) const;
 
-  [[nodiscard]] const RodEvaluation& cachedEvaluation(int rod) const;
-
  private:
-  [[nodiscard]] int vectorOffset(const Eigen::VectorXd& values,
-                                 int localOffset) const;
-  [[nodiscard]] Eigen::VectorXd gatherLocalVector(
-      const Eigen::VectorXd& values) const;
-  [[nodiscard]] Eigen::VectorXd gatherCurrentState() const;
-  [[nodiscard]] RodEvaluation evaluateRod(const Rod& rod, int rodIndex);
-  void addToVector(Eigen::VectorXd& values,
-                   int localOffset,
-                   double value) const;
+  [[nodiscard]] Eigen::VectorXd buildMassDiagonal() const;
 
-  DERSubsystem& subsystem_;
-  std::vector<RodEvaluation> evaluations_;
+  FEMSubsystem& subsystem_;
   Eigen::VectorXd step_start_;
-  std::vector<std::vector<RodDof>> step_previous_states_;
   Eigen::VectorXd inertial_target_;
   Eigen::VectorXd mass_diagonal_;
-  double step_dt_ = 0.0;
   Eigen::SparseMatrix<double> local_matrix_;
+  double step_dt_ = 0.0;
 };
 
-}  // namespace ksk::der
+}  // namespace ksk::engine::fem

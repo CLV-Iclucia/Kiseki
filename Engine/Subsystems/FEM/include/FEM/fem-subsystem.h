@@ -1,44 +1,49 @@
 #pragma once
 
-#include <DER/rod.h>
+#include <FEM/fem-scene.h>
+
+#include <Runtime/buffers.h>
+#include <Runtime/contact-table.h>
+#include <Runtime/global-geometry-manager.h>
 #include <Runtime/runtime-scene.h>
 #include <Runtime/subsystem.h>
-
-#include <glm/glm.hpp>
 
 #include <memory>
 #include <span>
 #include <vector>
 
-namespace ksk::der {
+#include <Eigen/Core>
+#include <Eigen/SparseCore>
+#include <glm/glm.hpp>
 
-class DERCPUBackend;
-class DERGpuBackend;
+namespace ksk::engine::fem {
 
-struct DERGeometrySample {
-  int rod = -1;
+class FEMCPUBackend;
+
+struct FEMVertexSample {
+  int mesh = -1;
   int vertex = -1;
   int qOffset = -1;
 };
 
-struct DERRodOffset {
+struct FEMMeshOffset {
   int q = 0;
   int samples = 0;
 };
 
-struct DERConstraintBinding {
-  int rod = -1;
+struct FEMConstraintBinding {
+  int mesh = -1;
   runtime::SceneConstraintDesc constraint;
 };
 
-class DERSubsystem final : public runtime::Subsystem {
+class FEMSubsystem final : public runtime::Subsystem {
  public:
-  DERSubsystem(runtime::SubsystemId id,
-               std::vector<Rod> rods,
-               std::vector<DERConstraintBinding> constraints = {},
+  FEMSubsystem(runtime::SubsystemId id,
+               std::vector<TetMeshDesc> meshes,
+               std::vector<FEMConstraintBinding> constraints = {},
                int scalarOffset = 0,
                glm::dvec3 gravity = glm::dvec3(0.0));
-  ~DERSubsystem() override;
+  ~FEMSubsystem() override;
 
   [[nodiscard]] runtime::SubsystemId id() const noexcept override;
   [[nodiscard]] runtime::DofRange dofRange() const noexcept override;
@@ -80,32 +85,64 @@ class DERSubsystem final : public runtime::Subsystem {
   void visit(runtime::CpuSubsystemBackend& backend) override;
   void visit(runtime::GpuSubsystemBackend& backend) override;
 
-  [[nodiscard]] const std::vector<Rod>& rods() const noexcept { return rods_; }
-  [[nodiscard]] std::vector<Rod>& rods() noexcept { return rods_; }
-  [[nodiscard]] const std::vector<DERRodOffset>& rodOffsets() const noexcept;
-  [[nodiscard]] const std::vector<DERGeometrySample>& geometrySamples() const noexcept;
-  [[nodiscard]] const std::vector<runtime::GeometryPointId>& geometryPointIds() const noexcept;
-  [[nodiscard]] const RodEvaluation& cachedEvaluation(int rod) const;
+  [[nodiscard]] const std::vector<TetMeshDesc>& meshes() const noexcept
+  {
+    return meshes_;
+  }
   [[nodiscard]] int localScalarCount() const noexcept;
-  [[nodiscard]] glm::dvec3 gravity() const noexcept { return gravity_; }
+  [[nodiscard]] const std::vector<FEMVertexSample>& samples() const noexcept
+  {
+    return samples_;
+  }
+  [[nodiscard]] const std::vector<runtime::GeometryPointId>& geometryPointIds()
+      const noexcept
+  {
+    return geometry_points_;
+  }
 
  private:
-  void updateSceneConstraints(double time);
+  friend class FEMCPUBackend;
+
+  struct ActiveConstraint {
+    int qOffset = -1;
+    double stiffness = 0.0;
+    double target = 0.0;
+  };
+
   void rebuildSamples();
-  [[nodiscard]] bool usesGPU(const runtime::DofBuffer& buffer) const noexcept;
-  [[nodiscard]] bool usesGPU(const runtime::GeometryBuffer& buffer) const noexcept;
+  void updateConstraintTargets(double time);
+  [[nodiscard]] Eigen::VectorXd gatherCurrentState() const;
+  [[nodiscard]] double elasticEnergy(const Eigen::VectorXd& localQ) const;
+  void assembleElasticGradient(const Eigen::VectorXd& localQ,
+                               Eigen::VectorXd& gradient) const;
+  void assembleElasticHessian(
+      const Eigen::VectorXd& localQ,
+      std::vector<Eigen::Triplet<double>>& triplets) const;
+  [[nodiscard]] int vectorOffset(const Eigen::VectorXd& values,
+                                 int localOffset) const;
+  [[nodiscard]] Eigen::VectorXd gatherLocalVector(
+      const Eigen::VectorXd& values) const;
+  [[nodiscard]] glm::dvec3 vertexPosition(int mesh, int vertex) const;
+  void setVertexPosition(int mesh, int vertex, const glm::dvec3& position);
+  [[nodiscard]] glm::dvec3 vertexVelocity(int mesh, int vertex) const;
+  void setVertexVelocity(int mesh, int vertex, const glm::dvec3& velocity);
+  [[nodiscard]] int constraintLocalOffset(
+      const FEMConstraintBinding& binding) const;
+  void addToVector(Eigen::VectorXd& values,
+                   int localOffset,
+                   double value) const;
 
   runtime::SubsystemId id_;
   runtime::DofRange range_;
   glm::dvec3 gravity_;
-  std::vector<Rod> rods_;
-  std::vector<DERConstraintBinding> constraints_;
-  std::vector<DERRodOffset> rod_offsets_;
-  std::vector<DERGeometrySample> samples_;
+  std::vector<TetMeshDesc> meshes_;
+  std::vector<FEMConstraintBinding> constraints_;
+  std::vector<ActiveConstraint> active_constraints_;
+  std::vector<FEMMeshOffset> mesh_offsets_;
+  std::vector<FEMVertexSample> samples_;
   std::vector<runtime::GeometryPointId> geometry_points_;
   runtime::ContactTable internal_contacts_;
-  std::unique_ptr<DERCPUBackend> cpu_backend_;
-  std::unique_ptr<DERGpuBackend> gpu_backend_;
+  std::unique_ptr<FEMCPUBackend> cpu_backend_;
 };
 
-}  // namespace ksk::der
+}  // namespace ksk::engine::fem

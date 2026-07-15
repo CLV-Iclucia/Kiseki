@@ -1,6 +1,6 @@
 #include <Runtime/global-solver.h>
 #include <Renderer/simulation-app.h>
-#include <Scene/hair.h>
+#include <SceneObjects/hair.h>
 
 #include <cxxopts.hpp>
 #include <glm/glm.hpp>
@@ -18,7 +18,7 @@
 
 namespace {
 
-ksk::scene::HairStrandDesc makeHair(int segments,
+ksk::scene::HairObjectDesc makeHair(int segments,
                                     double length,
                                     double yOffset,
                                     double zOffset,
@@ -28,7 +28,7 @@ ksk::scene::HairStrandDesc makeHair(int segments,
     throw std::invalid_argument("hair strand requires at least two segments");
   }
 
-  ksk::scene::HairStrandDesc hair;
+  ksk::scene::HairObjectDesc hair("hair");
   hair.material = material;
   hair.restBlocks.reserve(static_cast<size_t>(segments + 1));
   const double amplitude = length / 15.0;
@@ -87,17 +87,16 @@ void addTwistTestConstraints(ksk::runtime::RuntimeSceneDesc& scene,
   const int terminal_twist_sample =
       static_cast<int>(hair->restBlocks.size()) - 2;
   for (const ksk::runtime::ObjectRef rod : hair->rodRefs(scene)) {
-    ksk::scene::addConstraint(scene, rod, "x", 0, rootStiffness,
-                              [x = root_block.x](double) { return x; });
-    ksk::scene::addConstraint(scene, rod, "y", 0, rootStiffness,
-                              [y = root_block.y](double) { return y; });
-    ksk::scene::addConstraint(scene, rod, "z", 0, rootStiffness,
-                              [z = root_block.z](double) { return z; });
-    ksk::scene::addConstraint(scene, rod, "twist", 0, twistStiffness,
-                              [](double) { return 0.0; });
-    ksk::scene::addConstraint(
-        scene, rod, "twist", terminal_twist_sample, twistStiffness,
-        [&twistTarget](double) { return twistTarget; });
+    scene.addConstraint(rod, "x", 0, rootStiffness,
+                        [x = root_block.x](double) { return x; });
+    scene.addConstraint(rod, "y", 0, rootStiffness,
+                        [y = root_block.y](double) { return y; });
+    scene.addConstraint(rod, "z", 0, rootStiffness,
+                        [z = root_block.z](double) { return z; });
+    scene.addConstraint(rod, "twist", 0, twistStiffness,
+                        [theta = root_block.w](double) { return theta; });
+    scene.addConstraint(rod, "twist", terminal_twist_sample, twistStiffness,
+                        [&twistTarget](double) { return twistTarget; });
   }
 }
 
@@ -264,8 +263,10 @@ int main(int argc, char** argv)
     std::cout << "step=" << (step + 1)
               << " iterations=" << result.iterations
               << " converged=" << (result.converged ? "true" : "false")
-              << " grad=" << result.finalGradientNorm
-              << " step_norm=" << result.finalStepNorm;
+              << " grad=" << std::scientific << std::setprecision(6)
+              << result.finalGradientNorm
+              << " step_norm=" << result.finalStepNorm
+              << std::fixed << std::setprecision(6);
     printTipPositions(simulation, hair_vertex_counts);
     std::cout << '\n';
 

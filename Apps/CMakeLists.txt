@@ -32,7 +32,7 @@ target_compile_features(fem-showcase PUBLIC cxx_std_20)
 
 # DER Hair runtime smoke scene
 add_executable(der-hair der-hair/main.cc)
-    target_link_libraries(der-hair PUBLIC Kiseki::DER Kiseki::Scene cxxopts Kiseki::Renderer)
+    target_link_libraries(der-hair PUBLIC Kiseki::DER Kiseki::SceneObjects cxxopts Kiseki::Renderer)
 
 # Fluid Dam Break simulation
 add_executable(fluid-sim fluid-sim/main.cc)
