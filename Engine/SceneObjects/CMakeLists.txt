@@ -8,5 +8,5 @@ add_library(Kiseki::SceneObjects ALIAS SceneObjects)
 
 target_include_directories(SceneObjects PUBLIC include)
 
-target_link_libraries(SceneObjects PUBLIC Kiseki::Runtime Kiseki::DER)
+target_link_libraries(SceneObjects PUBLIC Kiseki::Runtime)
 target_compile_features(SceneObjects PUBLIC cxx_std_20)

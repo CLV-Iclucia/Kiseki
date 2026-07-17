@@ -24,12 +24,27 @@ inline std::unique_ptr<SceneProxy> buildSceneProxyFromFluid(
     core::Vec3f particleColor = {0.15f, 0.45f, 0.95f})
 {
     // 1. Readback from backend (CPU or GPU → CPU copy)
-    fluid::FluidFrame frame;
-    backend.readbackParticles(frame);
-
     // 2. Build proxy
     auto proxy = std::make_unique<SceneProxy>();
     proxy->frameIndex = frameIndex;
+
+    fluid::FluidSurfaceMesh surface;
+    if (backend.readbackSurfaceMesh(surface)) {
+        MeshProxy mesh;
+        mesh.name = "fluid_surface";
+        mesh.positions = std::move(surface.positions);
+        mesh.triangles = std::move(surface.triangles);
+        mesh.normals = std::move(surface.normals);
+        mesh.objectColor = core::Vec3f(0.12f, 0.42f, 0.95f);
+        if (mesh.normals.size() != mesh.positions.size()) {
+            computeSmoothNormals(mesh);
+        }
+        proxy->meshes.push_back(std::move(mesh));
+        return proxy;
+    }
+
+    fluid::FluidFrame frame;
+    backend.readbackParticles(frame);
 
     ParticleProxy particles;
     particles.name   = "fluid_particles";

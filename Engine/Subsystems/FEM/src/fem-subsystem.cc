@@ -50,7 +50,7 @@ int propertyLane(const std::string& property)
                            property);
 }
 
-deform::StableNeoHookean<double> makeEnergy(const TetMaterial& material)
+deform::StableNeoHookean<double> createEnergy(const TetMaterial& material)
 {
   return deform::StableNeoHookean<double>(
       deform::ElasticityParameters<double>{
@@ -140,55 +140,57 @@ void FEMSubsystem::declareGeometry(runtime::GlobalGeometryManager& geometry)
   geometry_points_.clear();
   geometry_points_.reserve(samples_.size());
 
-  for (int mesh_index = 0; mesh_index < static_cast<int>(meshes_.size());
-       ++mesh_index) {
+  for (int mesh_index = 0; mesh_index < meshes_.size(); mesh_index++) {
     const TetMeshDesc& mesh = meshes_[mesh_index];
     const int sample_base = mesh_offsets_[mesh_index].samples;
-    for (int vertex = 0; vertex < static_cast<int>(mesh.vertices.size());
-         ++vertex) {
-      geometry_points_.push_back(geometry.appendPoint(
-          id_, sample_base + vertex, vertexPosition(mesh_index, vertex)));
+    for (int vertex = 0; vertex < mesh.vertices.size(); vertex++) {
+      geometry_points_.push_back(geometry.addPoint(
+          id_,
+          sample_base + vertex,
+          vertexPosition(mesh_index, vertex),
+          restVertexPosition(mesh_index, vertex)));
     }
 
     for (const auto& edge : mesh.surfaceEdges) {
-      geometry.appendEdge(geometry_points_.at(sample_base + edge[0]),
+      geometry.addEdge(geometry_points_.at(sample_base + edge[0]),
                           geometry_points_.at(sample_base + edge[1]));
     }
     for (const auto& triangle : mesh.surfaceTriangles) {
-      geometry.appendTriangle(geometry_points_.at(sample_base + triangle[0]),
+      geometry.addTriangle(geometry_points_.at(sample_base + triangle[0]),
                               geometry_points_.at(sample_base + triangle[1]),
                               geometry_points_.at(sample_base + triangle[2]));
     }
   }
 }
 
-void FEMSubsystem::writeState(runtime::DofBuffer& q,
-                              runtime::DofBuffer& qdot) const
+void FEMSubsystem::writeState(runtime::DofView q,
+                              runtime::DofView qdot) const
 {
   cpu_backend_->writeState(q, qdot);
 }
 
-void FEMSubsystem::readState(runtime::DofBuffer& q, runtime::DofBuffer& qdot)
+void FEMSubsystem::readState(runtime::ConstDofView q,
+                             runtime::ConstDofView qdot)
 {
   cpu_backend_->readState(q, qdot);
 }
 
-void FEMSubsystem::beginStep(const runtime::DofBuffer& q,
-                             const runtime::DofBuffer& qdot,
+void FEMSubsystem::beginStep(runtime::ConstDofView q,
+                             runtime::ConstDofView qdot,
                              double dt)
 {
   cpu_backend_->beginStep(q, qdot, dt);
 }
 
-void FEMSubsystem::acceptStep(const runtime::DofBuffer& q,
-                              runtime::DofBuffer& qdot,
+void FEMSubsystem::acceptStep(runtime::ConstDofView q,
+                              runtime::DofView qdot,
                               double dt)
 {
   cpu_backend_->acceptStep(q, qdot, dt);
 }
 
-double FEMSubsystem::evaluateObjective(const runtime::DofBuffer& q,
-                                       const runtime::DofBuffer& qdot,
+double FEMSubsystem::evaluateObjective(runtime::ConstDofView q,
+                                       runtime::ConstDofView qdot,
                                        double dt)
 {
   return cpu_backend_->evaluateObjective(q, qdot, dt);
@@ -204,19 +206,19 @@ void FEMSubsystem::prepareLocalOperator(double dt)
   cpu_backend_->prepareLocalOperator(dt);
 }
 
-void FEMSubsystem::assembleLocalGradient(runtime::DofBuffer& g) const
+void FEMSubsystem::assembleLocalGradient(runtime::DofView g) const
 {
   cpu_backend_->assembleLocalGradient(g);
 }
 
-void FEMSubsystem::applyLocalMatrix(const runtime::DofBuffer& x,
-                                    runtime::DofBuffer& y) const
+void FEMSubsystem::applyLocalMatrix(runtime::ConstDofView x,
+                                    runtime::DofView y) const
 {
   cpu_backend_->applyLocalMatrix(x, y);
 }
 
-void FEMSubsystem::solveLocalSystem(const runtime::DofBuffer& b,
-                                    runtime::DofBuffer& x) const
+void FEMSubsystem::solveLocalSystem(runtime::ConstDofView b,
+                                    runtime::DofView x) const
 {
   cpu_backend_->solveLocalSystem(b, x);
 }
@@ -225,41 +227,42 @@ void FEMSubsystem::updateGeometry(runtime::GlobalGeometryManager& geometry) cons
 {
   for (int sample_index = 0; sample_index < static_cast<int>(samples_.size());
        ++sample_index) {
-    const runtime::GeometryPointId point = geometry_points_.at(sample_index);
+    const runtime::PointIdx point = geometry_points_.at(sample_index);
     if (!geometry.contains(point)) {
       throw std::runtime_error("FEM geometry point id is stale");
     }
     const FEMVertexSample& sample = samples_[sample_index];
     geometry.setPointPosition(point, vertexPosition(sample.mesh, sample.vertex));
+    geometry.setPointRestPosition(
+        point, restVertexPosition(sample.mesh, sample.vertex));
   }
 }
 
-void FEMSubsystem::mapDirectionToGeometry(const runtime::DofBuffer& dq,
-                                          runtime::GeometryBuffer& dx) const
+void FEMSubsystem::mapLocalDirectionToGeometry(runtime::ConstDofView localDq,
+                                          runtime::GeometryView globalDx) const
 {
-  cpu_backend_->mapDirectionToGeometry(dq, dx);
+  cpu_backend_->mapLocalDirectionToGeometry(localDq, globalDx);
 }
 
-void FEMSubsystem::setInternalContacts(runtime::ContactTable contacts)
+void FEMSubsystem::applyInternalContacts(runtime::ContactStencils contacts)
 {
-  // TODO: assemble FEM-local IPC/barrier contact energy/gradient/Hessian from
-  // these candidates. The routing path is in place, but FEM IPC is not.
+  // The CPU backend consumes these routed internal contacts when assembling
+  // contact energy, gradient, and Hessian products.
   internal_contacts_ = std::move(contacts);
 }
 
 void FEMSubsystem::scatterContactGradient(
-    std::span<const runtime::GeometryPointId> points,
-    const runtime::GeometryBuffer& pointGradient,
-    runtime::DofBuffer& g) const
+    std::span<const runtime::PointIdx> points,
+    runtime::ConstGeometryView pointGradient,
+    runtime::DofView g) const
 {
   cpu_backend_->scatterContactGradient(points, pointGradient, g);
 }
 
-void FEMSubsystem::applyContactHessian(const runtime::DofBuffer& dq,
-                                       const runtime::ContactTable& contacts,
-                                       runtime::DofBuffer& y) const
+void FEMSubsystem::applyInternalContactHessian(runtime::ConstDofView localDq,
+                                               runtime::DofView localY) const
 {
-  cpu_backend_->applyContactHessian(dq, contacts, y);
+  cpu_backend_->applyInternalContactHessian(localDq, localY);
 }
 
 void FEMSubsystem::visit(runtime::CpuSubsystemBackend& backend)
@@ -329,7 +332,7 @@ double FEMSubsystem::elasticEnergy(const Eigen::VectorXd& localQ) const
        ++mesh_index) {
     const TetMeshDesc& mesh = meshes_[mesh_index];
     const int mesh_base = mesh_offsets_[mesh_index].q;
-    const auto model = makeEnergy(mesh.material);
+    const auto model = createEnergy(mesh.material);
     for (const auto& tet : mesh.tets) {
       const Eigen::Matrix3d local_X = restTetEdges(mesh, tet);
       const double volume = local_X.determinant() / 6.0;
@@ -351,7 +354,7 @@ void FEMSubsystem::assembleElasticGradient(const Eigen::VectorXd& localQ,
        ++mesh_index) {
     const TetMeshDesc& mesh = meshes_[mesh_index];
     const int mesh_base = mesh_offsets_[mesh_index].q;
-    const auto model = makeEnergy(mesh.material);
+    const auto model = createEnergy(mesh.material);
     for (const auto& tet : mesh.tets) {
       const Eigen::Matrix3d local_X = restTetEdges(mesh, tet);
       const double volume = local_X.determinant() / 6.0;
@@ -379,7 +382,7 @@ void FEMSubsystem::assembleElasticHessian(
        ++mesh_index) {
     const TetMeshDesc& mesh = meshes_[mesh_index];
     const int mesh_base = mesh_offsets_[mesh_index].q;
-    const auto model = makeEnergy(mesh.material);
+    const auto model = createEnergy(mesh.material);
     for (const auto& tet : mesh.tets) {
       const Eigen::Matrix3d local_X = restTetEdges(mesh, tet);
       const double volume = local_X.determinant() / 6.0;
@@ -411,77 +414,49 @@ void FEMSubsystem::assembleElasticHessian(
   }
 }
 
-int FEMSubsystem::vectorOffset(const Eigen::VectorXd& values,
-                               int localOffset) const
-{
-  if (values.size() == range_.scalarCount) {
-    return localOffset;
-  }
-  return range_.scalarOffset + localOffset;
-}
-
-Eigen::VectorXd FEMSubsystem::gatherLocalVector(
-    const Eigen::VectorXd& values) const
-{
-  Eigen::VectorXd local(range_.scalarCount);
-  for (int i = 0; i < range_.scalarCount; ++i) {
-    local[i] = values[vectorOffset(values, i)];
-  }
-  return local;
-}
-
 glm::dvec3 FEMSubsystem::vertexPosition(int mesh, int vertex) const
 {
-  return initialPosition(meshes_.at(static_cast<size_t>(mesh)), vertex);
+  return initialPosition(meshes_.at(mesh), vertex);
+}
+
+glm::dvec3 FEMSubsystem::restVertexPosition(int mesh, int vertex) const
+{
+  return meshes_.at(mesh).vertices.at(vertex);
 }
 
 void FEMSubsystem::setVertexPosition(int mesh,
                                      int vertex,
                                      const glm::dvec3& position)
 {
-  TetMeshDesc& desc = meshes_.at(static_cast<size_t>(mesh));
+  TetMeshDesc& desc = meshes_.at(mesh);
   if (desc.initialPositions.empty()) {
     desc.initialPositions = desc.vertices;
   }
-  desc.initialPositions.at(static_cast<size_t>(vertex)) = position;
+  desc.initialPositions.at(vertex) = position;
 }
 
 glm::dvec3 FEMSubsystem::vertexVelocity(int mesh, int vertex) const
 {
-  return initialVelocity(meshes_.at(static_cast<size_t>(mesh)), vertex);
+  return initialVelocity(meshes_.at(mesh), vertex);
 }
 
 void FEMSubsystem::setVertexVelocity(int mesh,
                                      int vertex,
                                      const glm::dvec3& velocity)
 {
-  TetMeshDesc& desc = meshes_.at(static_cast<size_t>(mesh));
+  TetMeshDesc& desc = meshes_.at(mesh);
   if (desc.initialVelocities.empty()) {
     desc.initialVelocities.resize(desc.vertices.size(), glm::dvec3(0.0));
   }
-  desc.initialVelocities.at(static_cast<size_t>(vertex)) = velocity;
+  desc.initialVelocities.at(vertex) = velocity;
 }
 
 int FEMSubsystem::constraintLocalOffset(
     const FEMConstraintBinding& binding) const
 {
-  if (binding.mesh < 0 || binding.mesh >= static_cast<int>(meshes_.size())) {
-    throw std::runtime_error("FEM constraint binding references invalid mesh");
-  }
   const TetMeshDesc& mesh = meshes_[binding.mesh];
-  if (binding.constraint.sample < 0 ||
-      binding.constraint.sample >= static_cast<int>(mesh.vertices.size())) {
-    throw std::runtime_error("FEM constraint binding references invalid sample");
-  }
   const int lane = propertyLane(binding.constraint.property);
   return mesh_offsets_[binding.mesh].q + 3 * binding.constraint.sample + lane;
-}
-
-void FEMSubsystem::addToVector(Eigen::VectorXd& values,
-                               int localOffset,
-                               double value) const
-{
-  values[vectorOffset(values, localOffset)] += value;
 }
 
 }  // namespace ksk::engine::fem

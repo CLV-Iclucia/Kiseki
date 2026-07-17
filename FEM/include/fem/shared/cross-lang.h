@@ -30,8 +30,8 @@
   #include <cmath>
 
   namespace ksk::fem::shared {
-  using sh_real  = double;
-  using sh_real3 = glm::dvec3;
+  using real  = double;
+  using real3 = glm::dvec3;
   }  // namespace ksk::fem::shared
 
   #define SH_NS_BEGIN  namespace ksk::fem::shared {
@@ -58,28 +58,28 @@
 SH_NS_BEGIN
 
 // Full-precision double dot product (do NOT use the float-only dot() intrinsic).
-SH_INLINE sh_real shDot(sh_real3 a, sh_real3 b) {
+SH_INLINE real shDot(real3 a, real3 b) {
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
 // Full-precision double cross product (do NOT use the float-only cross() intrinsic).
-SH_INLINE sh_real3 shCross(sh_real3 a, sh_real3 b) {
-    return sh_real3(a.y * b.z - a.z * b.y,
+SH_INLINE real3 shCross(real3 a, real3 b) {
+    return real3(a.y * b.z - a.z * b.y,
                     a.z * b.x - a.x * b.z,
                     a.x * b.y - a.y * b.x);
 }
 
-SH_INLINE sh_real shMax(sh_real a, sh_real b) { return a > b ? a : b; }
+SH_INLINE real shMax(real a, real b) { return a > b ? a : b; }
 
 // Full-precision double sqrt. HLSL's sqrt() intrinsic is float-only, so on the
 // GPU we seed with the float sqrt and refine with two Newton iterations
 // y <- 0.5*(y + x/y), recovering full double precision (same trick as dsqrt).
-SH_INLINE sh_real shSqrt(sh_real x) {
+SH_INLINE real shSqrt(real x) {
 #ifdef __cplusplus
     return std::sqrt(x);
 #else
     if (x <= 0.0) return 0.0;
-    sh_real y = (sh_real)sqrt((float)x);
+    real y = (real)sqrt((float)x);
     y = 0.5 * (y + x / y);
     y = 0.5 * (y + x / y);
     return y;
@@ -91,7 +91,7 @@ SH_INLINE sh_real shSqrt(sh_real x) {
 // folded to [sqrt(1/2), sqrt(2)) so |s|<=0.172) and evaluate the atanh series
 //   ln(m) = 2*(s + s^3/3 + s^5/5 + ...),  s = (m-1)/(m+1)
 // to 11 terms (full double for |s|<=0.172), then add e*ln2.
-SH_INLINE sh_real shLog(sh_real x) {
+SH_INLINE real shLog(real x) {
 #ifdef __cplusplus
     return std::log(x);
 #else
@@ -100,11 +100,11 @@ SH_INLINE sh_real shLog(sh_real x) {
     asuint(x, lo, hi);
     int e = (int)((hi >> 20) & 0x7FFu) - 1023;
     uint mhi = (hi & 0x000FFFFFu) | 0x3FF00000u;  // force exponent 0 -> m in [1,2)
-    sh_real m = asdouble(lo, mhi);
+    real m = asdouble(lo, mhi);
     if (m > 1.4142135623730951) { m *= 0.5; e += 1; }
-    sh_real s  = (m - 1.0) / (m + 1.0);
-    sh_real s2 = s * s;
-    sh_real p  = 2.0 / 21.0;
+    real s  = (m - 1.0) / (m + 1.0);
+    real s2 = s * s;
+    real p  = 2.0 / 21.0;
     p = p * s2 + 2.0 / 19.0;
     p = p * s2 + 2.0 / 17.0;
     p = p * s2 + 2.0 / 15.0;
@@ -115,7 +115,7 @@ SH_INLINE sh_real shLog(sh_real x) {
     p = p * s2 + 2.0 / 5.0;
     p = p * s2 + 2.0 / 3.0;
     p = p * s2 + 2.0;
-    return (sh_real)e * 0.69314718055994530942 + s * p;
+    return (real)e * 0.69314718055994530942 + s * p;
 #endif
 }
 

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <Runtime/buffers.h>
 #include <Runtime/contact-table.h>
@@ -8,17 +8,18 @@
 
 #include <variant>
 #include <vector>
+#include <map>
 
 namespace ksk::runtime {
 
-struct SubsystemContactTable {
+struct SubsystemContactData {
   SubsystemId subsystem = -1;
-  ContactTable contacts;
+  ContactStencils contacts;
 };
 
-struct RoutedContactTables {
-  ContactTable globalContacts;
-  std::vector<SubsystemContactTable> internalContacts;
+struct GlobalContactRouter {
+  ContactStencils globalContacts;
+  std::map<SubsystemId, SubsystemContactData> subsystemInternalContacts;
 };
 
 struct DeviceContactTable {
@@ -38,7 +39,7 @@ struct DeviceRoutedContactTables {
 };
 
 using ContactDetectionOutput =
-    std::variant<RoutedContactTables, DeviceRoutedContactTables>;
+    std::variant<GlobalContactRouter, DeviceRoutedContactTables>;
 
 enum class ContactDetectionStorage {
   Auto,
@@ -55,7 +56,7 @@ struct ContactDetectionConfig {
   Real toi = 1.0;
 };
 
-[[nodiscard]] RoutedContactTables detectContactsAlongDirection(
+[[nodiscard]] GlobalContactRouter runCCD(
     const GlobalGeometryManager& geometry,
     const GeometryBuffer& geometryDirection,
     const ContactDetectionConfig& config = {});

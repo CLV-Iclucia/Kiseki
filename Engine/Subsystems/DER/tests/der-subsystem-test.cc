@@ -129,7 +129,6 @@ TEST(DERSubsystem, EmitsCenterlineGeometry)
   EXPECT_EQ(geometry.points.size(), 3);
   EXPECT_EQ(geometry.edges.size(), 2);
   EXPECT_TRUE(geometry.triangles.empty());
-  EXPECT_EQ(geometry.points[0].subsystem, runtime::SubsystemId{2});
   EXPECT_EQ(geometry.points[1].localSampleId, 1);
   EXPECT_DOUBLE_EQ(geometry.edges[0].radius, 0.5);
 }
@@ -148,7 +147,7 @@ TEST(DERSubsystem, MapsOnlyPositionDirectionToGeometry)
   dq.cpu()[7] = 20.0;
 
   auto dx = runtime::GeometryBuffer::CPU(3);
-  subsystem.mapDirectionToGeometry(dq, dx);
+  subsystem.mapLocalDirectionToGeometry(dq.view(), dx.view());
 
   EXPECT_DOUBLE_EQ(dx.cpu()[0].x, 1.0);
   EXPECT_DOUBLE_EQ(dx.cpu()[0].y, 2.0);
@@ -156,25 +155,6 @@ TEST(DERSubsystem, MapsOnlyPositionDirectionToGeometry)
   EXPECT_DOUBLE_EQ(dx.cpu()[1].x, 0.0);
   EXPECT_DOUBLE_EQ(dx.cpu()[1].y, 0.0);
   EXPECT_DOUBLE_EQ(dx.cpu()[1].z, 0.0);
-}
-
-TEST(DERSubsystem, ContactGradientScattersOnlyToPositions)
-{
-  DERSubsystem subsystem(runtime::SubsystemId{0}, {makeStraightRod()});
-  runtime::GlobalGeometryManager geometry;
-  subsystem.declareGeometry(geometry);
-
-  const std::array<runtime::GeometryPointId, 1> points{geometry.points[1].id};
-  auto gradients =
-      runtime::GeometryBuffer::FromCPU({glm::dvec3(4.0, 5.0, 6.0)});
-  auto g = runtime::DofBuffer::CPU(subsystem.localScalarCount());
-
-  subsystem.scatterContactGradient(points, gradients, g);
-
-  EXPECT_DOUBLE_EQ(g.cpu()[4], 4.0);
-  EXPECT_DOUBLE_EQ(g.cpu()[5], 5.0);
-  EXPECT_DOUBLE_EQ(g.cpu()[6], 6.0);
-  EXPECT_DOUBLE_EQ(g.cpu()[7], 0.0);
 }
 
 TEST(DERSubsystem, UsesRodEvaluationForLocalGradient)
@@ -188,7 +168,7 @@ TEST(DERSubsystem, UsesRodEvaluationForLocalGradient)
   DERSubsystem subsystem(runtime::SubsystemId{0}, {rod});
   subsystem.prepareLocalOperator(0.01);
   auto g = runtime::DofBuffer::CPU(subsystem.localScalarCount());
-  subsystem.assembleLocalGradient(g);
+  subsystem.assembleLocalGradient(g.view());
 
   for (int vertex = 0; vertex < 3; ++vertex) {
     for (int lane = 0; lane < 4; ++lane) {

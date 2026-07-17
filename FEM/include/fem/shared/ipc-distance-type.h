@@ -47,11 +47,11 @@ SH_NS_BEGIN
 // decideEdgeEdgeParallelDistanceType
 // ===========================================================================
 SH_INLINE int shDecideEdgeEdgeParallelDistanceType(
-    sh_real3 ea0, sh_real3 ea1, sh_real3 eb0, sh_real3 eb1) {
-    sh_real3 ea    = ea1 - ea0;
-    sh_real  eaSq  = shDot(ea, ea);
-    sh_real  alpha = shDot(eb0 - ea0, ea) / eaSq;
-    sh_real  beta  = shDot(eb1 - ea0, ea) / eaSq;
+    real3 ea0, real3 ea1, real3 eb0, real3 eb1) {
+    real3 ea    = ea1 - ea0;
+    real  eaSq  = shDot(ea, ea);
+    real  alpha = shDot(eb0 - ea0, ea) / eaSq;
+    real  beta  = shDot(eb1 - ea0, ea) / eaSq;
 
     int eac;  // 0: EA0, 1: EA1, 2: EA
     int ebc;  // 0: EB0, 1: EB1, 2: EB
@@ -74,32 +74,32 @@ SH_INLINE int shDecideEdgeEdgeParallelDistanceType(
 // decideEdgeEdgeDistanceType
 // ===========================================================================
 SH_INLINE int shDecideEdgeEdgeDistanceType(
-    sh_real3 ea0, sh_real3 ea1, sh_real3 eb0, sh_real3 eb1) {
-    const sh_real PARALLEL_THRESHOLD = 1.0e-20;
+    real3 ea0, real3 ea1, real3 eb0, real3 eb1) {
+    const real PARALLEL_THRESHOLD = 1.0e-20;
 
-    sh_real3 u = ea1 - ea0;
-    sh_real3 v = eb1 - eb0;
-    sh_real3 w = ea0 - eb0;
+    real3 u = ea1 - ea0;
+    real3 v = eb1 - eb0;
+    real3 w = ea0 - eb0;
 
-    sh_real a = shDot(u, u);
-    sh_real b = shDot(u, v);
-    sh_real c = shDot(v, v);
-    sh_real d = shDot(u, w);
-    sh_real e = shDot(v, w);
-    sh_real D = a * c - b * b;
+    real a = shDot(u, u);
+    real b = shDot(u, v);
+    real c = shDot(v, v);
+    real d = shDot(u, w);
+    real e = shDot(v, w);
+    real D = a * c - b * b;
 
     if (a == 0.0 && c == 0.0) return SH_EE_A_C;
     else if (a == 0.0)        return SH_EE_A_CD;
     else if (c == 0.0)        return SH_EE_AB_C;
 
-    sh_real  parallel_tolerance = PARALLEL_THRESHOLD * shMax(1.0, a * c);
-    sh_real3 uxv = shCross(u, v);
+    real  parallel_tolerance = PARALLEL_THRESHOLD * shMax(1.0, a * c);
+    real3 uxv = shCross(u, v);
     if (shDot(uxv, uxv) < parallel_tolerance)
         return shDecideEdgeEdgeParallelDistanceType(ea0, ea1, eb0, eb1);
 
     int     default_case = SH_EE_AB_CD;
-    sh_real sN = (b * e - c * d);
-    sh_real tN, tD;
+    real sN = (b * e - c * d);
+    real tN, tD;
     if (sN <= 0.0) {
         tN = e;
         tD = c;
@@ -140,32 +140,32 @@ SH_INLINE int shDecideEdgeEdgeDistanceType(
 // ===========================================================================
 // decidePointTriangleDistanceType (inline 2x2 edge projections)
 // ===========================================================================
-SH_INLINE void shPtEdgeTest(sh_real3 from, sh_real3 to, sh_real3 pt,
-                            sh_real3 normal, SH_OUT(sh_real) s, SH_OUT(sh_real) t) {
-    sh_real3 e = to - from;
-    sh_real3 n = shCross(e, normal);
+SH_INLINE void shPtEdgeTest(real3 from, real3 to, real3 pt,
+                            real3 normal, SH_OUT(real) s, SH_OUT(real) t) {
+    real3 e = to - from;
+    real3 n = shCross(e, normal);
     // 2x2 system [[e.e, e.n],[n.e, n.n]] * [s,t] = [e.rhs, n.rhs]
-    sh_real a00 = shDot(e, e), a01 = shDot(e, n);
-    sh_real a10 = a01,         a11 = shDot(n, n);
-    sh_real b0  = shDot(e, pt - from), b1 = shDot(n, pt - from);
-    sh_real det = a00 * a11 - a01 * a10;
+    real a00 = shDot(e, e), a01 = shDot(e, n);
+    real a10 = a01,         a11 = shDot(n, n);
+    real b0  = shDot(e, pt - from), b1 = shDot(n, pt - from);
+    real det = a00 * a11 - a01 * a10;
     s = (a11 * b0 - a01 * b1) / det;
     t = (a00 * b1 - a10 * b0) / det;
 }
 
 SH_INLINE int shDecidePointTriangleDistanceType(
-    sh_real3 p, sh_real3 t0, sh_real3 t1, sh_real3 t2) {
-    sh_real3 normal = shCross(t1 - t0, t2 - t0);
+    real3 p, real3 t0, real3 t1, real3 t2) {
+    real3 normal = shCross(t1 - t0, t2 - t0);
 
-    sh_real s0, t0v;
+    real s0, t0v;
     shPtEdgeTest(t0, t1, p, normal, s0, t0v);
     if (s0 > 0.0 && s0 < 1.0 && t0v >= 0.0) return SH_PT_P_AB;
 
-    sh_real s1, t1v;
+    real s1, t1v;
     shPtEdgeTest(t1, t2, p, normal, s1, t1v);
     if (s1 > 0.0 && s1 < 1.0 && t1v >= 0.0) return SH_PT_P_BC;
 
-    sh_real s2, t2v;
+    real s2, t2v;
     shPtEdgeTest(t2, t0, p, normal, s2, t2v);
     if (s2 > 0.0 && s2 < 1.0 && t2v >= 0.0) return SH_PT_P_CA;
 

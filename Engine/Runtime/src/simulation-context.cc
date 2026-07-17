@@ -1,19 +1,19 @@
-#include <Runtime/runtime-simulation.h>
+﻿#include <Runtime/simulation-context.h>
 
 #include <algorithm>
 #include <utility>
 
 namespace ksk::runtime {
 
-RuntimeSimulation::RuntimeSimulation(
+SimulationContext::SimulationContext(
     std::vector<std::unique_ptr<Subsystem>> subsystems,
     GlobalSolverConfig solver,
     glm::dvec3 gravity)
-    : RuntimeSimulation(std::move(subsystems), {}, solver, gravity)
+    : SimulationContext(std::move(subsystems), {}, solver, gravity)
 {
 }
 
-RuntimeSimulation::RuntimeSimulation(
+SimulationContext::SimulationContext(
     std::vector<std::unique_ptr<Subsystem>> subsystems,
     std::vector<std::string> subsystemTypeNames,
     GlobalSolverConfig solver,
@@ -27,7 +27,7 @@ RuntimeSimulation::RuntimeSimulation(
   rebuild();
 }
 
-void RuntimeSimulation::rebuild()
+void SimulationContext::rebuild()
 {
   scene_.dofs = {};
   scene_.geometry = {};
@@ -67,16 +67,17 @@ void RuntimeSimulation::rebuild()
   q_ = DofBuffer::CPU(scene_.dofs.totalScalars);
   qdot_ = DofBuffer::CPU(scene_.dofs.totalScalars);
   for (const auto& subsystem : subsystems_) {
-    subsystem->writeState(q_, qdot_);
+    const DofRange range = subsystem->dofRange();
+    subsystem->writeState(q_.slice(range), qdot_.slice(range));
   }
 }
 
-std::vector<std::unique_ptr<Subsystem>>& RuntimeSimulation::subsystems() noexcept
+std::vector<std::unique_ptr<Subsystem>>& SimulationContext::subsystems() noexcept
 {
   return subsystems_;
 }
 
-const std::vector<std::unique_ptr<Subsystem>>& RuntimeSimulation::subsystems()
+const std::vector<std::unique_ptr<Subsystem>>& SimulationContext::subsystems()
     const noexcept
 {
   return subsystems_;

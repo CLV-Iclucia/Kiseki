@@ -44,39 +44,38 @@ class DERSubsystem final : public runtime::Subsystem {
   [[nodiscard]] runtime::DofRange dofRange() const noexcept override;
 
   void declareGeometry(runtime::GlobalGeometryManager& geometry) override;
-  void writeState(runtime::DofBuffer& q,
-                  runtime::DofBuffer& qdot) const override;
-  void readState(runtime::DofBuffer& q,
-                 runtime::DofBuffer& qdot) override;
-  void beginStep(const runtime::DofBuffer& q,
-                 const runtime::DofBuffer& qdot,
+  void writeState(runtime::DofView q,
+                  runtime::DofView qdot) const override;
+  void readState(runtime::ConstDofView q,
+                 runtime::ConstDofView qdot) override;
+  void beginStep(runtime::ConstDofView q,
+                 runtime::ConstDofView qdot,
                  double dt) override;
-  void acceptStep(const runtime::DofBuffer& q,
-                  runtime::DofBuffer& qdot,
+  void acceptStep(runtime::ConstDofView q,
+                  runtime::DofView qdot,
                   double dt) override;
-  [[nodiscard]] double evaluateObjective(const runtime::DofBuffer& q,
-                                         const runtime::DofBuffer& qdot,
+  [[nodiscard]] double evaluateObjective(runtime::ConstDofView q,
+                                         runtime::ConstDofView qdot,
                                          double dt) override;
 
   void updateInternalConstraints(double time, double dt) override;
   void prepareLocalOperator(double dt) override;
-  void assembleLocalGradient(runtime::DofBuffer& g) const override;
-  void applyLocalMatrix(const runtime::DofBuffer& x,
-                        runtime::DofBuffer& y) const override;
-  void solveLocalSystem(const runtime::DofBuffer& b,
-                        runtime::DofBuffer& x) const override;
+  void assembleLocalGradient(runtime::DofView g) const override;
+  void applyLocalMatrix(runtime::ConstDofView x,
+                        runtime::DofView y) const override;
+  void solveLocalSystem(runtime::ConstDofView b,
+                        runtime::DofView x) const override;
 
   void updateGeometry(runtime::GlobalGeometryManager& geometry) const override;
-  void mapDirectionToGeometry(const runtime::DofBuffer& dq,
-                              runtime::GeometryBuffer& dx) const override;
-  void setInternalContacts(runtime::ContactTable contacts) override;
+  void mapLocalDirectionToGeometry(runtime::ConstDofView localDq,
+                              runtime::GeometryView globalDx) const override;
+  void applyInternalContacts(runtime::ContactStencils contacts) override;
   void scatterContactGradient(
-      std::span<const runtime::GeometryPointId> points,
-      const runtime::GeometryBuffer& pointGradient,
-      runtime::DofBuffer& g) const override;
-  void applyContactHessian(const runtime::DofBuffer& dq,
-                           const runtime::ContactTable& contacts,
-                           runtime::DofBuffer& y) const override;
+      std::span<const runtime::PointIdx> points,
+      runtime::ConstGeometryView pointGradient,
+      runtime::DofView g) const override;
+  void applyInternalContactHessian(runtime::ConstDofView localDq,
+                                   runtime::DofView localY) const override;
   void visit(runtime::CpuSubsystemBackend& backend) override;
   void visit(runtime::GpuSubsystemBackend& backend) override;
 
@@ -84,16 +83,20 @@ class DERSubsystem final : public runtime::Subsystem {
   [[nodiscard]] std::vector<Rod>& rods() noexcept { return rods_; }
   [[nodiscard]] const std::vector<DERRodOffset>& rodOffsets() const noexcept;
   [[nodiscard]] const std::vector<DERGeometrySample>& geometrySamples() const noexcept;
-  [[nodiscard]] const std::vector<runtime::GeometryPointId>& geometryPointIds() const noexcept;
+  [[nodiscard]] const std::vector<runtime::PointIdx>& geometryPointIds() const noexcept;
   [[nodiscard]] const RodEvaluation& cachedEvaluation(int rod) const;
   [[nodiscard]] int localScalarCount() const noexcept;
   [[nodiscard]] glm::dvec3 gravity() const noexcept { return gravity_; }
 
  private:
+  friend class DERCPUBackend;
+
   void updateSceneConstraints(double time);
   void rebuildSamples();
-  [[nodiscard]] bool usesGPU(const runtime::DofBuffer& buffer) const noexcept;
-  [[nodiscard]] bool usesGPU(const runtime::GeometryBuffer& buffer) const noexcept;
+  [[nodiscard]] bool usesGPU(runtime::ConstDofView view) const noexcept;
+  [[nodiscard]] bool usesGPU(runtime::DofView view) const noexcept;
+  [[nodiscard]] bool usesGPU(runtime::ConstGeometryView view) const noexcept;
+  [[nodiscard]] bool usesGPU(runtime::GeometryView view) const noexcept;
 
   runtime::SubsystemId id_;
   runtime::DofRange range_;
@@ -102,8 +105,8 @@ class DERSubsystem final : public runtime::Subsystem {
   std::vector<DERConstraintBinding> constraints_;
   std::vector<DERRodOffset> rod_offsets_;
   std::vector<DERGeometrySample> samples_;
-  std::vector<runtime::GeometryPointId> geometry_points_;
-  runtime::ContactTable internal_contacts_;
+  std::vector<runtime::PointIdx> geometry_points_;
+  runtime::ContactStencils internal_contacts_;
   std::unique_ptr<DERCPUBackend> cpu_backend_;
   std::unique_ptr<DERGpuBackend> gpu_backend_;
 };

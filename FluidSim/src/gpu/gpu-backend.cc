@@ -5,6 +5,7 @@
 
 #include <FluidSim/gpu/gpu-backend.h>
 #include <FluidSim/gpu/gpu-advector.h>
+#include <FluidSim/gpu/gpu-marching-cubes.h>
 #include <FluidSim/gpu/gpu-projector.h>
 #include <FluidSim/gpu/gpu-reconstructor.h>
 
@@ -69,6 +70,7 @@ void GPUFluidBackend::initialize(const FluidScene& scene) {
     advector_      = std::make_unique<GPUAdvector>(device_, grid_);
     projector_     = std::make_unique<GPUProjector>(device_, grid_, config_);
     reconstructor_ = std::make_unique<GPUReconstructor>(device_, grid_);
+    surfaceMesher_ = std::make_unique<GPUMarchingCubes>(device_, grid_);
 
     // 6. CFL reduction buffers
     {
@@ -175,6 +177,10 @@ void GPUFluidBackend::step(Real dt) {
         SIM_PROFILE_SCOPE("GPUFluid/ReconstructSurface");
         reconstructor_->execute(*cmd, grid_);
     }
+    if (surfaceMesher_) {
+        SIM_PROFILE_SCOPE("GPUFluid/ExtractSurfaceMesh");
+        surfaceMesher_->execute(*cmd, grid_);
+    }
 
     {
         SIM_PROFILE_SCOPE("GPUFluid/SubmitStep");
@@ -210,6 +216,14 @@ void GPUFluidBackend::readbackParticles(FluidFrame& out) {
     }
     readbackPos_->unmap();
     readbackVel_->unmap();
+}
+
+bool GPUFluidBackend::readbackSurfaceMesh(FluidSurfaceMesh& out) {
+    if (!surfaceMesher_) {
+        out = {};
+        return false;
+    }
+    return surfaceMesher_->readback(device_, out);
 }
 
 void GPUFluidBackend::updateCollider(const Mesh& mesh) {

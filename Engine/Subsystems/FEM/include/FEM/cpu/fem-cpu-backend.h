@@ -16,35 +16,34 @@ class FEMCPUBackend {
  public:
   explicit FEMCPUBackend(FEMSubsystem& subsystem);
 
-  void writeState(runtime::DofBuffer& q, runtime::DofBuffer& qdot) const;
-  void readState(runtime::DofBuffer& q, runtime::DofBuffer& qdot);
-  void beginStep(const runtime::DofBuffer& q,
-                 const runtime::DofBuffer& qdot,
+  void writeState(runtime::DofView q, runtime::DofView qdot) const;
+  void readState(runtime::ConstDofView q, runtime::ConstDofView qdot);
+  void beginStep(runtime::ConstDofView q,
+                 runtime::ConstDofView qdot,
                  double dt);
-  void acceptStep(const runtime::DofBuffer& q,
-                  runtime::DofBuffer& qdot,
+  void acceptStep(runtime::ConstDofView q,
+                  runtime::DofView qdot,
                   double dt);
-  [[nodiscard]] double evaluateObjective(const runtime::DofBuffer& q,
-                                         const runtime::DofBuffer& qdot,
+  [[nodiscard]] double evaluateObjective(runtime::ConstDofView q,
+                                         runtime::ConstDofView qdot,
                                          double dt);
 
   void updateInternalConstraints(double time, double dt);
   void prepareLocalOperator(double dt);
-  void assembleLocalGradient(runtime::DofBuffer& g) const;
-  void applyLocalMatrix(const runtime::DofBuffer& x,
-                        runtime::DofBuffer& y) const;
-  void solveLocalSystem(const runtime::DofBuffer& b,
-                        runtime::DofBuffer& x) const;
+  void assembleLocalGradient(runtime::DofView g) const;
+  void applyLocalMatrix(runtime::ConstDofView x,
+                        runtime::DofView y) const;
+  void solveLocalSystem(runtime::ConstDofView b,
+                        runtime::DofView x) const;
 
-  void mapDirectionToGeometry(const runtime::DofBuffer& dq,
-                              runtime::GeometryBuffer& dx) const;
+  void mapLocalDirectionToGeometry(runtime::ConstDofView localDq,
+                              runtime::GeometryView globalDx) const;
   void scatterContactGradient(
-      std::span<const runtime::GeometryPointId> points,
-      const runtime::GeometryBuffer& pointGradient,
-      runtime::DofBuffer& g) const;
-  void applyContactHessian(const runtime::DofBuffer& dq,
-                           const runtime::ContactTable& contacts,
-                           runtime::DofBuffer& y) const;
+      std::span<const runtime::PointIdx> points,
+      runtime::ConstGeometryView pointGradient,
+      runtime::DofView g) const;
+  void applyInternalContactHessian(runtime::ConstDofView localDq,
+                                   runtime::DofView localY) const;
 
  private:
   [[nodiscard]] Eigen::VectorXd buildMassDiagonal() const;

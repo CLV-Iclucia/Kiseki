@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <cstddef>
 
@@ -7,7 +7,7 @@ namespace ksk::runtime {
 using Real = double;
 
 using SubsystemId = int;
-using GeometryPointId = int;
+using PointIdx = int;
 
 using ObjectId = int;
 using ObjectTypeId = const void*;

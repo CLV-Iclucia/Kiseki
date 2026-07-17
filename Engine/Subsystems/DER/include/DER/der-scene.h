@@ -2,6 +2,8 @@
 
 #include <DER/rod.h>
 #include <Runtime/runtime-scene.h>
+#include <SceneObjects/hair.h>
+#include <SceneObjects/rod.h>
 
 #include <string>
 #include <string_view>
@@ -10,7 +12,7 @@
 
 namespace ksk::der {
 
-struct RodObject {};
+using RodObject = scene::RodObject;
 
 struct DERRodDesc {
   std::vector<RodDof> restBlocks;
@@ -56,3 +58,10 @@ struct RodObjectDesc final : runtime::SceneObjectDesc {
 
 runtime::ObjectRef addRod(runtime::RuntimeSceneDesc& scene, DERRodDesc rod);
 }  // namespace ksk::der
+
+namespace ksk::scene {
+
+[[nodiscard]] runtime::ObjectRef addHair(runtime::RuntimeSceneDesc& scene,
+                                         HairObjectDesc hair);
+
+}  // namespace ksk::scene

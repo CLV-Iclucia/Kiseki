@@ -49,39 +49,38 @@ class FEMSubsystem final : public runtime::Subsystem {
   [[nodiscard]] runtime::DofRange dofRange() const noexcept override;
 
   void declareGeometry(runtime::GlobalGeometryManager& geometry) override;
-  void writeState(runtime::DofBuffer& q,
-                  runtime::DofBuffer& qdot) const override;
-  void readState(runtime::DofBuffer& q,
-                 runtime::DofBuffer& qdot) override;
-  void beginStep(const runtime::DofBuffer& q,
-                 const runtime::DofBuffer& qdot,
+  void writeState(runtime::DofView q,
+                  runtime::DofView qdot) const override;
+  void readState(runtime::ConstDofView q,
+                 runtime::ConstDofView qdot) override;
+  void beginStep(runtime::ConstDofView q,
+                 runtime::ConstDofView qdot,
                  double dt) override;
-  void acceptStep(const runtime::DofBuffer& q,
-                  runtime::DofBuffer& qdot,
+  void acceptStep(runtime::ConstDofView q,
+                  runtime::DofView qdot,
                   double dt) override;
-  [[nodiscard]] double evaluateObjective(const runtime::DofBuffer& q,
-                                         const runtime::DofBuffer& qdot,
+  [[nodiscard]] double evaluateObjective(runtime::ConstDofView q,
+                                         runtime::ConstDofView qdot,
                                          double dt) override;
 
   void updateInternalConstraints(double time, double dt) override;
   void prepareLocalOperator(double dt) override;
-  void assembleLocalGradient(runtime::DofBuffer& g) const override;
-  void applyLocalMatrix(const runtime::DofBuffer& x,
-                        runtime::DofBuffer& y) const override;
-  void solveLocalSystem(const runtime::DofBuffer& b,
-                        runtime::DofBuffer& x) const override;
+  void assembleLocalGradient(runtime::DofView g) const override;
+  void applyLocalMatrix(runtime::ConstDofView x,
+                        runtime::DofView y) const override;
+  void solveLocalSystem(runtime::ConstDofView b,
+                        runtime::DofView x) const override;
 
   void updateGeometry(runtime::GlobalGeometryManager& geometry) const override;
-  void mapDirectionToGeometry(const runtime::DofBuffer& dq,
-                              runtime::GeometryBuffer& dx) const override;
-  void setInternalContacts(runtime::ContactTable contacts) override;
+  void mapLocalDirectionToGeometry(runtime::ConstDofView localDq,
+                              runtime::GeometryView globalDx) const override;
+  void applyInternalContacts(runtime::ContactStencils contacts) override;
   void scatterContactGradient(
-      std::span<const runtime::GeometryPointId> points,
-      const runtime::GeometryBuffer& pointGradient,
-      runtime::DofBuffer& g) const override;
-  void applyContactHessian(const runtime::DofBuffer& dq,
-                           const runtime::ContactTable& contacts,
-                           runtime::DofBuffer& y) const override;
+      std::span<const runtime::PointIdx> points,
+      runtime::ConstGeometryView pointGradient,
+      runtime::DofView g) const override;
+  void applyInternalContactHessian(runtime::ConstDofView localDq,
+                                   runtime::DofView localY) const override;
   void visit(runtime::CpuSubsystemBackend& backend) override;
   void visit(runtime::GpuSubsystemBackend& backend) override;
 
@@ -94,7 +93,7 @@ class FEMSubsystem final : public runtime::Subsystem {
   {
     return samples_;
   }
-  [[nodiscard]] const std::vector<runtime::GeometryPointId>& geometryPointIds()
+  [[nodiscard]] const std::vector<runtime::PointIdx>& geometryPointIds()
       const noexcept
   {
     return geometry_points_;
@@ -118,20 +117,13 @@ class FEMSubsystem final : public runtime::Subsystem {
   void assembleElasticHessian(
       const Eigen::VectorXd& localQ,
       std::vector<Eigen::Triplet<double>>& triplets) const;
-  [[nodiscard]] int vectorOffset(const Eigen::VectorXd& values,
-                                 int localOffset) const;
-  [[nodiscard]] Eigen::VectorXd gatherLocalVector(
-      const Eigen::VectorXd& values) const;
   [[nodiscard]] glm::dvec3 vertexPosition(int mesh, int vertex) const;
+  [[nodiscard]] glm::dvec3 restVertexPosition(int mesh, int vertex) const;
   void setVertexPosition(int mesh, int vertex, const glm::dvec3& position);
   [[nodiscard]] glm::dvec3 vertexVelocity(int mesh, int vertex) const;
   void setVertexVelocity(int mesh, int vertex, const glm::dvec3& velocity);
   [[nodiscard]] int constraintLocalOffset(
       const FEMConstraintBinding& binding) const;
-  void addToVector(Eigen::VectorXd& values,
-                   int localOffset,
-                   double value) const;
-
   runtime::SubsystemId id_;
   runtime::DofRange range_;
   glm::dvec3 gravity_;
@@ -140,8 +132,8 @@ class FEMSubsystem final : public runtime::Subsystem {
   std::vector<ActiveConstraint> active_constraints_;
   std::vector<FEMMeshOffset> mesh_offsets_;
   std::vector<FEMVertexSample> samples_;
-  std::vector<runtime::GeometryPointId> geometry_points_;
-  runtime::ContactTable internal_contacts_;
+  std::vector<runtime::PointIdx> geometry_points_;
+  runtime::ContactStencils internal_contacts_;
   std::unique_ptr<FEMCPUBackend> cpu_backend_;
 };
 

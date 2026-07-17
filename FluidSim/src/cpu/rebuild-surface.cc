@@ -6,7 +6,6 @@
 #include <FluidSim/cpu/sdf.h>
 #include <unordered_map>
 #include <array>
-#include <map>
 
 namespace fluid::cpu {
 // Still, all the tables in this code come from fluid-engine-dev

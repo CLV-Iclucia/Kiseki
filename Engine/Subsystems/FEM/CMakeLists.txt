@@ -15,7 +15,7 @@ set(ENGINE_FEM_HEADERS
 add_library(EngineFEM STATIC ${ENGINE_FEM_SOURCES} ${ENGINE_FEM_HEADERS})
 add_library(Kiseki::EngineFEM ALIAS EngineFEM)
 target_include_directories(EngineFEM PUBLIC include)
-target_link_libraries(EngineFEM PUBLIC Kiseki::Core Kiseki::Runtime Kiseki::Deform Eigen3::Eigen)
+target_link_libraries(EngineFEM PUBLIC Kiseki::Core Kiseki::Runtime Kiseki::SceneObjects Kiseki::Deform Kiseki::EngineContactIPC Eigen3::Eigen)
 target_compile_features(EngineFEM PUBLIC cxx_std_20)
 
 enable_testing()

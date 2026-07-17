@@ -53,7 +53,6 @@ TEST(FEMSubsystem, EmitsSurfaceGeometry)
   EXPECT_EQ(geometry.points.size(), 4);
   EXPECT_EQ(geometry.edges.size(), 6);
   EXPECT_EQ(geometry.triangles.size(), 4);
-  EXPECT_EQ(geometry.points[0].subsystem, runtime::SubsystemId{3});
   EXPECT_EQ(geometry.points[2].localSampleId, 2);
 }
 
@@ -69,29 +68,11 @@ TEST(FEMSubsystem, MapsPositionDirectionToGeometry)
   dq.cpu()[5] = 3.0;
 
   auto dx = runtime::GeometryBuffer::CPU(4);
-  subsystem.mapDirectionToGeometry(dq, dx);
+  subsystem.mapLocalDirectionToGeometry(dq.view(), dx.view());
 
   EXPECT_DOUBLE_EQ(dx.cpu()[1].x, 1.0);
   EXPECT_DOUBLE_EQ(dx.cpu()[1].y, 2.0);
   EXPECT_DOUBLE_EQ(dx.cpu()[1].z, 3.0);
-}
-
-TEST(FEMSubsystem, ContactGradientScattersToPositions)
-{
-  FEMSubsystem subsystem(runtime::SubsystemId{0}, {makeSingleTet()});
-  runtime::GlobalGeometryManager geometry;
-  subsystem.declareGeometry(geometry);
-
-  const std::array<runtime::GeometryPointId, 1> points{geometry.points[2].id};
-  auto gradients =
-      runtime::GeometryBuffer::FromCPU({glm::dvec3(4.0, 5.0, 6.0)});
-  auto g = runtime::DofBuffer::CPU(subsystem.localScalarCount());
-
-  subsystem.scatterContactGradient(points, gradients, g);
-
-  EXPECT_DOUBLE_EQ(g.cpu()[6], 4.0);
-  EXPECT_DOUBLE_EQ(g.cpu()[7], 5.0);
-  EXPECT_DOUBLE_EQ(g.cpu()[8], 6.0);
 }
 
 TEST(FEMSubsystem, RestTetHasZeroElasticGradient)
@@ -99,12 +80,12 @@ TEST(FEMSubsystem, RestTetHasZeroElasticGradient)
   FEMSubsystem subsystem(runtime::SubsystemId{0}, {makeSingleTet()});
   auto q = runtime::DofBuffer::CPU(subsystem.localScalarCount());
   auto qdot = runtime::DofBuffer::CPU(subsystem.localScalarCount());
-  subsystem.writeState(q, qdot);
-  subsystem.beginStep(q, qdot, 0.01);
+  subsystem.writeState(q.view(), qdot.view());
+  subsystem.beginStep(q.view(), qdot.view(), 0.01);
   subsystem.prepareLocalOperator(0.01);
 
   auto g = runtime::DofBuffer::CPU(subsystem.localScalarCount());
-  subsystem.assembleLocalGradient(g);
+  subsystem.assembleLocalGradient(g.view());
 
   EXPECT_NEAR(g.norm(), 0.0, 1.0e-8);
 }
@@ -117,12 +98,12 @@ TEST(FEMSubsystem, DeformedTetHasElasticGradient)
   FEMSubsystem subsystem(runtime::SubsystemId{0}, {mesh});
   auto q = runtime::DofBuffer::CPU(subsystem.localScalarCount());
   auto qdot = runtime::DofBuffer::CPU(subsystem.localScalarCount());
-  subsystem.writeState(q, qdot);
-  subsystem.beginStep(q, qdot, 0.01);
+  subsystem.writeState(q.view(), qdot.view());
+  subsystem.beginStep(q.view(), qdot.view(), 0.01);
   subsystem.prepareLocalOperator(0.01);
 
   auto g = runtime::DofBuffer::CPU(subsystem.localScalarCount());
-  subsystem.assembleLocalGradient(g);
+  subsystem.assembleLocalGradient(g.view());
 
   EXPECT_GT(g.norm(), 1.0e-6);
 }
@@ -151,7 +132,7 @@ TEST(FEMSceneFrontend, BuildsRuntimeAndListsProperties)
   EXPECT_TRUE(has_property("z"));
   EXPECT_EQ(scene.constraints.size(), 1);
 
-  runtime::RuntimeSimulation simulation = runtime::buildSimulation(scene);
+  runtime::SimulationContext simulation = runtime::buildSimulation(scene);
   EXPECT_EQ(simulation.scene().dofs.totalScalars, 12);
   EXPECT_EQ(simulation.scene().geometry.points.size(), 4);
   EXPECT_EQ(simulation.scene().geometry.triangles.size(), 4);

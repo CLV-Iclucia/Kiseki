@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <functional>
 #include <memory>
@@ -17,7 +17,7 @@
 
 namespace ksk::runtime {
 
-class RuntimeSimulation;
+class SimulationContext;
 class Subsystem;
 class SubsystemBuildContext;
 struct RuntimeSceneDesc;
@@ -66,7 +66,7 @@ struct RuntimeScene {
   DofLayout dofs;
   std::vector<SubsystemBatch> subsystemBatches;
   GlobalGeometryManager geometry;
-  ContactTable contacts;
+  ContactStencils contacts;
   GlobalSolverConfig solverConfig;
   glm::dvec3 gravity{0.0, -9.81, 0.0};
   BufferLayout buffers;
@@ -167,7 +167,7 @@ class SubsystemBuildContext {
 
   void addSubsystem(std::unique_ptr<Subsystem> subsystem,
                     std::string typeName);
-  [[nodiscard]] RuntimeSimulation finish();
+  [[nodiscard]] SimulationContext finish();
 
  private:
   GlobalSolverConfig solver_;
@@ -266,6 +266,6 @@ struct RuntimeSceneDesc {
   }
 };
 
-[[nodiscard]] RuntimeSimulation buildSimulation(const RuntimeSceneDesc& scene);
+[[nodiscard]] SimulationContext buildSimulation(const RuntimeSceneDesc& scene);
 
 }  // namespace ksk::runtime

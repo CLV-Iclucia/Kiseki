@@ -16,28 +16,28 @@
 SH_NS_BEGIN
 
 // barrier energy b(d²) without kappa: ŝ²-free form t²·ln²(I5), t = d²-d̂².
-SH_INLINE sh_real shBarrierEnergy(sh_real dSqr, sh_real dHatSqr) {
+SH_INLINE real shBarrierEnergy(real dSqr, real dHatSqr) {
     if (dSqr >= dHatSqr) return 0.0;
     if (dSqr <= 0.0)     return 1e18;
-    sh_real I5 = dSqr / dHatSqr;
-    sh_real L  = shLog(I5);
-    sh_real t  = dSqr - dHatSqr;
+    real I5 = dSqr / dHatSqr;
+    real L  = shLog(I5);
+    real t  = dSqr - dHatSqr;
     return t * t * L * L;
 }
 
 // gradient scalar coefficient = 2·∂b/∂I5 (includes the chain factor 2).
-SH_INLINE sh_real shBarrierGradCoeff(sh_real I5, sh_real dHatSqr) {
+SH_INLINE real shBarrierGradCoeff(real I5, real dHatSqr) {
     if (I5 >= 1.0 || I5 <= 0.0) return 0.0;
-    sh_real sHat2 = dHatSqr * dHatSqr;
-    sh_real L = shLog(I5);
+    real sHat2 = dHatSqr * dHatSqr;
+    real L = shLog(I5);
     return 4.0 * sHat2 * L * (I5 - 1.0) * (I5 + I5 * L - 1.0) / I5;
 }
 
 // λ₀(I5): closed-form non-zero eigenvalue of the inner Hessian (no kappa).
-SH_INLINE sh_real shBarrierLambda0(sh_real I5, sh_real dHatSqr) {
+SH_INLINE real shBarrierLambda0(real I5, real dHatSqr) {
     if (I5 >= 1.0 || I5 <= 0.0) return 0.0;
-    sh_real sHat2 = dHatSqr * dHatSqr;
-    sh_real L = shLog(I5);
+    real sHat2 = dHatSqr * dHatSqr;
+    real L = shLog(I5);
     return -(4.0 * sHat2
              * (4.0 * I5 + L - 3.0 * I5 * I5 * L * L + 6.0 * I5 * L
                 - 2.0 * I5 * I5 + I5 * L * L - 7.0 * I5 * I5 * L - 2.0))
@@ -45,9 +45,9 @@ SH_INLINE sh_real shBarrierLambda0(sh_real I5, sh_real dHatSqr) {
 }
 
 // Gauss-threshold-guarded, SPD-projected λ₀ (no kappa).
-SH_INLINE sh_real shBarrierClampedLambda0(sh_real I5, sh_real dHatSqr) {
+SH_INLINE real shBarrierClampedLambda0(real I5, real dHatSqr) {
     if (I5 >= 1.0) return 0.0;
-    sh_real lam = (I5 < SH_GAUSS_THRESHOLD)
+    real lam = (I5 < SH_GAUSS_THRESHOLD)
                       ? shBarrierLambda0(SH_GAUSS_THRESHOLD, dHatSqr)
                       : shBarrierLambda0(I5, dHatSqr);
     return shMax(lam, 0.0);

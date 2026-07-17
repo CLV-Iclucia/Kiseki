@@ -1,4 +1,4 @@
-#include <Runtime/runtime-scene.h>
+﻿#include <Runtime/runtime-scene.h>
 
 #include <gtest/gtest.h>
 
@@ -23,7 +23,7 @@ TEST(RuntimeLayout, RuntimeSceneRefreshesBufferLayout)
 {
   RuntimeScene scene;
   scene.dofs.appendRange(SubsystemId{0}, 6, 3);
-  scene.geometry.appendPoint(SubsystemId{0}, 0, glm::dvec3{1.0, 2.0, 3.0});
+  scene.geometry.addPoint(SubsystemId{0}, 0, glm::dvec3{1.0, 2.0, 3.0});
 
   scene.refreshBufferLayout();
 

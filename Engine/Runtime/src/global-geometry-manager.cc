@@ -1,78 +1,85 @@
-#include <Runtime/global-geometry-manager.h>
+﻿#include <Runtime/global-geometry-manager.h>
 
 #include <stdexcept>
 
 namespace ksk::runtime {
 
-GeometryBounds& GeometryBounds::expand(const glm::dvec3& point) noexcept
-{
-  if (empty) {
-    lower = point;
-    upper = point;
-    empty = false;
-    return *this;
-  }
-  lower = glm::min(lower, point);
-  upper = glm::max(upper, point);
-  return *this;
-}
-
-GeometryPointId GlobalGeometryManager::appendPoint(SubsystemId subsystem,
+PointIdx GlobalGeometryManager::addPoint(SubsystemId subsystem,
                                            int localSampleId,
                                            const glm::dvec3& position)
 {
-  return appendPoint(GeometryOwner{
+  return addPoint(subsystem, localSampleId, position, position);
+}
+
+PointIdx GlobalGeometryManager::addPoint(
+    SubsystemId subsystem,
+    int localSampleId,
+    const glm::dvec3& position,
+    const glm::dvec3& restPosition)
+{
+  return addPoint(GeometryOwner{
                          .subsystem = subsystem,
                      },
                      localSampleId,
                      position,
+                     restPosition,
                      -1,
                      -1);
 }
 
-GeometryPointId GlobalGeometryManager::appendColliderPoint(
+PointIdx GlobalGeometryManager::addColliderPoint(
     int collider,
     int localSampleId,
     const glm::dvec3& position)
 {
-  return appendPoint(GeometryOwner{
+  return addColliderPoint(collider, localSampleId, position, position);
+}
+
+PointIdx GlobalGeometryManager::addColliderPoint(
+    int collider,
+    int localSampleId,
+    const glm::dvec3& position,
+    const glm::dvec3& restPosition)
+{
+  return addPoint(GeometryOwner{
                          .collider = collider,
                      },
                      localSampleId,
                      position,
+                     restPosition,
                      -1,
                      -1);
 }
 
-GeometryPointId GlobalGeometryManager::appendPoint(
+PointIdx GlobalGeometryManager::addPoint(
     const GeometryOwner& owner,
     int localSampleId,
     const glm::dvec3& position,
+    const glm::dvec3& restPosition,
     GeometryInstanceId instance,
     int instanceVertex)
 {
-  GeometryPointId id = static_cast<int>(points.size());
+  PointIdx id = static_cast<int>(points.size());
   if (owner.isSubsystem()) {
-    appendReference(point_ranges_, owner, id);
+    addReference(point_ranges_, owner, id);
   } else if (owner.isCollider()) {
-    appendReference(collider_point_ranges_, owner, id);
+    addReference(collider_point_ranges_, owner, id);
   } else {
     throw std::invalid_argument("geometry point owner is invalid");
   }
 
   points.push_back(GeometryPoint{
-      .id = id,
       .owner = owner,
-      .subsystem = owner.subsystem,
       .localSampleId = localSampleId,
       .instance = instance,
       .instanceVertex = instanceVertex,
       .x = position,
+      .restX = restPosition,
   });
   return id;
 }
 
-int GlobalGeometryManager::appendEdge(GeometryPointId p0, GeometryPointId p1, Real radius)
+int GlobalGeometryManager::addEdge(PointIdx p0, PointIdx p1, Real radius)
 {
   const GeometryPoint& first = checkedPoint(p0);
   const GeometryPoint& second = checkedPoint(p1);
@@ -83,10 +90,10 @@ int GlobalGeometryManager::appendEdge(GeometryPointId p0, GeometryPointId p1, Re
   }
   const int id = static_cast<int>(edges.size());
   const GeometryReference ref = first.owner.isSubsystem()
-                                    ? appendReference(edge_ranges_,
+                                    ? addReference(edge_ranges_,
                                                       first.owner,
                                                       id)
-                                    : appendReference(collider_edge_ranges_,
+                                    : addReference(collider_edge_ranges_,
                                                       first.owner,
                                                       id);
   edges.push_back(GeometryEdge{
@@ -99,9 +106,9 @@ int GlobalGeometryManager::appendEdge(GeometryPointId p0, GeometryPointId p1, Re
   return id;
 }
 
-int GlobalGeometryManager::appendTriangle(GeometryPointId p0,
-                                          GeometryPointId p1,
-                                          GeometryPointId p2,
+int GlobalGeometryManager::addTriangle(PointIdx p0,
+                                          PointIdx p1,
+                                          PointIdx p2,
                                           Real radius)
 {
   const GeometryPoint& first = checkedPoint(p0);
@@ -116,10 +123,10 @@ int GlobalGeometryManager::appendTriangle(GeometryPointId p0,
   }
   const int id = static_cast<int>(triangles.size());
   const GeometryReference ref = first.owner.isSubsystem()
-                                    ? appendReference(triangle_ranges_,
+                                    ? addReference(triangle_ranges_,
                                                       first.owner,
                                                       id)
-                                    : appendReference(
+                                    : addReference(
                                           collider_triangle_ranges_,
                                           first.owner,
                                           id);
@@ -129,18 +136,18 @@ int GlobalGeometryManager::appendTriangle(GeometryPointId p0,
       .p0 = p0,
       .p1 = p1,
       .p2 = p2,
-      .radius = radius,
+      .thickness = radius,
   });
   return id;
 }
 
-GeometryInstanceId GlobalGeometryManager::appendInstance(
+GeometryInstanceId GlobalGeometryManager::addInstance(
     SubsystemId subsystem,
     int localInstanceId,
     const GeometryMeshDesc& mesh,
     const glm::dmat4& transform)
 {
-  return appendInstance(GeometryOwner{
+  return addInstance(GeometryOwner{
                             .subsystem = subsystem,
                         },
                         localInstanceId,
@@ -148,13 +155,13 @@ GeometryInstanceId GlobalGeometryManager::appendInstance(
                         transform);
 }
 
-GeometryInstanceId GlobalGeometryManager::appendColliderInstance(
+GeometryInstanceId GlobalGeometryManager::addColliderInstance(
     int collider,
     int localInstanceId,
     const GeometryMeshDesc& mesh,
     const glm::dmat4& transform)
 {
-  return appendInstance(GeometryOwner{
+  return addInstance(GeometryOwner{
                             .collider = collider,
                         },
                         localInstanceId,
@@ -162,7 +169,7 @@ GeometryInstanceId GlobalGeometryManager::appendColliderInstance(
                         transform);
 }
 
-GeometryInstanceId GlobalGeometryManager::appendInstance(
+GeometryInstanceId GlobalGeometryManager::addInstance(
     const GeometryOwner& owner,
     int localInstanceId,
     const GeometryMeshDesc& mesh,
@@ -194,8 +201,9 @@ GeometryInstanceId GlobalGeometryManager::appendInstance(
   };
   for (int vertex = 0; vertex < static_cast<int>(mesh.vertices.size());
        ++vertex) {
-    appendPoint(owner,
+    addPoint(owner,
                 vertex,
+                mesh.vertices[static_cast<size_t>(vertex)],
                 mesh.vertices[static_cast<size_t>(vertex)],
                 instance_id,
                 vertex);
@@ -206,8 +214,8 @@ GeometryInstanceId GlobalGeometryManager::appendInstance(
       .count = static_cast<int>(mesh.edges.size()),
   };
   for (const auto& edge : mesh.edges) {
-    appendEdge(GeometryPointId{point_range.first + edge[0]},
-               GeometryPointId{point_range.first + edge[1]},
+    addEdge(PointIdx{point_range.first + edge[0]},
+               PointIdx{point_range.first + edge[1]},
                mesh.radius);
   }
 
@@ -216,9 +224,9 @@ GeometryInstanceId GlobalGeometryManager::appendInstance(
       .count = static_cast<int>(mesh.triangles.size()),
   };
   for (const auto& triangle : mesh.triangles) {
-    appendTriangle(GeometryPointId{point_range.first + triangle[0]},
-                   GeometryPointId{point_range.first + triangle[1]},
-                   GeometryPointId{point_range.first + triangle[2]},
+    addTriangle(PointIdx{point_range.first + triangle[0]},
+                   PointIdx{point_range.first + triangle[1]},
+                   PointIdx{point_range.first + triangle[2]},
                    mesh.radius);
   }
 
@@ -234,7 +242,7 @@ GeometryInstanceId GlobalGeometryManager::appendInstance(
   return instance_id;
 }
 
-bool GlobalGeometryManager::contains(GeometryPointId point) const noexcept
+bool GlobalGeometryManager::contains(PointIdx point) const noexcept
 {
   return point >= 0 && point < static_cast<int>(points.size());
 }
@@ -284,12 +292,11 @@ GeometryRange GlobalGeometryManager::colliderTriangleRange(int collider) const n
   return rangeFor(collider_triangle_ranges_, collider);
 }
 
-GeometryReference GlobalGeometryManager::pointRef(GeometryPointId point) const
+GeometryReference GlobalGeometryManager::pointRef(PointIdx point) const
 {
   const GeometryPoint& entry = checkedPoint(point);
   return {
       .owner = entry.owner,
-      .subsystem = entry.subsystem,
       .localIndex = entry.localSampleId,
   };
 }
@@ -304,35 +311,28 @@ GeometryReference GlobalGeometryManager::triangleRef(int triangle) const
   return checkedTriangle(triangle).ref;
 }
 
-GeometryOwner GlobalGeometryManager::pointOwner(GeometryPointId point) const
+GeometryOwner GlobalGeometryManager::pointOwner(PointIdx point) const
 {
   return checkedPoint(point).owner;
 }
 
-bool GlobalGeometryManager::sameSubsystem(std::span<const GeometryPointId> stencil) const
+bool GlobalGeometryManager::sameSubsystem(std::span<const PointIdx> stencil) const
 {
   const GeometryStencilInfo info = classify(stencil);
   return info.valid && !info.hasCollider && info.subsystemCount == 1;
 }
 
-bool GlobalGeometryManager::hasCollider(std::span<const GeometryPointId> stencil) const
+bool GlobalGeometryManager::hasCollider(std::span<const PointIdx> stencil) const
 {
   return classify(stencil).hasCollider;
 }
 
-GeometryStencilInfo GlobalGeometryManager::classify(
-    std::span<const GeometryPointId> stencil) const
+GeometryStencilInfo GlobalGeometryManager::classify(std::span<const PointIdx> stencil) const
 {
   GeometryStencilInfo info;
-  for (const GeometryPointId point : stencil) {
-    if (!contains(point)) {
-      info.valid = false;
-      continue;
-    }
-
+  for (const PointIdx point : stencil) {
     const GeometryPoint& entry = checkedPoint(point);
-    info.hasInstanceGeometry =
-        info.hasInstanceGeometry || entry.instance >= 0;
+    info.hasInstanceGeometry = info.hasInstanceGeometry || entry.instance >= 0;
     if (entry.owner.isCollider()) {
       info.hasCollider = true;
       continue;
@@ -342,28 +342,28 @@ GeometryStencilInfo GlobalGeometryManager::classify(
       continue;
     }
 
-    bool found = false;
-    for (int i = 0; i < info.subsystemCount; ++i) {
-      if (info.subsystems[static_cast<size_t>(i)] == entry.owner.subsystem) {
-        found = true;
-        break;
-      }
+    const SubsystemId subsystem = entry.owner.subsystem;
+    if (info.subsystemCount == 0) {
+      info.subsystems[0] = subsystem;
+      info.subsystemCount = 1;
+      continue;
     }
-    if (!found) {
-      if (info.subsystemCount >= static_cast<int>(info.subsystems.size())) {
-        info.valid = false;
-        continue;
-      }
-      info.subsystems[static_cast<size_t>(info.subsystemCount)] =
-          entry.owner.subsystem;
-      ++info.subsystemCount;
+    if (info.subsystems[0] == subsystem) {
+      continue;
+    }
+    if (info.subsystemCount == 1) {
+      info.subsystems[1] = subsystem;
+      info.subsystemCount = 2;
+      continue;
+    }
+    if (info.subsystems[1] != subsystem) {
+      info.valid = false;
     }
   }
-  info.crossesSubsystems = info.subsystemCount > 1;
   return info;
 }
 
-GeometryPointId GlobalGeometryManager::localToGlobalPoint(SubsystemId subsystem,
+PointIdx GlobalGeometryManager::localToGlobalPoint(SubsystemId subsystem,
                                                   int localSampleId) const
 {
   const GeometryRange range = pointRange(subsystem);
@@ -375,7 +375,7 @@ GeometryPointId GlobalGeometryManager::localToGlobalPoint(SubsystemId subsystem,
   return -1;
 }
 
-GeometryPointId GlobalGeometryManager::colliderLocalToGlobalPoint(
+PointIdx GlobalGeometryManager::colliderLocalToGlobalPoint(
     int collider,
     int localSampleId) const
 {
@@ -388,20 +388,20 @@ GeometryPointId GlobalGeometryManager::colliderLocalToGlobalPoint(
   return -1;
 }
 
-std::array<GeometryPointId, 2> GlobalGeometryManager::globalEdge(int edge) const
+std::array<PointIdx, 2> GlobalGeometryManager::globalEdge(int edge) const
 {
   const GeometryEdge& entry = checkedEdge(edge);
   return {entry.p0, entry.p1};
 }
 
-std::array<GeometryPointId, 3> GlobalGeometryManager::globalTriangle(int triangle) const
+std::array<PointIdx, 3> GlobalGeometryManager::globalTriangle(int triangle) const
 {
   const GeometryTriangle& entry = checkedTriangle(triangle);
   return {entry.p0, entry.p1, entry.p2};
 }
 
 bool GlobalGeometryManager::triangleContainsPoint(int triangle,
-                                          GeometryPointId point) const
+                                          PointIdx point) const
 {
   const auto vertices = globalTriangle(triangle);
   return vertices[0] == point || vertices[1] == point || vertices[2] == point;
@@ -415,7 +415,7 @@ bool GlobalGeometryManager::edgesAdjacent(int edgeA, int edgeB) const
          a[1] == b[0] || a[1] == b[1];
 }
 
-GeometryBounds GlobalGeometryManager::pointBounds(GeometryPointId point) const
+GeometryBounds GlobalGeometryManager::pointBounds(PointIdx point) const
 {
   GeometryBounds bounds;
   bounds.expand(worldPosition(point));
@@ -426,9 +426,8 @@ GeometryBounds GlobalGeometryManager::edgeBounds(int edge) const
 {
   GeometryBounds bounds;
   const auto vertices = globalEdge(edge);
-  for (const GeometryPointId point : vertices) {
-    bounds.expand(worldPosition(point));
-  }
+  bounds.expand(worldPosition(vertices[0]));
+  bounds.expand(worldPosition(vertices[1]));
   return bounds;
 }
 
@@ -436,21 +435,18 @@ GeometryBounds GlobalGeometryManager::triangleBounds(int triangle) const
 {
   GeometryBounds bounds;
   const auto vertices = globalTriangle(triangle);
-  for (const GeometryPointId point : vertices) {
+  for (const PointIdx point : vertices) {
     bounds.expand(worldPosition(point));
   }
   return bounds;
 }
 
 GeometryBounds GlobalGeometryManager::trajectoryPointBounds(
-    GeometryPointId point,
+    PointIdx point,
     std::span<const glm::dvec3> directions,
     Real toi) const
 {
   checkedPoint(point);
-  if (point >= static_cast<int>(directions.size())) {
-    throw std::out_of_range("geometry trajectory direction point is out of range");
-  }
   const glm::dvec3 position = worldPosition(point);
   GeometryBounds bounds;
   bounds.expand(position);
@@ -461,19 +457,19 @@ GeometryBounds GlobalGeometryManager::trajectoryPointBounds(
 GeometryBounds GlobalGeometryManager::trajectoryEdgeBounds(
     int edge,
     std::span<const glm::dvec3> directions,
-    Real toi) const
+    Real toi, Real radius) const
 {
   GeometryBounds bounds;
   const auto vertices = globalEdge(edge);
-  for (const GeometryPointId point : vertices) {
+  for (const PointIdx point : vertices) {
     const GeometryBounds point_bounds = trajectoryPointBounds(point, directions, toi);
-    bounds.expand(point_bounds.lower);
-    bounds.expand(point_bounds.upper);
+    bounds.expand(point_bounds.lo);
+    bounds.expand(point_bounds.hi);
   }
   return bounds;
 }
 
-glm::dvec3 GlobalGeometryManager::worldPosition(GeometryPointId point) const
+glm::dvec3 GlobalGeometryManager::worldPosition(PointIdx point) const
 {
   const GeometryPoint& entry = checkedPoint(point);
   if (entry.instance < 0) {
@@ -483,7 +479,17 @@ glm::dvec3 GlobalGeometryManager::worldPosition(GeometryPointId point) const
   return glm::dvec3(instance.transform * glm::dvec4(entry.x, 1.0));
 }
 
-void GlobalGeometryManager::setPointPosition(GeometryPointId point,
+glm::dvec3 GlobalGeometryManager::restPosition(PointIdx point) const
+{
+  const GeometryPoint& entry = checkedPoint(point);
+  if (entry.instance < 0) {
+    return entry.restX;
+  }
+  const GeometryInstance& instance = checkedInstance(entry.instance);
+  return glm::dvec3(instance.transform * glm::dvec4(entry.restX, 1.0));
+}
+
+void GlobalGeometryManager::setPointPosition(PointIdx point,
                                      const glm::dvec3& position)
 {
   GeometryPoint& entry = checkedPoint(point);
@@ -494,23 +500,35 @@ void GlobalGeometryManager::setPointPosition(GeometryPointId point,
   entry.x = position;
 }
 
+void GlobalGeometryManager::setPointRestPosition(
+    PointIdx point,
+    const glm::dvec3& restPosition)
+{
+  GeometryPoint& entry = checkedPoint(point);
+  if (entry.instance >= 0) {
+    throw std::invalid_argument(
+        "cannot directly set an instance vertex rest position");
+  }
+  entry.restX = restPosition;
+}
+
 void GlobalGeometryManager::setInstanceTransform(GeometryInstanceId instance,
                                          const glm::dmat4& transform)
 {
   checkedInstance(instance).transform = transform;
 }
 
-GeometryBounds GlobalGeometryManager::trajectoryTriangleBounds(
+spatify::BBox<Real, 3> GlobalGeometryManager::trajectoryTriangleBounds(
     int triangle,
     std::span<const glm::dvec3> directions,
-    Real toi) const
+    Real toi, Real thickness) const
 {
   GeometryBounds bounds;
   const auto vertices = globalTriangle(triangle);
-  for (const GeometryPointId point : vertices) {
+  for (const PointIdx point : vertices) {
     const GeometryBounds point_bounds = trajectoryPointBounds(point, directions, toi);
-    bounds.expand(point_bounds.lower);
-    bounds.expand(point_bounds.upper);
+    bounds.expand(point_bounds.lo);
+    bounds.expand(point_bounds.hi);
   }
   return bounds;
 }
@@ -525,7 +543,7 @@ GeometryRange GlobalGeometryManager::rangeFor(
   return ranges[static_cast<size_t>(ownerIndex)];
 }
 
-GeometryReference GlobalGeometryManager::appendReference(
+GeometryReference GlobalGeometryManager::addReference(
     std::vector<GeometryRange>& ranges,
     const GeometryOwner& owner,
     int nextGlobalIndex)
@@ -552,43 +570,34 @@ GeometryReference GlobalGeometryManager::appendReference(
 
   const GeometryReference ref{
       .owner = owner,
-      .subsystem = owner.subsystem,
       .localIndex = range.count,
   };
   ++range.count;
   return ref;
 }
 
-const GeometryPoint& GlobalGeometryManager::checkedPoint(GeometryPointId point) const
+const GeometryPoint& GlobalGeometryManager::checkedPoint(PointIdx point) const
 {
-  if (!contains(point)) {
-    throw std::out_of_range("geometry point id is out of range");
-  }
-  return points[static_cast<size_t>(point)];
+  assert(contains(point));
+  return points[point];
 }
 
-GeometryPoint& GlobalGeometryManager::checkedPoint(GeometryPointId point)
+GeometryPoint& GlobalGeometryManager::checkedPoint(PointIdx point)
 {
-  if (!contains(point)) {
-    throw std::out_of_range("geometry point id is out of range");
-  }
-  return points[static_cast<size_t>(point)];
+  assert(contains(point));
+  return points[point];
 }
 
 const GeometryEdge& GlobalGeometryManager::checkedEdge(int edge) const
 {
-  if (edge < 0 || edge >= static_cast<int>(edges.size())) {
-    throw std::out_of_range("geometry edge id is out of range");
-  }
-  return edges[static_cast<size_t>(edge)];
+  assert(edge >= 0 && edge < static_cast<int>(edges.size()));
+  return edges[edge];
 }
 
 const GeometryTriangle& GlobalGeometryManager::checkedTriangle(int triangle) const
 {
-  if (triangle < 0 || triangle >= static_cast<int>(triangles.size())) {
-    throw std::out_of_range("geometry triangle id is out of range");
-  }
-  return triangles[static_cast<size_t>(triangle)];
+  assert(triangle >= 0 && triangle < triangles.size());
+  return triangles[triangle];
 }
 
 const GeometryInstance& GlobalGeometryManager::checkedInstance(

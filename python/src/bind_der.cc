@@ -100,7 +100,7 @@ std::vector<der::RodDof> parseRodBlocks(
   return blocks;
 }
 
-py::array_t<double> geometryPositions(const runtime::RuntimeSimulation& sim)
+py::array_t<double> geometryPositions(const runtime::SimulationContext& sim)
 {
   const auto& geometry = sim.scene().geometry;
   auto result = py::array_t<double>(
@@ -110,7 +110,7 @@ py::array_t<double> geometryPositions(const runtime::RuntimeSimulation& sim)
        i < static_cast<py::ssize_t>(geometry.pointCount());
        ++i) {
     const glm::dvec3 point =
-        geometry.worldPosition(runtime::GeometryPointId{
+        geometry.worldPosition(runtime::PointIdx{
             static_cast<int>(i),
         });
     out(i, 0) = point.x;
@@ -139,7 +139,7 @@ py::array_t<double> rodPositions(const PyRuntimeSimulation& sim, int rodIndex)
   auto out = result.mutable_unchecked<2>();
   for (py::ssize_t i = 0; i < count; ++i) {
     const glm::dvec3 point =
-        geometry.worldPosition(runtime::GeometryPointId{
+        geometry.worldPosition(runtime::PointIdx{
             static_cast<int>(offset + i),
         });
     out(i, 0) = point.x;

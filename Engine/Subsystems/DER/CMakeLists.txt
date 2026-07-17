@@ -2,6 +2,7 @@ project(DER LANGUAGES CXX)
 
 set(DER_SOURCES
     src/rod.cc
+    src/hair-scene.cc
     src/der-subsystem.cc
     src/der-scene.cc
     src/cpu/der-cpu-backend.cc
@@ -19,7 +20,7 @@ set(DER_HEADERS
 add_library(DER STATIC ${DER_SOURCES} ${DER_HEADERS})
 add_library(Kiseki::DER ALIAS DER)
 target_include_directories(DER PUBLIC include)
-target_link_libraries(DER PUBLIC Kiseki::Core Kiseki::Runtime Eigen3::Eigen)
+target_link_libraries(DER PUBLIC Kiseki::Core Kiseki::Runtime Kiseki::SceneObjects Kiseki::EngineContactIPC Eigen3::Eigen)
 target_compile_features(DER PUBLIC cxx_std_20)
 
 enable_testing()

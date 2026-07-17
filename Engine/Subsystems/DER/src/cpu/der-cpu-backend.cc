@@ -2,9 +2,13 @@
 
 #include <DER/der-subsystem.h>
 
+#include <Contact/contact-barrier.h>
+
 #include <Eigen/SparseCholesky>
 
 #include <algorithm>
+#include <array>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -15,33 +19,230 @@ namespace ksk::der
     {
         static_assert(sizeof(RodDof) == 4 * sizeof(double));
 
-        void ensureWritable(Eigen::VectorXd& values, int minimumSize)
+        void requireCPU(runtime::ConstDofView view, const char* operation)
         {
-            if (values.size() >= minimumSize)
+            if (!view.isCPU())
+            {
+                throw std::runtime_error(std::string(operation) +
+                    " requires a CPU DofView");
+            }
+        }
+
+        void requireCPU(runtime::DofView view, const char* operation)
+        {
+            requireCPU(view.asConst(), operation);
+        }
+
+        void requireCPU(runtime::ConstGeometryView view, const char* operation)
+        {
+            if (!view.isCPU())
+            {
+                throw std::runtime_error(std::string(operation) +
+                    " requires a CPU GeometryView");
+            }
+        }
+
+        void requireCPU(runtime::GeometryView view, const char* operation)
+        {
+            requireCPU(view.asConst(), operation);
+        }
+
+        void requireDofCount(runtime::ConstDofView view,
+                             int expected,
+                             const char* operation)
+        {
+            if (view.scalarCount() < expected)
+            {
+                throw std::invalid_argument(std::string(operation) +
+                    " received a DOF view that is too small");
+            }
+        }
+
+        int contactPointCount(runtime::ContactCase type)
+        {
+            switch (type)
+            {
+            case runtime::ContactCase::PP:
+                return 2;
+            case runtime::ContactCase::PE:
+                return 3;
+            case runtime::ContactCase::PT:
+            case runtime::ContactCase::EE:
+                return 4;
+            }
+            return 0;
+        }
+
+        engine::contact::EBarrierStencil barrierStencilType(
+            runtime::ContactCase type)
+        {
+            switch (type)
+            {
+            case runtime::ContactCase::PP:
+                return engine::contact::EBarrierStencil::PP;
+            case runtime::ContactCase::PE:
+                return engine::contact::EBarrierStencil::PE;
+            case runtime::ContactCase::PT:
+                return engine::contact::EBarrierStencil::PT;
+            case runtime::ContactCase::EE:
+                return engine::contact::EBarrierStencil::EE;
+            }
+            return engine::contact::EBarrierStencil::PP;
+        }
+
+        int findSampleIndex(const DERSubsystem& subsystem, runtime::PointIdx point)
+        {
+            const auto& points = subsystem.geometryPointIds();
+            const auto it = std::find(points.begin(), points.end(), point);
+            if (it == points.end())
+            {
+                return -1;
+            }
+            return static_cast<int>(it - points.begin());
+        }
+
+        struct LocalContactStencil
+        {
+            std::array<int, 4> qOffsets{-1, -1, -1, -1};
+            std::array<glm::dvec3, 4> x{
+                glm::dvec3(0.0),
+                glm::dvec3(0.0),
+                glm::dvec3(0.0),
+                glm::dvec3(0.0)
+            };
+            std::array<glm::dvec3, 4> restX{
+                glm::dvec3(0.0),
+                glm::dvec3(0.0),
+                glm::dvec3(0.0),
+                glm::dvec3(0.0)
+            };
+            int count = 0;
+            double dHat = 0.0;
+            double surfaceOffset = 0.0;
+            double kappa = 0.0;
+        };
+
+        std::optional<LocalContactStencil> gatherLocalContact(
+            const DERSubsystem& subsystem,
+            const runtime::ContactStencil& contact)
+        {
+            LocalContactStencil local;
+            local.count = contactPointCount(contact.type);
+            local.dHat = contact.dHat;
+            local.surfaceOffset = contact.thickness;
+            local.kappa = contact.stiffness;
+            if (local.count <= 0 || local.dHat <= 0.0 || local.kappa <= 0.0)
+            {
+                return std::nullopt;
+            }
+
+            const auto& samples = subsystem.geometrySamples();
+            const auto& rods = subsystem.rods();
+            for (int i = 0; i < local.count; ++i)
+            {
+                const int sample_index =
+                    findSampleIndex(subsystem, contact.geometryIds[i]);
+                if (sample_index < 0)
+                {
+                    return std::nullopt;
+                }
+                const DERGeometrySample& sample = samples[sample_index];
+                const Rod& rod = rods[sample.rod];
+                local.qOffsets[i] = sample.qOffset;
+                local.x[i] = rod.state().position(sample.vertex);
+                local.restX[i] = glm::dvec3(
+                    rod.restState().blocks.at(sample.vertex));
+            }
+            return local;
+        }
+
+        engine::contact::GIPCBarrierStencil makeBarrierStencil(
+            const LocalContactStencil& contact,
+            runtime::ContactCase type)
+        {
+            engine::contact::GIPCBarrierStencil barrier;
+            barrier.type = barrierStencilType(type);
+            barrier.x = contact.x;
+            barrier.restX = contact.restX;
+            barrier.dHat = contact.dHat;
+            barrier.reservedDist = contact.surfaceOffset;
+            barrier.kappa = contact.kappa;
+            return barrier;
+        }
+
+        void scatterBarrierValues(
+            const LocalContactStencil& contact,
+            const std::array<glm::dvec3, 4>& values,
+            runtime::DofView y)
+        {
+            for (int i = 0; i < contact.count; i++)
+            {
+                const int offset = contact.qOffsets[i];
+                y[offset + 0] += values[i].x;
+                y[offset + 1] += values[i].y;
+                y[offset + 2] += values[i].z;
+            }
+        }
+
+        std::array<glm::dvec3, 4> gatherBarrierDirection(
+            const LocalContactStencil& contact,
+            runtime::ConstDofView dq)
+        {
+            std::array<glm::dvec3, 4> direction{
+                glm::dvec3(0.0),
+                glm::dvec3(0.0),
+                glm::dvec3(0.0),
+                glm::dvec3(0.0)
+            };
+            for (int i = 0; i < contact.count; i++)
+            {
+                const int offset = contact.qOffsets[i];
+                direction[i] = glm::dvec3(
+                    dq[offset + 0], dq[offset + 1], dq[offset + 2]);
+            }
+            return direction;
+        }
+
+        double appendContactGradientAndEnergy(const DERSubsystem& subsystem,
+                                              const runtime::ContactStencil& contact,
+                                              runtime::DofView* g)
+        {
+            const std::optional<LocalContactStencil> local =
+                gatherLocalContact(subsystem, contact);
+            if (!local)
+            {
+                return 0.0;
+            }
+
+            const engine::contact::GIPCBarrierStencil barrier =
+                makeBarrierStencil(*local, contact.type);
+            if (g == nullptr)
+            {
+                return engine::contact::computeGIPCBarrierEnergy(barrier);
+            }
+            const engine::contact::LocalBarrierGradient barrier_gradient =
+                engine::contact::computeGIPCBarrierGradient(barrier);
+            scatterBarrierValues(*local, barrier_gradient.gradient, *g);
+            return barrier_gradient.energy;
+        }
+
+        void applyContactHessianProduct(const DERSubsystem& subsystem,
+                                        const runtime::ContactStencil& contact,
+                                        runtime::ConstDofView dq,
+                                        runtime::DofView y)
+        {
+            const std::optional<LocalContactStencil> local =
+                gatherLocalContact(subsystem, contact);
+            if (!local)
             {
                 return;
             }
-            const Eigen::Index old_size = values.size();
-            values.conservativeResize(minimumSize);
-            values.segment(old_size, minimumSize - old_size).setZero();
-        }
 
-        void requireCPU(const runtime::DofBuffer& buffer, const char* operation)
-        {
-            if (!buffer.isCPU())
-            {
-                throw std::runtime_error(std::string(operation) +
-                    " requires a CPU DofBuffer");
-            }
-        }
-
-        void requireCPU(const runtime::GeometryBuffer& buffer, const char* operation)
-        {
-            if (!buffer.isCPU())
-            {
-                throw std::runtime_error(std::string(operation) +
-                    " requires a CPU GeometryBuffer");
-            }
+            const std::array<glm::dvec3, 4> product =
+                engine::contact::computeGIPCBarrierHessianProduct(
+                    makeBarrierStencil(*local, contact.type),
+                    gatherBarrierDirection(*local, dq));
+            scatterBarrierValues(*local, product, y);
         }
     } // namespace
 
@@ -50,17 +251,13 @@ namespace ksk::der
     {
     }
 
-    void DERCPUBackend::writeState(runtime::DofBuffer& q,
-                                   runtime::DofBuffer& qdot) const
+    void DERCPUBackend::writeState(runtime::DofView q,
+                                   runtime::DofView qdot) const
     {
         requireCPU(q, "DERCpuBackend::writeState");
         requireCPU(qdot, "DERCpuBackend::writeState");
-
-        const runtime::DofRange range = subsystem_.dofRange();
-        Eigen::VectorXd& q_values = q.cpu();
-        Eigen::VectorXd& qdot_values = qdot.cpu();
-        ensureWritable(q_values, range.scalarOffset + range.scalarCount);
-        ensureWritable(qdot_values, range.scalarOffset + range.scalarCount);
+        requireDofCount(q, subsystem_.localScalarCount(), "DERCpuBackend::writeState");
+        requireDofCount(qdot, subsystem_.localScalarCount(), "DERCpuBackend::writeState");
 
         const auto& rods = subsystem_.rods();
         const auto& offsets = subsystem_.rodOffsets();
@@ -68,59 +265,59 @@ namespace ksk::der
              ++rod_index)
         {
             const Rod& rod = rods[rod_index];
-            const int base = range.scalarOffset + offsets[rod_index].q;
+            const int base = offsets[rod_index].q;
             for (int vertex = 0; vertex < static_cast<int>(rod.state().size());
                  ++vertex)
             {
                 for (int lane = 0; lane < 4; ++lane)
                 {
-                    q_values[base + 4 * vertex + lane] =
+                    q[base + 4 * vertex + lane] =
                         rod.state().blocks[vertex][lane];
-                    qdot_values[base + 4 * vertex + lane] =
+                    qdot[base + 4 * vertex + lane] =
                         rod.velocity().blocks[vertex][lane];
                 }
             }
         }
     }
 
-    void DERCPUBackend::readState(runtime::DofBuffer& q,
-                                  runtime::DofBuffer& qdot)
+    void DERCPUBackend::readState(runtime::ConstDofView q,
+                                  runtime::ConstDofView qdot)
     {
         requireCPU(q, "DERCpuBackend::readState");
         requireCPU(qdot, "DERCpuBackend::readState");
+        requireDofCount(q, subsystem_.localScalarCount(), "DERCpuBackend::readState");
+        requireDofCount(qdot, subsystem_.localScalarCount(), "DERCpuBackend::readState");
 
-        Eigen::VectorXd& q_values = q.cpu();
-        Eigen::VectorXd& qdot_values = qdot.cpu();
         const auto& offsets = subsystem_.rodOffsets();
         auto& rods = subsystem_.rods();
-        const runtime::DofRange range = subsystem_.dofRange();
-        ensureWritable(q_values, range.scalarOffset + range.scalarCount);
-        ensureWritable(qdot_values, range.scalarOffset + range.scalarCount);
-
         for (int rod_index = 0; rod_index < static_cast<int>(rods.size());
              ++rod_index)
         {
             Rod& rod = rods[rod_index];
             const int base = offsets[rod_index].q;
-            const int block_count = static_cast<int>(rod.state().size());
-            auto* q_blocks = reinterpret_cast<RodDof*>(
-                q_values.data() + vectorOffset(q_values, base));
-            auto* qdot_blocks = reinterpret_cast<RodDof*>(
-                qdot_values.data() + vectorOffset(qdot_values, base));
-            rod.bindState(std::span<RodDof>(q_blocks, block_count),
-                          std::span<RodDof>(qdot_blocks, block_count));
+            for (int vertex = 0; vertex < static_cast<int>(rod.state().size());
+                 ++vertex)
+            {
+                for (int lane = 0; lane < 4; ++lane)
+                {
+                    rod.state().blocks[vertex][lane] =
+                        q[base + 4 * vertex + lane];
+                    rod.velocity().blocks[vertex][lane] =
+                        qdot[base + 4 * vertex + lane];
+                }
+            }
         }
     }
 
-    void DERCPUBackend::beginStep(const runtime::DofBuffer& q,
-                                  const runtime::DofBuffer& qdot,
+    void DERCPUBackend::beginStep(runtime::ConstDofView q,
+                                  runtime::ConstDofView qdot,
                                   double dt)
     {
         requireCPU(q, "DERCpuBackend::beginStep");
         requireCPU(qdot, "DERCpuBackend::beginStep");
         step_dt_ = dt;
-        step_start_ = gatherLocalVector(q.cpu());
-        inertial_target_ = step_start_ + dt * gatherLocalVector(qdot.cpu());
+        step_start_ = gatherLocalVector(q);
+        inertial_target_ = step_start_ + dt * gatherLocalVector(qdot);
 
         mass_diagonal_ = Eigen::VectorXd::Zero(subsystem_.localScalarCount());
         const auto& rods = subsystem_.rods();
@@ -138,25 +335,25 @@ namespace ksk::der
         }
     }
 
-    void DERCPUBackend::acceptStep(const runtime::DofBuffer& q,
-                                   runtime::DofBuffer& qdot,
+    void DERCPUBackend::acceptStep(runtime::ConstDofView q,
+                                   runtime::DofView qdot,
                                    double dt)
     {
         requireCPU(q, "DERCpuBackend::acceptStep");
         requireCPU(qdot, "DERCpuBackend::acceptStep");
+        requireDofCount(q, subsystem_.localScalarCount(), "DERCpuBackend::acceptStep");
+        requireDofCount(qdot, subsystem_.localScalarCount(), "DERCpuBackend::acceptStep");
         if (step_start_.size() != subsystem_.localScalarCount())
         {
             throw std::runtime_error("DER CPU backend step has not begun");
         }
 
-        const runtime::DofRange range = subsystem_.dofRange();
-        Eigen::VectorXd& qdot_values = qdot.cpu();
-        ensureWritable(qdot_values, range.scalarOffset + range.scalarCount);
-        const Eigen::VectorXd local_q = gatherLocalVector(q.cpu());
+        const int scalar_count = subsystem_.localScalarCount();
+        const Eigen::VectorXd local_q = gatherLocalVector(q);
         const Eigen::VectorXd local_qdot = (local_q - step_start_) / dt;
-        for (int i = 0; i < range.scalarCount; ++i)
+        for (int i = 0; i < scalar_count; ++i)
         {
-            qdot_values[vectorOffset(qdot_values, i)] = local_qdot[i];
+            qdot[i] = local_qdot[i];
         }
 
         auto& rods = subsystem_.rods();
@@ -180,14 +377,14 @@ namespace ksk::der
         }
     }
 
-    double DERCPUBackend::evaluateObjective(const runtime::DofBuffer& q,
-                                            const runtime::DofBuffer& qdot,
+    double DERCPUBackend::evaluateObjective(runtime::ConstDofView q,
+                                            runtime::ConstDofView qdot,
                                             double dt)
     {
         requireCPU(q, "DERCpuBackend::evaluateObjective");
         requireCPU(qdot, "DERCpuBackend::evaluateObjective");
 
-        const Eigen::VectorXd local_q = gatherLocalVector(q.cpu());
+        const Eigen::VectorXd local_q = gatherLocalVector(q);
         double objective = 0.0;
         const Eigen::VectorXd inertial_residual = local_q - inertial_target_;
         objective +=
@@ -204,6 +401,10 @@ namespace ksk::der
                 throw std::runtime_error(evaluation.diagnostic);
             }
             objective += evaluation.energy.total();
+        }
+        for (const runtime::ContactStencil& contact : subsystem_.internal_contacts_)
+        {
+            objective += appendContactGradientAndEnergy(subsystem_, contact, nullptr);
         }
         return objective;
     }
@@ -270,7 +471,7 @@ namespace ksk::der
         local_matrix_.makeCompressed();
     }
 
-    void DERCPUBackend::assembleLocalGradient(runtime::DofBuffer& g) const
+    void DERCPUBackend::assembleLocalGradient(runtime::DofView g) const
     {
         if (evaluations_.size() != subsystem_.rods().size())
         {
@@ -278,14 +479,13 @@ namespace ksk::der
         }
         requireCPU(g, "DERCpuBackend::assembleLocalGradient");
 
-        const runtime::DofRange range = subsystem_.dofRange();
         const auto& offsets = subsystem_.rodOffsets();
-        Eigen::VectorXd& g_values = g.cpu();
-        ensureWritable(g_values, range.scalarOffset + range.scalarCount);
+        const int scalar_count = subsystem_.localScalarCount();
+        requireDofCount(g, scalar_count, "DERCpuBackend::assembleLocalGradient");
 
-        Eigen::VectorXd local_gradient = Eigen::VectorXd::Zero(range.scalarCount);
-        if (inertial_target_.size() == range.scalarCount &&
-            mass_diagonal_.size() == range.scalarCount)
+        Eigen::VectorXd local_gradient = Eigen::VectorXd::Zero(scalar_count);
+        if (inertial_target_.size() == scalar_count &&
+            mass_diagonal_.size() == scalar_count)
         {
             local_gradient +=
                 (mass_diagonal_.array() *
@@ -308,14 +508,18 @@ namespace ksk::der
                 }
             }
         }
-        for (int i = 0; i < range.scalarCount; ++i)
+        for (int i = 0; i < scalar_count; ++i)
         {
-            addToVector(g_values, i, local_gradient[i]);
+            addToVector(g, i, local_gradient[i]);
+        }
+        for (const runtime::ContactStencil& contact : subsystem_.internal_contacts_)
+        {
+            appendContactGradientAndEnergy(subsystem_, contact, &g);
         }
     }
 
-    void DERCPUBackend::applyLocalMatrix(const runtime::DofBuffer& x,
-                                         runtime::DofBuffer& y) const
+    void DERCPUBackend::applyLocalMatrix(runtime::ConstDofView x,
+                                         runtime::DofView y) const
     {
         if (local_matrix_.rows() != subsystem_.localScalarCount())
         {
@@ -323,20 +527,20 @@ namespace ksk::der
         }
         requireCPU(x, "DERCpuBackend::applyLocalMatrix");
         requireCPU(y, "DERCpuBackend::applyLocalMatrix");
+        requireDofCount(x, subsystem_.localScalarCount(), "DERCpuBackend::applyLocalMatrix");
+        requireDofCount(y, subsystem_.localScalarCount(), "DERCpuBackend::applyLocalMatrix");
 
-        const runtime::DofRange range = subsystem_.dofRange();
-        const Eigen::VectorXd local_x = gatherLocalVector(x.cpu());
+        const int scalar_count = subsystem_.localScalarCount();
+        const Eigen::VectorXd local_x = gatherLocalVector(x);
         const Eigen::VectorXd local_y = local_matrix_ * local_x;
-        Eigen::VectorXd& y_values = y.cpu();
-        ensureWritable(y_values, range.scalarOffset + range.scalarCount);
-        for (int i = 0; i < range.scalarCount; ++i)
+        for (int i = 0; i < scalar_count; ++i)
         {
-            addToVector(y_values, i, local_y[i]);
+            addToVector(y, i, local_y[i]);
         }
     }
 
-    void DERCPUBackend::solveLocalSystem(const runtime::DofBuffer& b,
-                                         runtime::DofBuffer& x) const
+    void DERCPUBackend::solveLocalSystem(runtime::ConstDofView b,
+                                         runtime::DofView x) const
     {
         if (local_matrix_.rows() != subsystem_.localScalarCount())
         {
@@ -344,6 +548,8 @@ namespace ksk::der
         }
         requireCPU(b, "DERCpuBackend::solveLocalSystem");
         requireCPU(x, "DERCpuBackend::solveLocalSystem");
+        requireDofCount(b, subsystem_.localScalarCount(), "DERCpuBackend::solveLocalSystem");
+        requireDofCount(x, subsystem_.localScalarCount(), "DERCpuBackend::solveLocalSystem");
 
         Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
         solver.compute(local_matrix_);
@@ -351,31 +557,27 @@ namespace ksk::der
         {
             throw std::runtime_error("failed to factor DER CPU backend local matrix");
         }
-        const Eigen::VectorXd local_x = solver.solve(gatherLocalVector(b.cpu()));
+        const Eigen::VectorXd local_x = solver.solve(gatherLocalVector(b));
         if (solver.info() != Eigen::Success)
         {
             throw std::runtime_error("failed to solve DER CPU backend local system");
         }
 
-        const runtime::DofRange range = subsystem_.dofRange();
-        Eigen::VectorXd& x_values = x.cpu();
-        ensureWritable(x_values, range.scalarOffset + range.scalarCount);
-        for (int i = 0; i < range.scalarCount; ++i)
+        const int scalar_count = subsystem_.localScalarCount();
+        for (int i = 0; i < scalar_count; ++i)
         {
-            x_values[vectorOffset(x_values, i)] = local_x[i];
+            x[i] = local_x[i];
         }
     }
 
-    void DERCPUBackend::mapDirectionToGeometry(const runtime::DofBuffer& dq,
-                                               runtime::GeometryBuffer& dx) const
+    void DERCPUBackend::mapLocalDirectionToGeometry(runtime::ConstDofView localDq,
+                                               runtime::GeometryView globalDx) const
     {
-        requireCPU(dq, "DERCpuBackend::mapDirectionToGeometry");
-        requireCPU(dx, "DERCpuBackend::mapDirectionToGeometry");
+        requireCPU(localDq, "DERCpuBackend::mapLocalDirectionToGeometry");
+        requireCPU(globalDx, "DERCpuBackend::mapLocalDirectionToGeometry");
 
-        const Eigen::VectorXd& dq_values = dq.cpu();
         const auto& samples = subsystem_.geometrySamples();
         const auto& geometry_points = subsystem_.geometryPointIds();
-        std::vector<glm::dvec3>& dx_values = dx.cpu();
         if (geometry_points.size() != samples.size())
         {
             throw std::runtime_error("DER geometry point mapping is stale");
@@ -384,34 +586,31 @@ namespace ksk::der
         for (int sample = 0; sample < samples.size(); sample++)
         {
             auto point = geometry_points[sample];
-            if (point < 0 || point >= static_cast<int>(dx_values.size()))
+            if (point < 0 || point >= globalDx.pointCount())
             {
                 throw std::invalid_argument("DER global geometry direction buffer is too small");
             }
             const int offset = samples[sample].qOffset;
-            dx_values[point] = glm::dvec3(dq_values[vectorOffset(dq_values, offset + 0)],
-                                          dq_values[vectorOffset(dq_values, offset + 1)],
-                                          dq_values[vectorOffset(dq_values, offset + 2)]);
+            globalDx[point] = glm::dvec3(localDq[offset + 0],
+                                         localDq[offset + 1],
+                                         localDq[offset + 2]);
         }
     }
 
     void DERCPUBackend::scatterContactGradient(
-        std::span<const runtime::GeometryPointId> points,
-        const runtime::GeometryBuffer& pointGradient,
-        runtime::DofBuffer& g) const
+        std::span<const runtime::PointIdx> points,
+        runtime::ConstGeometryView pointGradient,
+        runtime::DofView g) const
     {
         requireCPU(pointGradient, "DERCpuBackend::scatterContactGradient");
         requireCPU(g, "DERCpuBackend::scatterContactGradient");
 
-        const std::vector<glm::dvec3>& point_gradient = pointGradient.cpu();
-        if (points.size() != point_gradient.size())
+        if (points.size() != static_cast<size_t>(pointGradient.pointCount()))
         {
             throw std::invalid_argument("contact point and gradient counts differ");
         }
 
-        const runtime::DofRange range = subsystem_.dofRange();
-        Eigen::VectorXd& g_values = g.cpu();
-        ensureWritable(g_values, range.scalarOffset + range.scalarCount);
+        requireDofCount(g, subsystem_.localScalarCount(), "DERCpuBackend::scatterContactGradient");
 
         const auto& geometry_points = subsystem_.geometryPointIds();
         const auto& samples = subsystem_.geometrySamples();
@@ -425,16 +624,29 @@ namespace ksk::der
             }
             const int sample = static_cast<int>(it - geometry_points.begin());
             const int offset = samples[sample].qOffset;
-            addToVector(g_values, offset + 0, point_gradient[i].x);
-            addToVector(g_values, offset + 1, point_gradient[i].y);
-            addToVector(g_values, offset + 2, point_gradient[i].z);
+            const glm::dvec3 point_gradient =
+                pointGradient[static_cast<int>(i)];
+            addToVector(g, offset + 0, point_gradient.x);
+            addToVector(g, offset + 1, point_gradient.y);
+            addToVector(g, offset + 2, point_gradient.z);
         }
     }
 
-    void DERCPUBackend::applyContactHessian(const runtime::DofBuffer& dq,
-                                            const runtime::ContactTable& contacts,
-                                            runtime::DofBuffer& y) const
+    void DERCPUBackend::applyInternalContactHessian(
+        runtime::ConstDofView localDq,
+        runtime::DofView localY) const
     {
+        requireCPU(localDq, "DERCpuBackend::applyInternalContactHessian");
+        requireCPU(localY, "DERCpuBackend::applyInternalContactHessian");
+        requireDofCount(localDq, subsystem_.localScalarCount(),
+                        "DERCpuBackend::applyInternalContactHessian");
+        requireDofCount(localY, subsystem_.localScalarCount(),
+                        "DERCpuBackend::applyInternalContactHessian");
+
+        for (const runtime::ContactStencil& contact : subsystem_.internal_contacts_)
+        {
+            applyContactHessianProduct(subsystem_, contact, localDq, localY);
+        }
     }
 
     const RodEvaluation& DERCPUBackend::cachedEvaluation(int rod) const
@@ -442,24 +654,15 @@ namespace ksk::der
         return evaluations_.at(static_cast<size_t>(rod));
     }
 
-    int DERCPUBackend::vectorOffset(const Eigen::VectorXd& values,
-                                    int localOffset) const
-    {
-        const runtime::DofRange range = subsystem_.dofRange();
-        if (values.size() == range.scalarCount)
-        {
-            return localOffset;
-        }
-        return range.scalarOffset + localOffset;
-    }
-
     Eigen::VectorXd DERCPUBackend::gatherLocalVector(
-        const Eigen::VectorXd& values) const
+        runtime::ConstDofView values) const
     {
+        requireDofCount(values, subsystem_.localScalarCount(),
+                        "DERCPUBackend::gatherLocalVector");
         Eigen::VectorXd local(subsystem_.localScalarCount());
         for (int i = 0; i < subsystem_.localScalarCount(); ++i)
         {
-            local[i] = values[vectorOffset(values, i)];
+            local[i] = values[i];
         }
         return local;
     }
@@ -504,10 +707,10 @@ namespace ksk::der
         return rod.evaluate(subsystem_.gravity());
     }
 
-    void DERCPUBackend::addToVector(Eigen::VectorXd& values,
+    void DERCPUBackend::addToVector(runtime::DofView values,
                                     int localOffset,
                                     double value) const
     {
-        values[vectorOffset(values, localOffset)] += value;
+        values[localOffset] += value;
     }
 } // namespace ksk::der

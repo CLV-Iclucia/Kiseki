@@ -1,4 +1,4 @@
-#include <Runtime/contact-detection.h>
+﻿#include <Runtime/contact-detection.h>
 
 #include "contact-detection-backends.h"
 
@@ -14,27 +14,21 @@ ContactDetectionOutput detectContactTablesAlongDirection(
     const ContactDetectionConfig& config)
 {
   if (geometryDirection.isGPU()) {
-    return detail::detectContactsAlongDirectionGPU(
+    return detail::runCCDOnGPU(
         geometry, geometryDirection, config);
   }
-  return detail::detectContactsAlongDirectionCPU(
-      geometry, geometryDirection, config);
+  return detail::runCCDOnCPU(geometry, geometryDirection, config);
 }
 
-RoutedContactTables detectContactsAlongDirection(
+GlobalContactRouter runCCD(
     const GlobalGeometryManager& geometry,
     const GeometryBuffer& geometryDirection,
     const ContactDetectionConfig& config)
 {
-  ContactDetectionOutput output =
-      detectContactTablesAlongDirection(geometry, geometryDirection, config);
-  if (RoutedContactTables* host_tables =
-          std::get_if<RoutedContactTables>(&output)) {
-    return std::move(*host_tables);
-  }
-  throw std::runtime_error(
-      "detectContactsAlongDirection requested host contacts but the selected "
-      "backend produced device contact tables");
+    if (geometryDirection.isGPU()) {
+        throw std::runtime_error("runCCD requested host tables but got device tables");
+    }
+    return detail::runCCDOnCPU(geometry, geometryDirection, config);
 }
 
 }  // namespace ksk::runtime

@@ -11,15 +11,12 @@
 
 namespace fluid::cpu {
 
-// ---- 配置 ----
 struct AdvectorConfig {
     AdvectionMethod method = AdvectionMethod::FLIP;
     Real flipBlend = 0.97;
     int rk3Steps = 3;
 };
 
-// ---- 共享的内部 Advector 实现 ----
-// CPUAdvectorP2G 和 CPUAdvectorG2P 共享同一个底层 advector
 class CPUAdvector {
 public:
     CPUAdvector(CPUFluidContext& ctx, const AdvectorConfig& config);

@@ -1,10 +1,11 @@
 #include <Runtime/global-solver.h>
 
 #include <Runtime/contact-detection.h>
-#include <Runtime/contact-potential.h>
+#include <Runtime/contact-barrier-energy.h>
 
 #include <algorithm>
 #include <cmath>
+#include <ranges>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -12,17 +13,20 @@
 namespace ksk::runtime {
 namespace {
 
-GeometryBuffer makeGeometryDirectionBuffer(const DofBuffer& direction,
+GeometryBuffer createGeometryDirectionBuffer(const DofBuffer& direction,
                                            int point_count)
 {
-  if (direction.isCPU()) {
+  if (direction.isCPU())
     return GeometryBuffer::CPU(point_count);
+  return GeometryBuffer::GPU(*direction.device(), point_count);
+}
+
+DofBuffer createDofBufferLike(const DofBuffer& reference, int scalar_count)
+{
+  if (reference.isCPU()) {
+    return DofBuffer::CPU(scalar_count);
   }
-  if (rhi::Device* device = direction.device()) {
-    return GeometryBuffer::GPU(*device, point_count);
-  }
-  throw std::runtime_error(
-      "GPU direction buffer does not carry a valid device");
+  return DofBuffer::GPU(*reference.device(), scalar_count);
 }
 
 }  // namespace
@@ -33,7 +37,7 @@ void GlobalGaussNewtonSolver::prepare(const RuntimeScene& scene)
   geometry_point_count_ = static_cast<int>(scene.geometry.points.size());
 }
 
-RuntimeStepResult GlobalGaussNewtonSolver::step(RuntimeSimulation& simulation,
+RuntimeStepResult GlobalGaussNewtonSolver::step(SimulationContext& simulation,
                                                 double dt,
                                                 double time)
 {
@@ -44,8 +48,9 @@ RuntimeStepResult GlobalGaussNewtonSolver::step(RuntimeSimulation& simulation,
   auto& subsystems = simulation.subsystems();
 
   for (const auto& subsystem : subsystems) {
-    subsystem->readState(q, qdot);
-    subsystem->beginStep(q, qdot, dt);
+    const DofRange range = subsystem->dofRange();
+    subsystem->readState(q.slice(range), qdot.slice(range));
+    subsystem->beginStep(q.slice(range), qdot.slice(range), dt);
   }
 
   RuntimeStepResult result;
@@ -53,14 +58,15 @@ RuntimeStepResult GlobalGaussNewtonSolver::step(RuntimeSimulation& simulation,
   const int scalar_count = simulation.scene().dofs.totalScalars;
 
   for (int iteration = 0; iteration < config.maxNewtonIterations; ++iteration) {
-    DofBuffer gradient = DofBuffer::CPU(scalar_count);
-    DofBuffer direction = DofBuffer::CPU(scalar_count);
+    DofBuffer gradient = createDofBufferLike(q, scalar_count);
+    DofBuffer direction = createDofBufferLike(q, scalar_count);
 
     for (const auto& subsystem : subsystems) {
-      subsystem->readState(q, qdot);
+      const DofRange range = subsystem->dofRange();
+      subsystem->readState(q.slice(range), qdot.slice(range));
       subsystem->updateInternalConstraints(time + dt, dt);
       subsystem->prepareLocalOperator(dt);
-      subsystem->assembleLocalGradient(gradient);
+      subsystem->assembleLocalGradient(gradient.slice(range));
       subsystem->updateGeometry(simulation.scene().geometry);
     }
     assembleContactGradient(simulation, gradient);
@@ -91,7 +97,7 @@ RuntimeStepResult GlobalGaussNewtonSolver::step(RuntimeSimulation& simulation,
     bool accepted = false;
     for (int line_search = 0;
          line_search < config.maxLineSearchIterations;
-         ++line_search) {
+         line_search++) {
       q.assignLinearCombination(q_before, alpha, direction);
       const double objective_trial = evaluateObjective(simulation, dt);
       const double armijo_rhs =
@@ -118,11 +124,13 @@ RuntimeStepResult GlobalGaussNewtonSolver::step(RuntimeSimulation& simulation,
   }
 
   for (const auto& subsystem : subsystems) {
-    subsystem->readState(q, qdot);
+    const DofRange range = subsystem->dofRange();
+    subsystem->readState(q.slice(range), qdot.slice(range));
   }
 
   for (const auto& subsystem : subsystems) {
-    subsystem->acceptStep(q, qdot, dt);
+    const DofRange range = subsystem->dofRange();
+    subsystem->acceptStep(q.slice(range), qdot.slice(range), dt);
     subsystem->updateGeometry(simulation.scene().geometry);
   }
 
@@ -130,43 +138,45 @@ RuntimeStepResult GlobalGaussNewtonSolver::step(RuntimeSimulation& simulation,
 }
 
 double GlobalGaussNewtonSolver::evaluateObjective(
-    RuntimeSimulation& simulation,
+    SimulationContext& simulation,
     double dt)
 {
   double objective = 0.0;
   DofBuffer& q = simulation.q();
   DofBuffer& qdot = simulation.qdot();
   for (const auto& subsystem : simulation.subsystems()) {
-    subsystem->readState(q, qdot);
-    objective += subsystem->evaluateObjective(q, qdot, dt);
+    const DofRange range = subsystem->dofRange();
+    subsystem->readState(q.slice(range), qdot.slice(range));
+    objective +=
+        subsystem->evaluateObjective(q.slice(range), qdot.slice(range), dt);
     subsystem->updateGeometry(simulation.scene().geometry);
   }
-  objective += evaluateContactEnergy(simulation.scene().geometry, simulation.scene().contacts);
+  objective += computeContactEnergy(simulation.scene().geometry, simulation.scene().contacts);
   return objective;
 }
 
 void GlobalGaussNewtonSolver::assembleContactGradient(
-    RuntimeSimulation& simulation,
+    SimulationContext& simulation,
     DofBuffer& gradient)
 {
-  const ContactTable& contacts = simulation.scene().contacts;
-  if (contacts.stencils.empty()) {
+  const ContactStencils& contacts = simulation.scene().contacts;
+  if (contacts.empty()) {
     return;
   }
 
   const ContactPotentialGradient contact_gradient =
-      evaluateContactGradient(simulation.scene().geometry, contacts);
+      computeContactGradient(simulation.scene().geometry, contacts);
   if (contact_gradient.points.empty()) {
     return;
   }
 
   for (const auto& subsystem : simulation.subsystems()) {
-    std::vector<GeometryPointId> points;
+    std::vector<PointIdx> points;
     std::vector<glm::dvec3> point_gradient;
     auto subsystem_id = subsystem->id();
 
     for (int i = 0; i < contact_gradient.points.size(); i++) {
-      const GeometryPointId point = contact_gradient.points[i];
+      const PointIdx point = contact_gradient.points[i];
       if (simulation.scene().geometry.pointOwner(point).subsystem != subsystem_id) {
         continue;
       }
@@ -178,12 +188,14 @@ void GlobalGaussNewtonSolver::assembleContactGradient(
       continue;
     }
     subsystem->scatterContactGradient(
-        points, GeometryBuffer::FromCPU(std::move(point_gradient)), gradient);
+        points,
+        GeometryBuffer::FromCPU(std::move(point_gradient)).view().asConst(),
+        gradient.slice(subsystem->dofRange()));
   }
 }
 
 void GlobalGaussNewtonSolver::updateContactsAlongDirection(
-    RuntimeSimulation& simulation,
+    SimulationContext& simulation,
     const DofBuffer& direction)
 {
   RuntimeScene& scene = simulation.scene();
@@ -202,33 +214,31 @@ void GlobalGaussNewtonSolver::updateContactsAlongDirection(
   };
 
   GeometryBuffer geometry_direction =
-      makeGeometryDirectionBuffer(direction, scene.geometry.pointCount());
+      createGeometryDirectionBuffer(direction, scene.geometry.pointCount());
 
   for (const auto& subsystem : simulation.subsystems()) {
-    subsystem->mapDirectionToGeometry(direction, geometry_direction);
+    subsystem->mapLocalDirectionToGeometry(
+        direction.slice(subsystem->dofRange()), geometry_direction.view());
   }
 
-  RoutedContactTables routed =
-      detectContactsAlongDirection(scene.geometry,
-                                   geometry_direction,
-                                   contact_config);
-  scene.contacts = std::move(routed.globalContacts);
+  GlobalContactRouter routed_contacts = runCCD(scene.geometry, geometry_direction, contact_config);
+  scene.contacts = std::move(routed_contacts.globalContacts);
 
   for (const auto& subsystem : simulation.subsystems()) {
-    ContactTable contacts;
+    ContactStencils contacts;
     const SubsystemId subsystem_id = subsystem->id();
-    for (SubsystemContactTable& entry : routed.internalContacts) {
+    for (auto& entry : routed_contacts.subsystemInternalContacts | std::views::values) {
       if (entry.subsystem == subsystem_id) {
         contacts = std::move(entry.contacts);
         break;
       }
     }
-    subsystem->setInternalContacts(std::move(contacts));
+    subsystem->applyInternalContacts(std::move(contacts));
   }
 }
 
 bool GlobalGaussNewtonSolver::solveNewtonDirection(
-    RuntimeSimulation& simulation,
+    SimulationContext& simulation,
     const DofBuffer& gradient,
     DofBuffer& direction)
 {
@@ -240,20 +250,20 @@ bool GlobalGaussNewtonSolver::solveNewtonDirection(
   }
 
   if (simulation.subsystems().size() == 1 &&
-      simulation.scene().contacts.stencils.empty()) {
+      simulation.scene().contacts.empty()) {
     return solveSingleSubsystemDirection(simulation, gradient, direction);
   }
 
   direction.setZero();
 
-  DofBuffer residual = DofBuffer::CPU(scalar_count);
+  DofBuffer residual = createDofBufferLike(gradient, scalar_count);
   residual.assignScaled(-1.0, gradient);
   const double rhs_norm = residual.norm();
   if (rhs_norm == 0.0) {
     return true;
   }
 
-  DofBuffer z = DofBuffer::CPU(scalar_count);
+  DofBuffer z = createDofBufferLike(gradient, scalar_count);
   applyPreconditioner(simulation, residual, z);
 
   DofBuffer search = z.clone();
@@ -263,7 +273,7 @@ bool GlobalGaussNewtonSolver::solveNewtonDirection(
   }
 
   const double tolerance = config.pcgTolerance * std::max(1.0, rhs_norm);
-  DofBuffer matrix_search = DofBuffer::CPU(scalar_count);
+  DofBuffer matrix_search = createDofBufferLike(gradient, scalar_count);
 
   for (int iteration = 0; iteration < config.maxPcgIterations; ++iteration) {
     applyGlobalMatrix(simulation, search, matrix_search);
@@ -296,59 +306,110 @@ bool GlobalGaussNewtonSolver::solveNewtonDirection(
 }
 
 bool GlobalGaussNewtonSolver::solveSingleSubsystemDirection(
-    RuntimeSimulation& simulation,
+    SimulationContext& simulation,
     const DofBuffer& gradient,
     DofBuffer& direction)
 {
   direction.setZero();
 
-  DofBuffer residual = DofBuffer::CPU(simulation.scene().dofs.totalScalars);
+  DofBuffer residual =
+      createDofBufferLike(gradient, simulation.scene().dofs.totalScalars);
   residual.assignScaled(-1.0, gradient);
   if (residual.norm() == 0.0) {
     return true;
   }
 
-  simulation.subsystems().front()->solveLocalSystem(residual, direction);
+  const DofRange range = simulation.subsystems().front()->dofRange();
+  simulation.subsystems().front()->solveLocalSystem(residual.slice(range),
+                                                    direction.slice(range));
   return std::isfinite(direction.norm());
 }
 
-void GlobalGaussNewtonSolver::applyGlobalMatrix(RuntimeSimulation& simulation,
+void GlobalGaussNewtonSolver::applyGlobalMatrix(SimulationContext& simulation,
                                                 const DofBuffer& x,
                                                 DofBuffer& y)
 {
   y.setZero();
   for (const auto& subsystem : simulation.subsystems()) {
-    subsystem->applyLocalMatrix(x, y);
+    const DofRange range = subsystem->dofRange();
+    subsystem->applyLocalMatrix(x.slice(range), y.slice(range));
   }
 
-  const ContactTable& contacts = simulation.scene().contacts;
-  if (contacts.stencils.empty()) {
+  const ContactStencils& contacts = simulation.scene().contacts;
+  if (!contacts.empty()) {
+    applyGlobalContactHessian(simulation, x, y);
+  }
+  for (const auto& subsystem : simulation.subsystems()) {
+    subsystem->applyInternalContactHessian(
+        x.slice(subsystem->dofRange()), y.slice(subsystem->dofRange()));
+  }
+}
+
+void GlobalGaussNewtonSolver::applyGlobalContactHessian(
+    SimulationContext& simulation,
+    const DofBuffer& x,
+    DofBuffer& y)
+{
+  const ContactStencils& contacts = simulation.scene().contacts;
+  if (contacts.empty()) {
+    return;
+  }
+
+  GeometryBuffer geometry_direction =
+      createGeometryDirectionBuffer(x, simulation.scene().geometry.pointCount());
+  for (const auto& subsystem : simulation.subsystems()) {
+    subsystem->mapLocalDirectionToGeometry(
+        x.slice(subsystem->dofRange()), geometry_direction.view());
+  }
+
+  const ContactPotentialGradient contact_hessian_product =
+      computeContactHessianProduct(
+          simulation.scene().geometry,
+          contacts,
+          geometry_direction.view().asConst());
+  if (contact_hessian_product.points.empty()) {
     return;
   }
 
   for (const auto& subsystem : simulation.subsystems()) {
-    subsystem->applyContactHessian(x, contacts, y);
+    std::vector<PointIdx> points;
+    std::vector<glm::dvec3> point_values;
+    const SubsystemId subsystem_id = subsystem->id();
+
+    for (int i = 0; i < contact_hessian_product.points.size(); ++i) {
+      const PointIdx point = contact_hessian_product.points[i];
+      if (simulation.scene().geometry.pointOwner(point).subsystem != subsystem_id)
+        continue;
+      points.push_back(point);
+      point_values.push_back(contact_hessian_product.gradient.cpu()[i]);
+    }
+
+    if (points.empty()) {
+      continue;
+    }
+    subsystem->scatterContactGradient(
+        points,
+        GeometryBuffer::FromCPU(std::move(point_values)).view().asConst(),
+        y.slice(subsystem->dofRange()));
   }
 }
 
 void GlobalGaussNewtonSolver::applyPreconditioner(
-    RuntimeSimulation& simulation,
+    SimulationContext& simulation,
     const DofBuffer& residual,
     DofBuffer& z)
 {
   z.setZero();
   for (const auto& subsystem : simulation.subsystems()) {
-    subsystem->solveLocalSystem(residual, z);
+    const DofRange range = subsystem->dofRange();
+    subsystem->solveLocalSystem(residual.slice(range), z.slice(range));
   }
 }
 
-SimulationRunner::SimulationRunner(RuntimeSimulation simulation, double timeStep)
+SimulationRunner::SimulationRunner(SimulationContext simulation, double timeStep)
     : simulation_(std::move(simulation))
     , time_step_(timeStep)
 {
-  if (time_step_ <= 0.0) {
-    throw std::invalid_argument("simulation time step must be positive");
-  }
 }
 
 RuntimeStepResult SimulationRunner::step()
@@ -361,9 +422,6 @@ RuntimeStepResult SimulationRunner::step()
 
 RuntimeStepResult SimulationRunner::run(int steps)
 {
-  if (steps <= 0) {
-    throw std::invalid_argument("simulation step count must be positive");
-  }
   for (int step_index = 0; step_index < steps; ++step_index) {
     step();
   }
@@ -372,7 +430,7 @@ RuntimeStepResult SimulationRunner::run(int steps)
 
 SimulationRunner buildSimulationRunner(const RuntimeSceneDesc& scene)
 {
-  return SimulationRunner(buildSimulation(scene), scene.timeStep);
+  return {buildSimulation(scene), scene.timeStep};
 }
 
 }  // namespace ksk::runtime

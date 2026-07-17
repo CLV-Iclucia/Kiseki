@@ -19,7 +19,6 @@ public:
     m_cvConsumer.notify_one();
   }
 
-  /// 返回 nullptr 表示已 shutdown。
   std::unique_ptr<SceneProxy> pop() {
     std::unique_lock lock(m_mutex);
     m_cvConsumer.wait(lock, [&] { return !m_queue.empty() || m_shutdown; });

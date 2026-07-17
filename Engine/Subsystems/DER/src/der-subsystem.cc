@@ -98,21 +98,21 @@ void DERSubsystem::declareGeometry(runtime::GlobalGeometryManager& geometry)
          ++vertex) {
       const int sample = sample_base + vertex;
       geometry_points_.push_back(
-          geometry.appendPoint(id_, sample, rod.state().position(vertex)));
+          geometry.addPoint(id_, sample, rod.state().position(vertex)));
     }
 
     for (int edge = 0; edge + 1 < static_cast<int>(rod.state().size());
          ++edge) {
-      const runtime::GeometryPointId p0 = geometry_points_[sample_base + edge];
-      const runtime::GeometryPointId p1 =
+      const runtime::PointIdx p0 = geometry_points_[sample_base + edge];
+      const runtime::PointIdx p1 =
           geometry_points_[sample_base + edge + 1];
-      geometry.appendEdge(p0, p1, rod.material().radius);
+      geometry.addEdge(p0, p1, rod.material().radius);
     }
   }
 }
 
-void DERSubsystem::writeState(runtime::DofBuffer& q,
-                              runtime::DofBuffer& qdot) const
+void DERSubsystem::writeState(runtime::DofView q,
+                              runtime::DofView qdot) const
 {
   if (usesGPU(q) || usesGPU(qdot)) {
     gpu_backend_->writeState(q, qdot);
@@ -121,8 +121,8 @@ void DERSubsystem::writeState(runtime::DofBuffer& q,
   cpu_backend_->writeState(q, qdot);
 }
 
-void DERSubsystem::readState(runtime::DofBuffer& q,
-                             runtime::DofBuffer& qdot)
+void DERSubsystem::readState(runtime::ConstDofView q,
+                             runtime::ConstDofView qdot)
 {
   if (usesGPU(q) || usesGPU(qdot)) {
     gpu_backend_->readState(q, qdot);
@@ -131,8 +131,8 @@ void DERSubsystem::readState(runtime::DofBuffer& q,
   cpu_backend_->readState(q, qdot);
 }
 
-void DERSubsystem::beginStep(const runtime::DofBuffer& q,
-                             const runtime::DofBuffer& qdot,
+void DERSubsystem::beginStep(runtime::ConstDofView q,
+                             runtime::ConstDofView qdot,
                              double dt)
 {
   if (usesGPU(q) || usesGPU(qdot)) {
@@ -142,8 +142,8 @@ void DERSubsystem::beginStep(const runtime::DofBuffer& q,
   cpu_backend_->beginStep(q, qdot, dt);
 }
 
-void DERSubsystem::acceptStep(const runtime::DofBuffer& q,
-                              runtime::DofBuffer& qdot,
+void DERSubsystem::acceptStep(runtime::ConstDofView q,
+                              runtime::DofView qdot,
                               double dt)
 {
   if (usesGPU(q) || usesGPU(qdot)) {
@@ -153,8 +153,8 @@ void DERSubsystem::acceptStep(const runtime::DofBuffer& q,
   cpu_backend_->acceptStep(q, qdot, dt);
 }
 
-double DERSubsystem::evaluateObjective(const runtime::DofBuffer& q,
-                                       const runtime::DofBuffer& qdot,
+double DERSubsystem::evaluateObjective(runtime::ConstDofView q,
+                                       runtime::ConstDofView qdot,
                                        double dt)
 {
   if (usesGPU(q) || usesGPU(qdot)) {
@@ -175,7 +175,7 @@ void DERSubsystem::prepareLocalOperator(double dt)
   cpu_backend_->prepareLocalOperator(dt);
 }
 
-void DERSubsystem::assembleLocalGradient(runtime::DofBuffer& g) const
+void DERSubsystem::assembleLocalGradient(runtime::DofView g) const
 {
   if (usesGPU(g)) {
     gpu_backend_->assembleLocalGradient(g);
@@ -184,8 +184,8 @@ void DERSubsystem::assembleLocalGradient(runtime::DofBuffer& g) const
   cpu_backend_->assembleLocalGradient(g);
 }
 
-void DERSubsystem::applyLocalMatrix(const runtime::DofBuffer& x,
-                                    runtime::DofBuffer& y) const
+void DERSubsystem::applyLocalMatrix(runtime::ConstDofView x,
+                                    runtime::DofView y) const
 {
   if (usesGPU(x) || usesGPU(y)) {
     gpu_backend_->applyLocalMatrix(x, y);
@@ -194,8 +194,8 @@ void DERSubsystem::applyLocalMatrix(const runtime::DofBuffer& x,
   cpu_backend_->applyLocalMatrix(x, y);
 }
 
-void DERSubsystem::solveLocalSystem(const runtime::DofBuffer& b,
-                                    runtime::DofBuffer& x) const
+void DERSubsystem::solveLocalSystem(runtime::ConstDofView b,
+                                    runtime::DofView x) const
 {
   if (usesGPU(b) || usesGPU(x)) {
     gpu_backend_->solveLocalSystem(b, x);
@@ -207,7 +207,7 @@ void DERSubsystem::solveLocalSystem(const runtime::DofBuffer& b,
 void DERSubsystem::updateGeometry(runtime::GlobalGeometryManager& geometry) const
 {
   for (int sample = 0; sample < static_cast<int>(samples_.size()); ++sample) {
-    const runtime::GeometryPointId point = geometry_points_.at(sample);
+    const runtime::PointIdx point = geometry_points_.at(sample);
     if (!geometry.contains(point)) {
       throw std::runtime_error("DERSubsystem geometry point id is stale");
     }
@@ -218,27 +218,27 @@ void DERSubsystem::updateGeometry(runtime::GlobalGeometryManager& geometry) cons
   }
 }
 
-void DERSubsystem::mapDirectionToGeometry(const runtime::DofBuffer& dq,
-                                          runtime::GeometryBuffer& dx) const
+void DERSubsystem::mapLocalDirectionToGeometry(runtime::ConstDofView localDq,
+                                          runtime::GeometryView globalDx) const
 {
-  if (usesGPU(dq) || usesGPU(dx)) {
-    gpu_backend_->mapDirectionToGeometry(dq, dx);
+  if (usesGPU(localDq) || usesGPU(globalDx)) {
+    gpu_backend_->mapLocalDirectionToGeometry(localDq, globalDx);
     return;
   }
-  cpu_backend_->mapDirectionToGeometry(dq, dx);
+  cpu_backend_->mapLocalDirectionToGeometry(localDq, globalDx);
 }
 
-void DERSubsystem::setInternalContacts(runtime::ContactTable contacts)
+void DERSubsystem::applyInternalContacts(runtime::ContactStencils contacts)
 {
-  // TODO: assemble DER-local contact energy/gradient/Hessian from these
-  // candidates. The routing path is in place, but DER contact physics is not.
+  // The CPU backend consumes these routed internal contacts when assembling
+  // contact energy, gradient, and Hessian products.
   internal_contacts_ = std::move(contacts);
 }
 
 void DERSubsystem::scatterContactGradient(
-    std::span<const runtime::GeometryPointId> points,
-    const runtime::GeometryBuffer& pointGradient,
-    runtime::DofBuffer& g) const
+    std::span<const runtime::PointIdx> points,
+    runtime::ConstGeometryView pointGradient,
+    runtime::DofView g) const
 {
   if (usesGPU(pointGradient) || usesGPU(g)) {
     gpu_backend_->scatterContactGradient(points, pointGradient, g);
@@ -247,15 +247,14 @@ void DERSubsystem::scatterContactGradient(
   cpu_backend_->scatterContactGradient(points, pointGradient, g);
 }
 
-void DERSubsystem::applyContactHessian(const runtime::DofBuffer& dq,
-                                       const runtime::ContactTable& contacts,
-                                       runtime::DofBuffer& y) const
+void DERSubsystem::applyInternalContactHessian(runtime::ConstDofView localDq,
+                                               runtime::DofView localY) const
 {
-  if (usesGPU(dq) || usesGPU(y)) {
-    gpu_backend_->applyContactHessian(dq, contacts, y);
+  if (usesGPU(localDq) || usesGPU(localY)) {
+    gpu_backend_->applyInternalContactHessian(localDq, localY);
     return;
   }
-  cpu_backend_->applyContactHessian(dq, contacts, y);
+  cpu_backend_->applyInternalContactHessian(localDq, localY);
 }
 
 void DERSubsystem::visit(runtime::CpuSubsystemBackend& backend)
@@ -278,7 +277,7 @@ const std::vector<DERRodOffset>& DERSubsystem::rodOffsets() const noexcept
   return rod_offsets_;
 }
 
-const std::vector<runtime::GeometryPointId>& DERSubsystem::geometryPointIds() const noexcept
+const std::vector<runtime::PointIdx>& DERSubsystem::geometryPointIds() const noexcept
 {
   return geometry_points_;
 }
@@ -345,14 +344,24 @@ void DERSubsystem::rebuildSamples()
   }
 }
 
-bool DERSubsystem::usesGPU(const runtime::DofBuffer& buffer) const noexcept
+bool DERSubsystem::usesGPU(runtime::ConstDofView view) const noexcept
 {
-  return buffer.isGPU();
+  return view.isGPU();
 }
 
-bool DERSubsystem::usesGPU(const runtime::GeometryBuffer& buffer) const noexcept
+bool DERSubsystem::usesGPU(runtime::DofView view) const noexcept
 {
-  return buffer.isGPU();
+  return view.isGPU();
+}
+
+bool DERSubsystem::usesGPU(runtime::ConstGeometryView view) const noexcept
+{
+  return view.isGPU();
+}
+
+bool DERSubsystem::usesGPU(runtime::GeometryView view) const noexcept
+{
+  return view.isGPU();
 }
 
 }  // namespace ksk::der

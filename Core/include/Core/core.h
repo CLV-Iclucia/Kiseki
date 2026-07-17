@@ -56,8 +56,4 @@ template <typename T> struct TMatrix<T, 4> {
   using type = glm::tmat4x4<T>;
 };
 template <typename T, int Dim> using Matrix = typename TMatrix<T, Dim>::type;
-enum Device {
-  CPU = 0,
-  GPU = 1,
-};
 } // namespace ksk::core

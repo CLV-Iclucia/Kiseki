@@ -62,25 +62,20 @@ private:
     std::unique_ptr<SceneProxy> currentFrame;
 
     while (m_running) {
-      // 1. 非阻塞尝试获取新帧；如果有就更新，没有就复用上一帧
       if (auto newFrame = m_queue.tryPop())
         currentFrame = std::move(newFrame);
 
-      // 如果还没有任何帧（模拟尚未推送第一帧），阻塞等一次
       if (!currentFrame) {
         currentFrame = m_queue.pop();
         if (!currentFrame) break; // shutdown
       }
 
-      // 2. 处理用户输入
       if (m_inputCallback)
         m_inputCallback(m_camera);
 
-      // 3. 渲染当前帧
       currentFrame->camera = m_camera;
       drawFrame(*currentFrame);
 
-      // 4. swap + poll events（保持窗口响应）
       if (!pollAndSwap()) {
         m_running = false;
         m_queue.shutdown();
@@ -94,7 +89,6 @@ private:
   std::atomic<bool> m_running{false};
 };
 
-/// 工厂函数
 std::unique_ptr<Renderer> createRenderer(const RendererConfig& config = {});
 
 } // namespace ksk::renderer

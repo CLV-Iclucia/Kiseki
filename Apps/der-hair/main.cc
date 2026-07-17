@@ -1,3 +1,4 @@
+#include <DER/der-scene.h>
 #include <Runtime/global-solver.h>
 #include <Renderer/simulation-app.h>
 #include <SceneObjects/hair.h>
@@ -53,7 +54,7 @@ void printTipPositions(const ksk::runtime::SimulationRunner& simulation,
   for (int hair = 0; hair < static_cast<int>(hairVertexCounts.size()); ++hair) {
     offset += hairVertexCounts[static_cast<size_t>(hair)];
     const glm::dvec3 tip =
-        geometry.worldPosition(ksk::runtime::GeometryPointId{offset - 1});
+        geometry.worldPosition(ksk::runtime::PointIdx{offset - 1});
     std::cout << " hair" << hair << "_tip=("
               << tip.x << ", " << tip.y << ", " << tip.z << ")";
   }
@@ -119,7 +120,7 @@ std::unique_ptr<ksk::renderer::SceneProxy> buildProxy(
   hairs.positions.reserve(geometry.points.size());
   for (int point = 0; point < geometry.pointCount(); ++point) {
     hairs.positions.push_back(
-        toVec3f(geometry.worldPosition(ksk::runtime::GeometryPointId{point})));
+        toVec3f(geometry.worldPosition(ksk::runtime::PointIdx{point})));
   }
   hairs.edges.reserve(geometry.edges.size());
   for (const auto& edge : geometry.edges) {
@@ -135,7 +136,7 @@ std::unique_ptr<ksk::renderer::SceneProxy> buildProxy(
   vertices.positions.reserve(geometry.points.size());
   for (int point = 0; point < geometry.pointCount(); ++point) {
     vertices.positions.push_back(
-        toVec3f(geometry.worldPosition(ksk::runtime::GeometryPointId{point})));
+        toVec3f(geometry.worldPosition(ksk::runtime::PointIdx{point})));
   }
   proxy->particles.push_back(std::move(vertices));
 

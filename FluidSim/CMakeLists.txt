@@ -37,7 +37,7 @@ if(KISEKI_BUILD_RHI)
         ${gpu_srcs}       ${gpu_headers}
     )
 
-    target_link_libraries(FluidSim PUBLIC Kiseki::Core Kiseki::Spatify TBB::tbb Kiseki::RHI)
+    target_link_libraries(FluidSim PUBLIC Kiseki::Core Kiseki::Spatify TBB::tbb Kiseki::RHI Kiseki::RPK)
 else()
     message(STATUS "[FluidSim] RHI not available — GPU backend excluded")
 

@@ -12,8 +12,8 @@ DERGpuBackend::DERGpuBackend(DERSubsystem& subsystem)
 {
 }
 
-void DERGpuBackend::writeState(runtime::DofBuffer& q,
-                               runtime::DofBuffer& qdot) const
+void DERGpuBackend::writeState(runtime::DofView q,
+                               runtime::DofView qdot) const
 {
   requireGPU(q, "DERGpuBackend::writeState");
   requireGPU(qdot, "DERGpuBackend::writeState");
@@ -21,8 +21,8 @@ void DERGpuBackend::writeState(runtime::DofBuffer& q,
   unsupported("DERGpuBackend::writeState");
 }
 
-void DERGpuBackend::readState(runtime::DofBuffer& q,
-                              runtime::DofBuffer& qdot)
+void DERGpuBackend::readState(runtime::ConstDofView q,
+                              runtime::ConstDofView qdot)
 {
   requireGPU(q, "DERGpuBackend::readState");
   requireGPU(qdot, "DERGpuBackend::readState");
@@ -30,8 +30,8 @@ void DERGpuBackend::readState(runtime::DofBuffer& q,
   unsupported("DERGpuBackend::readState");
 }
 
-void DERGpuBackend::beginStep(const runtime::DofBuffer& q,
-                              const runtime::DofBuffer& qdot,
+void DERGpuBackend::beginStep(runtime::ConstDofView q,
+                              runtime::ConstDofView qdot,
                               double dt)
 {
   (void)dt;
@@ -41,8 +41,8 @@ void DERGpuBackend::beginStep(const runtime::DofBuffer& q,
   unsupported("DERGpuBackend::beginStep");
 }
 
-void DERGpuBackend::acceptStep(const runtime::DofBuffer& q,
-                               runtime::DofBuffer& qdot,
+void DERGpuBackend::acceptStep(runtime::ConstDofView q,
+                               runtime::DofView qdot,
                                double dt)
 {
   (void)dt;
@@ -52,8 +52,8 @@ void DERGpuBackend::acceptStep(const runtime::DofBuffer& q,
   unsupported("DERGpuBackend::acceptStep");
 }
 
-double DERGpuBackend::evaluateObjective(const runtime::DofBuffer& q,
-                                        const runtime::DofBuffer& qdot,
+double DERGpuBackend::evaluateObjective(runtime::ConstDofView q,
+                                        runtime::ConstDofView qdot,
                                         double dt)
 {
   (void)dt;
@@ -75,14 +75,14 @@ void DERGpuBackend::prepareLocalOperator(double dt)
   unsupported("DERGpuBackend::prepareLocalOperator");
 }
 
-void DERGpuBackend::assembleLocalGradient(runtime::DofBuffer& g) const
+void DERGpuBackend::assembleLocalGradient(runtime::DofView g) const
 {
   requireGPU(g, "DERGpuBackend::assembleLocalGradient");
   unsupported("DERGpuBackend::assembleLocalGradient");
 }
 
-void DERGpuBackend::applyLocalMatrix(const runtime::DofBuffer& x,
-                                     runtime::DofBuffer& y) const
+void DERGpuBackend::applyLocalMatrix(runtime::ConstDofView x,
+                                     runtime::DofView y) const
 {
   requireGPU(x, "DERGpuBackend::applyLocalMatrix");
   requireGPU(y, "DERGpuBackend::applyLocalMatrix");
@@ -90,8 +90,8 @@ void DERGpuBackend::applyLocalMatrix(const runtime::DofBuffer& x,
   unsupported("DERGpuBackend::applyLocalMatrix");
 }
 
-void DERGpuBackend::solveLocalSystem(const runtime::DofBuffer& b,
-                                     runtime::DofBuffer& x) const
+void DERGpuBackend::solveLocalSystem(runtime::ConstDofView b,
+                                     runtime::DofView x) const
 {
   requireGPU(b, "DERGpuBackend::solveLocalSystem");
   requireGPU(x, "DERGpuBackend::solveLocalSystem");
@@ -99,19 +99,19 @@ void DERGpuBackend::solveLocalSystem(const runtime::DofBuffer& b,
   unsupported("DERGpuBackend::solveLocalSystem");
 }
 
-void DERGpuBackend::mapDirectionToGeometry(const runtime::DofBuffer& dq,
-                                           runtime::GeometryBuffer& dx) const
+void DERGpuBackend::mapLocalDirectionToGeometry(runtime::ConstDofView localDq,
+                                           runtime::GeometryView globalDx) const
 {
-  requireGPU(dq, "DERGpuBackend::mapDirectionToGeometry");
-  requireGPU(dx, "DERGpuBackend::mapDirectionToGeometry");
-  requireSameDevice(dq, dx, "DERGpuBackend::mapDirectionToGeometry");
-  unsupported("DERGpuBackend::mapDirectionToGeometry");
+  requireGPU(localDq, "DERGpuBackend::mapLocalDirectionToGeometry");
+  requireGPU(globalDx, "DERGpuBackend::mapLocalDirectionToGeometry");
+  requireSameDevice(localDq, globalDx, "DERGpuBackend::mapLocalDirectionToGeometry");
+  unsupported("DERGpuBackend::mapLocalDirectionToGeometry");
 }
 
 void DERGpuBackend::scatterContactGradient(
-    std::span<const runtime::GeometryPointId> points,
-    const runtime::GeometryBuffer& pointGradient,
-    runtime::DofBuffer& g) const
+    std::span<const runtime::PointIdx> points,
+    runtime::ConstGeometryView pointGradient,
+    runtime::DofView g) const
 {
   (void)points;
   requireGPU(pointGradient, "DERGpuBackend::scatterContactGradient");
@@ -124,15 +124,15 @@ void DERGpuBackend::scatterContactGradient(
   unsupported("DERGpuBackend::scatterContactGradient");
 }
 
-void DERGpuBackend::applyContactHessian(const runtime::DofBuffer& dq,
-                                        const runtime::ContactTable& contacts,
-                                        runtime::DofBuffer& y) const
+void DERGpuBackend::applyInternalContactHessian(
+    runtime::ConstDofView localDq,
+    runtime::DofView localY) const
 {
-  (void)contacts;
-  requireGPU(dq, "DERGpuBackend::applyContactHessian");
-  requireGPU(y, "DERGpuBackend::applyContactHessian");
-  requireSameDevice(dq, y, "DERGpuBackend::applyContactHessian");
-  unsupported("DERGpuBackend::applyContactHessian");
+  requireGPU(localDq, "DERGpuBackend::applyInternalContactHessian");
+  requireGPU(localY, "DERGpuBackend::applyInternalContactHessian");
+  requireSameDevice(localDq, localY,
+                    "DERGpuBackend::applyInternalContactHessian");
+  unsupported("DERGpuBackend::applyInternalContactHessian");
 }
 
 void DERGpuBackend::unsupported(const char* operation)
@@ -141,34 +141,46 @@ void DERGpuBackend::unsupported(const char* operation)
                            " is a GPU placeholder and has no kernels yet");
 }
 
-void DERGpuBackend::requireGPU(const runtime::DofBuffer& buffer,
+void DERGpuBackend::requireGPU(runtime::ConstDofView view,
                                const char* operation)
 {
-  if (!buffer.isGPU()) {
+  if (!view.isGPU()) {
     throw std::runtime_error(std::string(operation) +
-                             " requires a GPU DofBuffer");
+                             " requires a GPU DofView");
   }
-  if (!buffer.gpu()) {
+  if (!view.gpu()) {
     throw std::runtime_error(std::string(operation) +
-                             " received an empty GPU DofBuffer");
+                             " received an empty GPU DofView");
   }
 }
 
-void DERGpuBackend::requireGPU(const runtime::GeometryBuffer& buffer,
+void DERGpuBackend::requireGPU(runtime::DofView view,
                                const char* operation)
 {
-  if (!buffer.isGPU()) {
+  requireGPU(view.asConst(), operation);
+}
+
+void DERGpuBackend::requireGPU(runtime::ConstGeometryView view,
+                               const char* operation)
+{
+  if (!view.isGPU()) {
     throw std::runtime_error(std::string(operation) +
-                             " requires a GPU GeometryBuffer");
+                             " requires a GPU GeometryView");
   }
-  if (!buffer.gpu()) {
+  if (!view.gpu()) {
     throw std::runtime_error(std::string(operation) +
-                             " received an empty GPU GeometryBuffer");
+                             " received an empty GPU GeometryView");
   }
 }
 
-void DERGpuBackend::requireSameDevice(const runtime::DofBuffer& lhs,
-                                      const runtime::DofBuffer& rhs,
+void DERGpuBackend::requireGPU(runtime::GeometryView view,
+                               const char* operation)
+{
+  requireGPU(view.asConst(), operation);
+}
+
+void DERGpuBackend::requireSameDevice(runtime::ConstDofView lhs,
+                                      runtime::ConstDofView rhs,
                                       const char* operation)
 {
   if (lhs.device() != rhs.device()) {
@@ -177,8 +189,8 @@ void DERGpuBackend::requireSameDevice(const runtime::DofBuffer& lhs,
   }
 }
 
-void DERGpuBackend::requireSameDevice(const runtime::DofBuffer& lhs,
-                                      const runtime::GeometryBuffer& rhs,
+void DERGpuBackend::requireSameDevice(runtime::ConstDofView lhs,
+                                      runtime::ConstGeometryView rhs,
                                       const char* operation)
 {
   if (lhs.device() != rhs.device()) {

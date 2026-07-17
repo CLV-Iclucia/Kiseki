@@ -58,7 +58,4 @@ struct HairObjectDesc : runtime::SceneObjectDesc {
   std::vector<HairBlock> restBlocks;
 };
 
-[[nodiscard]] runtime::ObjectRef addHair(runtime::RuntimeSceneDesc& scene,
-                                         HairObjectDesc hair);
-
 }  // namespace ksk::scene

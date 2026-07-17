@@ -18,6 +18,11 @@ public:
 
     virtual void readbackParticles(FluidFrame& out) = 0;
 
+    virtual bool readbackSurfaceMesh(FluidSurfaceMesh& out) {
+        out = {};
+        return false;
+    }
+
     virtual void updateCollider(const Mesh& mesh) = 0;
     virtual void updateSolverConfig(const SolverConfig& config) = 0;
 };

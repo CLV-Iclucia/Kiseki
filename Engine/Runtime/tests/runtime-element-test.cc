@@ -1,4 +1,4 @@
-#include <Scene/hair.h>
+﻿#include <Scene/hair.h>
 #include <Runtime/runtime-scene.h>
 
 #include <algorithm>

@@ -226,9 +226,10 @@ FLUIDSIM_COMPUTE_SHADER_BEGIN(ProjectCS)
     SHADER_PARAMS_END();
 FLUIDSIM_COMPUTE_SHADER_END()
 
-FLUIDSIM_COMPUTE_SHADER_BEGIN(ReconstructSdfCS)
+FLUIDSIM_COMPUTE_SHADER_BEGIN(BuildParticleHashCS)
     SHADER_PARAMS_BEGIN(Params)
-        SHADER_PARAM_UAV   (ksk::rhi::ImageRef, fluidSdf);
+        SHADER_PARAM_UAV   (ksk::rhi::BufferRef, particleCellKeys);
+        SHADER_PARAM_UAV   (ksk::rhi::BufferRef, particleIndices);
         SHADER_PARAM_SRV   (ksk::rhi::BufferRef, positions);
         SHADER_PARAM_SCALAR(uint32_t, gridSizeX);
         SHADER_PARAM_SCALAR(uint32_t, gridSizeY);
@@ -238,6 +239,33 @@ FLUIDSIM_COMPUTE_SHADER_BEGIN(ReconstructSdfCS)
         SHADER_PARAM_SCALAR(float, originY);
         SHADER_PARAM_SCALAR(float, originZ);
         SHADER_PARAM_SCALAR(uint32_t, numParticles);
+    SHADER_PARAMS_END();
+FLUIDSIM_COMPUTE_SHADER_END()
+
+FLUIDSIM_COMPUTE_SHADER_BEGIN(BuildParticleCellRangesCS)
+    SHADER_PARAMS_BEGIN(Params)
+        SHADER_PARAM_SRV   (ksk::rhi::BufferRef, particleCellKeys);
+        SHADER_PARAM_UAV   (ksk::rhi::BufferRef, cellStart);
+        SHADER_PARAM_UAV   (ksk::rhi::BufferRef, cellEnd);
+        SHADER_PARAM_SCALAR(uint32_t, numParticles);
+    SHADER_PARAMS_END();
+FLUIDSIM_COMPUTE_SHADER_END()
+
+FLUIDSIM_COMPUTE_SHADER_BEGIN(ReconstructSdfHashedCS)
+    SHADER_PARAMS_BEGIN(Params)
+        SHADER_PARAM_UAV   (ksk::rhi::ImageRef, fluidSdf);
+        SHADER_PARAM_SRV   (ksk::rhi::BufferRef, positions);
+        SHADER_PARAM_SRV   (ksk::rhi::BufferRef, particleIndices);
+        SHADER_PARAM_SRV   (ksk::rhi::BufferRef, cellStart);
+        SHADER_PARAM_SRV   (ksk::rhi::BufferRef, cellEnd);
+        SHADER_PARAM_SCALAR(uint32_t, gridSizeX);
+        SHADER_PARAM_SCALAR(uint32_t, gridSizeY);
+        SHADER_PARAM_SCALAR(uint32_t, gridSizeZ);
+        SHADER_PARAM_SCALAR(float, gridSpacing);
+        SHADER_PARAM_SCALAR(float, originX);
+        SHADER_PARAM_SCALAR(float, originY);
+        SHADER_PARAM_SCALAR(float, originZ);
+        SHADER_PARAM_SCALAR(uint32_t, searchRadius);
         SHADER_PARAM_SCALAR(float, particleRadius);
     SHADER_PARAMS_END();
 FLUIDSIM_COMPUTE_SHADER_END()
@@ -249,6 +277,25 @@ FLUIDSIM_COMPUTE_SHADER_BEGIN(SmoothSdfCS)
         SHADER_PARAM_SCALAR(uint32_t, gridSizeX);
         SHADER_PARAM_SCALAR(uint32_t, gridSizeY);
         SHADER_PARAM_SCALAR(uint32_t, gridSizeZ);
+    SHADER_PARAMS_END();
+FLUIDSIM_COMPUTE_SHADER_END()
+
+FLUIDSIM_COMPUTE_SHADER_BEGIN(MarchingCubesCS)
+    SHADER_PARAMS_BEGIN(Params)
+        SHADER_PARAM_IMAGE (ksk::rhi::ImageBinding, fluidSdf);
+        SHADER_PARAM_UAV   (ksk::rhi::BufferRef, positions);
+        SHADER_PARAM_UAV   (ksk::rhi::BufferRef, normals);
+        SHADER_PARAM_UAV   (ksk::rhi::BufferRef, triangles);
+        SHADER_PARAM_UAV   (ksk::rhi::BufferRef, counter);
+        SHADER_PARAM_SCALAR(uint32_t, gridSizeX);
+        SHADER_PARAM_SCALAR(uint32_t, gridSizeY);
+        SHADER_PARAM_SCALAR(uint32_t, gridSizeZ);
+        SHADER_PARAM_SCALAR(float, gridSpacing);
+        SHADER_PARAM_SCALAR(float, originX);
+        SHADER_PARAM_SCALAR(float, originY);
+        SHADER_PARAM_SCALAR(float, originZ);
+        SHADER_PARAM_SCALAR(uint32_t, maxTriangles);
+        SHADER_PARAM_SCALAR(uint32_t, maxVertices);
     SHADER_PARAMS_END();
 FLUIDSIM_COMPUTE_SHADER_END()
 

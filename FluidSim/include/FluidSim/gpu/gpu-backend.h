@@ -42,6 +42,7 @@ struct GPUGridState {
 class GPUAdvector;
 class GPUProjector;
 class GPUReconstructor;
+class GPUMarchingCubes;
 
 class GPUFluidBackend : public FluidBackend {
 public:
@@ -52,6 +53,7 @@ public:
     void initialize(const FluidScene& scene) override;
     void step(Real dt) override;
     void readbackParticles(FluidFrame& out) override;
+    bool readbackSurfaceMesh(FluidSurfaceMesh& out) override;
     void updateCollider(const Mesh& mesh) override;
     void updateSolverConfig(const SolverConfig& config) override;
 
@@ -71,6 +73,7 @@ private:
     std::unique_ptr<GPUAdvector>      advector_;
     std::unique_ptr<GPUProjector>     projector_;
     std::unique_ptr<GPUReconstructor> reconstructor_;
+    std::unique_ptr<GPUMarchingCubes> surfaceMesher_;
 
     DirichletCS dirichlet_;
     ExtrapolateCS extrapolate_;

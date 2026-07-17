@@ -16,7 +16,7 @@ std::vector<runtime::ObjectRef> HairObjectDesc::rodRefs(
   result.reserve(children().size());
   for (runtime::ObjectId childId : children()) {
     runtime::ObjectRef child = scene.findObjectById(childId);
-    if (child.isValid() && child.isA<der::RodObject>()) {
+    if (child.isValid() && child.isA<RodObject>()) {
       result.push_back(child);
     }
   }

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <Runtime/buffers.h>
 #include <Runtime/runtime-scene.h>
@@ -10,20 +10,20 @@
 
 namespace ksk::runtime {
 
-class RuntimeSimulation {
+class SimulationContext {
  public:
-  RuntimeSimulation() = default;
-  explicit RuntimeSimulation(std::vector<std::unique_ptr<Subsystem>> subsystems,
+  SimulationContext() = default;
+  explicit SimulationContext(std::vector<std::unique_ptr<Subsystem>> subsystems,
                              GlobalSolverConfig solver = {},
                              glm::dvec3 gravity = glm::dvec3(0.0, -9.81, 0.0));
-  RuntimeSimulation(std::vector<std::unique_ptr<Subsystem>> subsystems,
+  SimulationContext(std::vector<std::unique_ptr<Subsystem>> subsystems,
                     std::vector<std::string> subsystemTypeNames,
                     GlobalSolverConfig solver = {},
                     glm::dvec3 gravity = glm::dvec3(0.0, -9.81, 0.0));
-  RuntimeSimulation(const RuntimeSimulation&) = delete;
-  RuntimeSimulation& operator=(const RuntimeSimulation&) = delete;
-  RuntimeSimulation(RuntimeSimulation&&) noexcept = default;
-  RuntimeSimulation& operator=(RuntimeSimulation&&) noexcept = default;
+  SimulationContext(const SimulationContext&) = delete;
+  SimulationContext& operator=(const SimulationContext&) = delete;
+  SimulationContext(SimulationContext&&) noexcept = default;
+  SimulationContext& operator=(SimulationContext&&) noexcept = default;
 
   void rebuild();
 

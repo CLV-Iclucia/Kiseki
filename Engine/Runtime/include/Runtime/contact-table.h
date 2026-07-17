@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <array>
 #include <cstdint>
@@ -9,7 +9,7 @@
 namespace ksk::runtime {
 
 enum class ContactCase : std::uint16_t {
-  PP,
+  PP = 2,
   PE,
   PT,
   EE,
@@ -23,15 +23,6 @@ struct ContactStencil {
   Real thickness = 0.0;
 };
 
-struct ContactBatch {
-  ContactCase type = ContactCase::PP;
-  int first = 0;
-  int count = 0;
-};
-
-struct ContactTable {
-  std::vector<ContactStencil> stencils;
-  std::vector<ContactBatch> batches;
-};
+  using ContactStencils = std::vector<ContactStencil>;
 
 }  // namespace ksk::runtime

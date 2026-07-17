@@ -101,4 +101,10 @@ struct FluidFrame {
     std::vector<Vec3d> particleVelocities;
 };
 
+struct FluidSurfaceMesh {
+    std::vector<Vec3f> positions;
+    std::vector<Vec3u> triangles;
+    std::vector<Vec3f> normals;
+};
+
 } // namespace fluid

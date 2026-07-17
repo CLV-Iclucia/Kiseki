@@ -1,7 +1,7 @@
-#pragma once
+﻿#pragma once
 
 #include <Runtime/runtime-scene.h>
-#include <Runtime/runtime-simulation.h>
+#include <Runtime/simulation-context.h>
 
 namespace ksk::runtime {
 
@@ -15,7 +15,7 @@ struct RuntimeStepResult {
 class GlobalGaussNewtonSolver {
  public:
   void prepare(const RuntimeScene& scene);
-  RuntimeStepResult step(RuntimeSimulation& simulation,
+  RuntimeStepResult step(SimulationContext& simulation,
                          double dt,
                          double time = 0.0);
 
@@ -26,23 +26,26 @@ class GlobalGaussNewtonSolver {
   }
 
  private:
-  [[nodiscard]] static double evaluateObjective(RuntimeSimulation& simulation,
+  [[nodiscard]] static double evaluateObjective(SimulationContext& simulation,
                                                 double dt);
-  static void assembleContactGradient(RuntimeSimulation& simulation,
+  static void assembleContactGradient(SimulationContext& simulation,
                                       DofBuffer& gradient);
-  static void updateContactsAlongDirection(RuntimeSimulation& simulation,
+  static void updateContactsAlongDirection(SimulationContext& simulation,
                                            const DofBuffer& direction);
-  [[nodiscard]] static bool solveNewtonDirection(RuntimeSimulation& simulation,
+  [[nodiscard]] static bool solveNewtonDirection(SimulationContext& simulation,
                                                  const DofBuffer& gradient,
                                                  DofBuffer& direction);
   [[nodiscard]] static bool solveSingleSubsystemDirection(
-      RuntimeSimulation& simulation,
+      SimulationContext& simulation,
       const DofBuffer& gradient,
       DofBuffer& direction);
-  static void applyGlobalMatrix(RuntimeSimulation& simulation,
+  static void applyGlobalMatrix(SimulationContext& simulation,
                                 const DofBuffer& x,
                                 DofBuffer& y);
-  static void applyPreconditioner(RuntimeSimulation& simulation,
+  static void applyGlobalContactHessian(SimulationContext& simulation,
+                                        const DofBuffer& x,
+                                        DofBuffer& y);
+  static void applyPreconditioner(SimulationContext& simulation,
                                   const DofBuffer& residual,
                                   DofBuffer& z);
 
@@ -53,13 +56,13 @@ class GlobalGaussNewtonSolver {
 class SimulationRunner {
  public:
   SimulationRunner() = default;
-  SimulationRunner(RuntimeSimulation simulation, double timeStep);
+  SimulationRunner(SimulationContext simulation, double timeStep);
 
   [[nodiscard]] RuntimeStepResult step();
   [[nodiscard]] RuntimeStepResult run(int steps);
 
-  [[nodiscard]] RuntimeSimulation& simulation() noexcept { return simulation_; }
-  [[nodiscard]] const RuntimeSimulation& simulation() const noexcept
+  [[nodiscard]] SimulationContext& simulation() noexcept { return simulation_; }
+  [[nodiscard]] const SimulationContext& simulation() const noexcept
   {
     return simulation_;
   }
@@ -72,7 +75,7 @@ class SimulationRunner {
   [[nodiscard]] int stepsCompleted() const noexcept { return steps_completed_; }
 
  private:
-  RuntimeSimulation simulation_;
+  SimulationContext simulation_;
   GlobalGaussNewtonSolver solver_;
   RuntimeStepResult last_step_;
   double time_step_ = 1.0 / 60.0;

@@ -49,7 +49,7 @@ struct BufferDesc {
 // boilerplate below — there is intentionally no shared base class or CRTP
 // (see plan §3.0 / R21).
 //
-class Buffer : public ksk::core::NonCopyable {
+class Buffer : public core::NonCopyable {
  public:
   // ---- Refcount (hand-written; six lines per resource class) -------------
   void addRef() noexcept { m_rc.fetch_add(1, std::memory_order_relaxed); }

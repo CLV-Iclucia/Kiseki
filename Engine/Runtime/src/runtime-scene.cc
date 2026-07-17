@@ -1,6 +1,6 @@
-#include <Runtime/runtime-scene.h>
+﻿#include <Runtime/runtime-scene.h>
 
-#include <Runtime/runtime-simulation.h>
+#include <Runtime/simulation-context.h>
 #include <Runtime/subsystem.h>
 
 #include <algorithm>
@@ -70,9 +70,9 @@ void SubsystemBuildContext::addSubsystem(std::unique_ptr<Subsystem> subsystem,
   subsystem_type_names_.push_back(std::move(typeName));
 }
 
-RuntimeSimulation SubsystemBuildContext::finish()
+SimulationContext SubsystemBuildContext::finish()
 {
-  return RuntimeSimulation(
+  return SimulationContext(
       std::move(subsystems_),
       std::move(subsystem_type_names_),
       solver_,
@@ -248,7 +248,7 @@ std::vector<ObjectRef> RuntimeSceneDesc::findObjectsByTag(const std::string& tag
   return result;
 }
 
-RuntimeSimulation buildSimulation(const RuntimeSceneDesc& scene)
+SimulationContext buildSimulation(const RuntimeSceneDesc& scene)
 {
   SubsystemBuildContext context(scene.solverConfig, scene.gravity, &scene);
   for (const auto& subsystem : scene.subsystems) {

@@ -19,8 +19,11 @@ IMPLEMENT_COMPUTE_SHADER(ColliderCS, FLUIDSIM_SHADER_DIR "/collider.hlsl", "main
 IMPLEMENT_COMPUTE_SHADER(BuildWeightsCS, FLUIDSIM_SHADER_DIR "/build-weights.hlsl", "main");
 IMPLEMENT_COMPUTE_SHADER(BuildSystemCS, FLUIDSIM_SHADER_DIR "/build-system.hlsl", "main");
 IMPLEMENT_COMPUTE_SHADER(ProjectCS, FLUIDSIM_SHADER_DIR "/project.hlsl", "main");
-IMPLEMENT_COMPUTE_SHADER(ReconstructSdfCS, FLUIDSIM_SHADER_DIR "/reconstruct-sdf.hlsl", "main");
+IMPLEMENT_COMPUTE_SHADER(BuildParticleHashCS, FLUIDSIM_SHADER_DIR "/build-particle-hash.hlsl", "main");
+IMPLEMENT_COMPUTE_SHADER(BuildParticleCellRangesCS, FLUIDSIM_SHADER_DIR "/build-particle-cell-ranges.hlsl", "main");
+IMPLEMENT_COMPUTE_SHADER(ReconstructSdfHashedCS, FLUIDSIM_SHADER_DIR "/reconstruct-sdf-hashed.hlsl", "main");
 IMPLEMENT_COMPUTE_SHADER(SmoothSdfCS, FLUIDSIM_SHADER_DIR "/smooth-sdf.hlsl", "main");
+IMPLEMENT_COMPUTE_SHADER(MarchingCubesCS, FLUIDSIM_SHADER_DIR "/marching-cubes.hlsl", "main");
 IMPLEMENT_COMPUTE_SHADER(JacobiIterCS, FLUIDSIM_SHADER_DIR "/jacobi.hlsl", "main");
 IMPLEMENT_COMPUTE_SHADER(PCGSpMVCS, FLUIDSIM_SHADER_DIR "/cg-spmv.hlsl", "main");
 IMPLEMENT_COMPUTE_SHADER(PCGDotCS, FLUIDSIM_SHADER_DIR "/cg-dot-product.hlsl", "main");

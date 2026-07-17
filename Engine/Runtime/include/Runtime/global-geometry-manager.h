@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <array>
 #include <span>
@@ -7,6 +7,8 @@
 #include <glm/glm.hpp>
 
 #include <Runtime/types.h>
+
+#include <Spatify/bbox.h>
 
 namespace ksk::runtime {
 
@@ -28,7 +30,6 @@ struct GeometryOwner {
 
 struct GeometryReference {
   GeometryOwner owner;
-  SubsystemId subsystem = -1;
   int localIndex = -1;
 };
 
@@ -43,39 +44,31 @@ struct GeometryRange {
   }
 };
 
-struct GeometryBounds {
-  glm::dvec3 lower{0.0};
-  glm::dvec3 upper{0.0};
-  bool empty = true;
-
-  GeometryBounds& expand(const glm::dvec3& point) noexcept;
-};
-
+using GeometryBounds = spatify::BBox<Real, 3>;
 struct GeometryPoint {
-  GeometryPointId id = -1;
   GeometryOwner owner;
-  SubsystemId subsystem = -1;
   int localSampleId = -1;
   GeometryInstanceId instance = -1;
   int instanceVertex = -1;
   glm::dvec3 x{0.0};
+  glm::dvec3 restX{0.0};
 };
 
 struct GeometryEdge {
   int id = -1;
   GeometryReference ref;
-  GeometryPointId p0 = -1;
-  GeometryPointId p1 = -1;
+  PointIdx p0 = -1;
+  PointIdx p1 = -1;
   Real radius = 0.0;
 };
 
 struct GeometryTriangle {
   int id = -1;
   GeometryReference ref;
-  GeometryPointId p0 = -1;
-  GeometryPointId p1 = -1;
-  GeometryPointId p2 = -1;
-  Real radius = 0.0;
+  PointIdx p0 = -1;
+  PointIdx p1 = -1;
+  PointIdx p2 = -1;
+  Real thickness = 0.0;
 };
 
 struct GeometryMeshDesc {
@@ -98,10 +91,9 @@ struct GeometryInstance {
 struct GeometryStencilInfo {
   bool valid = true;
   bool hasCollider = false;
-  bool crossesSubsystems = false;
   bool hasInstanceGeometry = false;
   int subsystemCount = 0;
-  std::array<SubsystemId, 4> subsystems{};
+  std::array<SubsystemId, 2> subsystems{};
 };
 
 struct GlobalGeometryManager {
@@ -110,31 +102,37 @@ struct GlobalGeometryManager {
   std::vector<GeometryTriangle> triangles;
   std::vector<GeometryInstance> instances;
 
-  [[nodiscard]] GeometryPointId appendPoint(SubsystemId subsystem,
+  [[nodiscard]] PointIdx addPoint(SubsystemId subsystem,
                                             int localSampleId,
                                             const glm::dvec3& position);
-  [[nodiscard]] GeometryPointId appendColliderPoint(
+  [[nodiscard]] PointIdx addPoint(SubsystemId subsystem,
+                                            int localSampleId,
+                                            const glm::dvec3& position,
+                                            const glm::dvec3& restPosition);
+  [[nodiscard]] PointIdx addColliderPoint(
       int collider,
       int localSampleId,
       const glm::dvec3& position);
-  [[nodiscard]] int appendEdge(GeometryPointId p0,
-                               GeometryPointId p1,
+  [[nodiscard]] PointIdx addColliderPoint(
+      int collider,
+      int localSampleId,
+      const glm::dvec3& position,
+      const glm::dvec3& restPosition);
+  [[nodiscard]] int addEdge(PointIdx p0,
+                               PointIdx p1,
                                Real radius = 0.0);
-  [[nodiscard]] int appendTriangle(GeometryPointId p0,
-                                   GeometryPointId p1,
-                                   GeometryPointId p2,
-                                   Real radius = 0.0);
-  [[nodiscard]] GeometryInstanceId appendInstance(
+  [[nodiscard]] int addTriangle(PointIdx p0, PointIdx p1, PointIdx p2, Real thickness = 0.0);
+  [[nodiscard]] GeometryInstanceId addInstance(
       SubsystemId subsystem,
       int localInstanceId,
       const GeometryMeshDesc& mesh,
       const glm::dmat4& transform = glm::dmat4(1.0));
-  [[nodiscard]] GeometryInstanceId appendColliderInstance(
+  [[nodiscard]] GeometryInstanceId addColliderInstance(
       int collider,
       int localInstanceId,
       const GeometryMeshDesc& mesh,
       const glm::dmat4& transform = glm::dmat4(1.0));
-  [[nodiscard]] bool contains(GeometryPointId point) const noexcept;
+  [[nodiscard]] bool contains(PointIdx point) const noexcept;
 
   [[nodiscard]] int pointCount() const noexcept;
   [[nodiscard]] int edgeCount() const noexcept;
@@ -147,48 +145,49 @@ struct GlobalGeometryManager {
   [[nodiscard]] GeometryRange colliderEdgeRange(int collider) const noexcept;
   [[nodiscard]] GeometryRange colliderTriangleRange(int collider) const noexcept;
 
-  [[nodiscard]] GeometryReference pointRef(GeometryPointId point) const;
+  [[nodiscard]] GeometryReference pointRef(PointIdx point) const;
   [[nodiscard]] GeometryReference edgeRef(int edge) const;
   [[nodiscard]] GeometryReference triangleRef(int triangle) const;
 
-  [[nodiscard]] GeometryOwner pointOwner(GeometryPointId point) const;
-  [[nodiscard]] bool sameSubsystem(std::span<const GeometryPointId> stencil) const;
-  [[nodiscard]] bool hasCollider(std::span<const GeometryPointId> stencil) const;
-  [[nodiscard]] GeometryStencilInfo classify(
-      std::span<const GeometryPointId> stencil) const;
+  [[nodiscard]] GeometryOwner pointOwner(PointIdx point) const;
+  [[nodiscard]] bool sameSubsystem(std::span<const PointIdx> stencil) const;
+  [[nodiscard]] bool hasCollider(std::span<const PointIdx> stencil) const;
+  [[nodiscard]] GeometryStencilInfo classify(std::span<const PointIdx> stencil) const;
 
-  [[nodiscard]] GeometryPointId localToGlobalPoint(
+  [[nodiscard]] PointIdx localToGlobalPoint(
       SubsystemId subsystem,
       int localSampleId) const;
-  [[nodiscard]] GeometryPointId colliderLocalToGlobalPoint(
+  [[nodiscard]] PointIdx colliderLocalToGlobalPoint(
       int collider,
       int localSampleId) const;
-  [[nodiscard]] std::array<GeometryPointId, 2> globalEdge(int edge) const;
-  [[nodiscard]] std::array<GeometryPointId, 3> globalTriangle(
-      int triangle) const;
+  [[nodiscard]] std::array<PointIdx, 2> globalEdge(int edge) const;
+  [[nodiscard]] std::array<PointIdx, 3> globalTriangle(int triangle) const;
 
   [[nodiscard]] bool triangleContainsPoint(int triangle,
-                                           GeometryPointId point) const;
+                                           PointIdx point) const;
   [[nodiscard]] bool edgesAdjacent(int edgeA, int edgeB) const;
 
-  [[nodiscard]] GeometryBounds pointBounds(GeometryPointId point) const;
+  [[nodiscard]] GeometryBounds pointBounds(PointIdx point) const;
   [[nodiscard]] GeometryBounds edgeBounds(int edge) const;
   [[nodiscard]] GeometryBounds triangleBounds(int triangle) const;
   [[nodiscard]] GeometryBounds trajectoryPointBounds(
-      GeometryPointId point,
+      PointIdx point,
       std::span<const glm::dvec3> directions,
       Real toi) const;
   [[nodiscard]] GeometryBounds trajectoryEdgeBounds(
       int edge,
       std::span<const glm::dvec3> directions,
-      Real toi) const;
+      Real toi, Real radius = 0.0) const;
   [[nodiscard]] GeometryBounds trajectoryTriangleBounds(
       int triangle,
       std::span<const glm::dvec3> directions,
-      Real toi) const;
+      Real toi, Real thickness = 0.0) const;
 
-  [[nodiscard]] glm::dvec3 worldPosition(GeometryPointId point) const;
-  void setPointPosition(GeometryPointId point, const glm::dvec3& position);
+  [[nodiscard]] glm::dvec3 worldPosition(PointIdx point) const;
+  [[nodiscard]] glm::dvec3 restPosition(PointIdx point) const;
+  void setPointPosition(PointIdx point, const glm::dvec3& position);
+  void setPointRestPosition(PointIdx point,
+                            const glm::dvec3& restPosition);
   void setInstanceTransform(GeometryInstanceId instance,
                             const glm::dmat4& transform);
 
@@ -196,23 +195,24 @@ struct GlobalGeometryManager {
   [[nodiscard]] GeometryRange rangeFor(
       const std::vector<GeometryRange>& ranges,
       int ownerIndex) const noexcept;
-  [[nodiscard]] GeometryReference appendReference(
+  [[nodiscard]] GeometryReference addReference(
       std::vector<GeometryRange>& ranges,
       const GeometryOwner& owner,
       int nextGlobalIndex);
-  [[nodiscard]] GeometryPointId appendPoint(
+  [[nodiscard]] PointIdx addPoint(
       const GeometryOwner& owner,
       int localSampleId,
       const glm::dvec3& position,
+      const glm::dvec3& restPosition,
       GeometryInstanceId instance,
       int instanceVertex);
-  [[nodiscard]] GeometryInstanceId appendInstance(
+  [[nodiscard]] GeometryInstanceId addInstance(
       const GeometryOwner& owner,
       int localInstanceId,
       const GeometryMeshDesc& mesh,
       const glm::dmat4& transform);
-  [[nodiscard]] const GeometryPoint& checkedPoint(GeometryPointId point) const;
-  [[nodiscard]] GeometryPoint& checkedPoint(GeometryPointId point);
+  [[nodiscard]] const GeometryPoint& checkedPoint(PointIdx point) const;
+  [[nodiscard]] GeometryPoint& checkedPoint(PointIdx point);
   [[nodiscard]] const GeometryEdge& checkedEdge(int edge) const;
   [[nodiscard]] const GeometryTriangle& checkedTriangle(int triangle) const;
   [[nodiscard]] const GeometryInstance& checkedInstance(
