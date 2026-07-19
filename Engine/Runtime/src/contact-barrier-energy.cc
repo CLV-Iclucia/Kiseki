@@ -2,6 +2,7 @@
 
 #include <Contact/contact-barrier.h>
 #include <array>
+#include <cstdint>
 #include <stdexcept>
 #include <unordered_map>
 #include <vector>
@@ -10,30 +11,19 @@ namespace ksk::runtime
 {
     namespace
     {
-        struct StencilEvaluation
-        {
-            std::array<PointIdx, 4> points{-1, -1, -1, -1};
-            std::array<glm::dvec3, 4> x{
-                glm::dvec3(0.0),
-                glm::dvec3(0.0),
-                glm::dvec3(0.0),
-                glm::dvec3(0.0)
-            };
-            std::array<glm::dvec3, 4> restX{
-                glm::dvec3(0.0),
-                glm::dvec3(0.0),
-                glm::dvec3(0.0),
-                glm::dvec3(0.0)
-            };
-            int count = 0;
-            double dHat = 0.0;
-            double surfaceOffset = 0.0;
-            double kappa = 0.0;
-        };
-
         int stencilPointCount(ContactCase type)
         {
-            return static_cast<int>(type);
+            switch (type)
+            {
+            case ContactCase::PP:
+                return 2;
+            case ContactCase::PE:
+                return 3;
+            case ContactCase::PT:
+            case ContactCase::EE:
+                return 4;
+            }
+            return 0;
         }
 
         engine::contact::EBarrierStencil barrierStencilType(ContactCase type)
@@ -41,47 +31,33 @@ namespace ksk::runtime
             switch (type)
             {
             case ContactCase::PP:
-                return ksk::engine::contact::EBarrierStencil::PP;
+                return engine::contact::EBarrierStencil::PP;
             case ContactCase::PE:
-                return ksk::engine::contact::EBarrierStencil::PE;
+                return engine::contact::EBarrierStencil::PE;
             case ContactCase::PT:
-                return ksk::engine::contact::EBarrierStencil::PT;
+                return engine::contact::EBarrierStencil::PT;
             case ContactCase::EE:
-                return ksk::engine::contact::EBarrierStencil::EE;
+                return engine::contact::EBarrierStencil::EE;
             }
             return engine::contact::EBarrierStencil::PP;
         }
 
-        StencilEvaluation gatherStencil(const GlobalGeometryManager& geometry,
-                                        const ContactStencil& stencil)
+        engine::contact::GIPCBarrierStencil constructBarrierStencil(
+            const GlobalGeometryManager& geometry,
+            const ContactStencil& contact)
         {
-            StencilEvaluation evaluation;
-            evaluation.points = stencil.geometryIds;
-            evaluation.count = stencilPointCount(stencil.type);
-            evaluation.dHat = stencil.dHat;
-            evaluation.surfaceOffset = stencil.thickness;
-            evaluation.kappa = stencil.stiffness;
+            engine::contact::GIPCBarrierStencil barrier;
+            barrier.type = barrierStencilType(contact.type);
+            barrier.dHat = contact.dHat;
+            barrier.reservedDist = contact.thickness;
+            barrier.kappa = contact.stiffness;
 
-            for (int i = 0; i < evaluation.count; ++i)
+            for (int i = 0; i < stencilPointCount(contact.type); ++i)
             {
-                const PointIdx point = evaluation.points[i];
-                evaluation.x[i] = geometry.worldPosition(point);
-                evaluation.restX[i] = geometry.restPosition(point);
+                const PointIdx point = contact.geometryIds[static_cast<size_t>(i)];
+                barrier.x[static_cast<size_t>(i)] = geometry.worldPosition(point);
+                barrier.restX[static_cast<size_t>(i)] = geometry.restPosition(point);
             }
-            return evaluation;
-        }
-
-        ksk::engine::contact::GIPCBarrierStencil makeBarrierStencil(
-            const StencilEvaluation& stencil,
-            ContactCase type)
-        {
-            ksk::engine::contact::GIPCBarrierStencil barrier;
-            barrier.type = barrierStencilType(type);
-            barrier.x = stencil.x;
-            barrier.restX = stencil.restX;
-            barrier.dHat = stencil.dHat;
-            barrier.reservedDist = stencil.surfaceOffset;
-            barrier.kappa = stencil.kappa;
             return barrier;
         }
 
@@ -103,9 +79,35 @@ namespace ksk::runtime
             return offset;
         }
 
+        bool isNonZero(const glm::dvec3& value)
+        {
+            return value.x != 0.0 || value.y != 0.0 || value.z != 0.0;
+        }
+
+        bool isNonZero(const glm::dmat3& value)
+        {
+            for (int col = 0; col < 3; col++)
+            {
+                for (int row = 0; row < 3; row++)
+                {
+                    if (value[col][row] != 0.0)
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        std::uint64_t pointPairKey(PointIdx row, PointIdx col)
+        {
+            return (static_cast<std::uint64_t>(static_cast<std::uint32_t>(row)) << 32) |
+                   static_cast<std::uint32_t>(col);
+        }
+
         std::array<glm::dvec3, 4> gatherBarrierDirection(
-            const StencilEvaluation& stencil,
-            ConstGeometryView geometryDirection)
+            const ContactStencil& contact,
+            const ConstGeometryView& geometryDirection)
         {
             std::array direction{
                 glm::dvec3(0.0),
@@ -113,89 +115,74 @@ namespace ksk::runtime
                 glm::dvec3(0.0),
                 glm::dvec3(0.0)
             };
-            for (int i = 0; i < stencil.count; i++)
-                direction[i] = geometryDirection.cpu()[stencil.points[i]];
+            for (int i = 0; i < stencilPointCount(contact.type); i++)
+            {
+                direction[static_cast<size_t>(i)] =
+                    geometryDirection.cpu()[contact.geometryIds[static_cast<size_t>(i)]];
+            }
             return direction;
         }
 
         void scatterBarrierValues(
-            const StencilEvaluation& stencil,
+            const ContactStencil& contact,
             const std::array<glm::dvec3, 4>& values,
             std::vector<PointIdx>& points,
             std::vector<glm::dvec3>& out,
             std::unordered_map<PointIdx, int>& offsets)
         {
-            for (int i = 0; i < stencil.count; i++)
+            for (int i = 0; i < stencilPointCount(contact.type); i++)
             {
+                if (!isNonZero(values[i]))
+                {
+                    continue;
+                }
+
                 const int offset =
-                    appendPoint(points, out, offsets, stencil.points[static_cast<size_t>(i)]);
-                out[static_cast<size_t>(offset)] += values[static_cast<size_t>(i)];
+                    appendPoint(points,
+                                out,
+                                offsets,
+                                contact.geometryIds[static_cast<size_t>(i)]);
+                out[offset] += values[i];
             }
         }
 
-        bool hasBarrierValues(const StencilEvaluation& stencil,
-                              const std::array<glm::dvec3, 4>& values)
+        void scatterBarrierHessian(
+            const ContactStencil& contact,
+            const engine::contact::LocalBarrierHessian& hessian,
+            std::vector<ContactGeometryHessianBlock>& blocks,
+            std::unordered_map<std::uint64_t, int>& offsets)
         {
-            for (int i = 0; i < stencil.count; i++)
+            const int count = stencilPointCount(contact.type);
+            for (int row = 0; row < count; row++)
             {
-                const glm::dvec3& value = values[static_cast<size_t>(i)];
-                if (value.x != 0.0 || value.y != 0.0 || value.z != 0.0)
+                const PointIdx row_point = contact.geometryIds[static_cast<size_t>(row)];
+                for (int col = 0; col < count; col++)
                 {
-                    return true;
+                    const glm::dmat3& value = hessian.blocks[row][col];
+                    if (!isNonZero(value))
+                    {
+                        continue;
+                    }
+
+                    const PointIdx col_point =
+                        contact.geometryIds[static_cast<size_t>(col)];
+                    const std::uint64_t key = pointPairKey(row_point, col_point);
+                    const auto found = offsets.find(key);
+                    if (found != offsets.end())
+                    {
+                        blocks[found->second].value += value;
+                        continue;
+                    }
+
+                    const int offset = static_cast<int>(blocks.size());
+                    offsets.emplace(key, offset);
+                    blocks.push_back(ContactGeometryHessianBlock{
+                        .row = row_point,
+                        .col = col_point,
+                        .value = value,
+                    });
                 }
             }
-            return false;
-        }
-
-        double evaluateStencil(const ContactStencil& contact,
-                               const GlobalGeometryManager& geometry,
-                               std::vector<PointIdx>* gradient_points,
-                               std::vector<glm::dvec3>* gradient_values,
-                               std::unordered_map<PointIdx, int>* gradient_offsets,
-                               const ConstGeometryView* geometry_direction,
-                               std::vector<PointIdx>* hessian_points,
-                               std::vector<glm::dvec3>* hessian_values,
-                               std::unordered_map<PointIdx, int>* hessian_offsets)
-        {
-            const StencilEvaluation stencil = gatherStencil(geometry, contact);
-            const engine::contact::GIPCBarrierStencil barrier =
-                makeBarrierStencil(stencil, contact.type);
-
-            double energy = 0.0;
-            if (gradient_points != nullptr)
-            {
-                const engine::contact::LocalBarrierGradient gradient =
-                    engine::contact::computeGIPCBarrierGradient(barrier);
-                energy = gradient.energy;
-                if (hasBarrierValues(stencil, gradient.gradient))
-                {
-                    scatterBarrierValues(stencil,
-                                         gradient.gradient,
-                                         *gradient_points,
-                                         *gradient_values,
-                                         *gradient_offsets);
-                }
-            }
-            else
-            {
-                energy = ksk::engine::contact::computeGIPCBarrierEnergy(barrier);
-            }
-
-            if (geometry_direction != nullptr)
-            {
-                const std::array<glm::dvec3, 4> product =
-                    ksk::engine::contact::computeGIPCBarrierHessianProduct(
-                        barrier, gatherBarrierDirection(stencil, *geometry_direction));
-                if (hasBarrierValues(stencil, product))
-                {
-                    scatterBarrierValues(stencil,
-                                         product,
-                                         *hessian_points,
-                                         *hessian_values,
-                                         *hessian_offsets);
-                }
-            }
-            return energy;
         }
     } // namespace
 
@@ -205,23 +192,14 @@ namespace ksk::runtime
         double energy = 0.0;
         for (const ContactStencil& contact : contacts)
         {
-            engine::contact::GIPCBarrierStencil barrier;
-            for (int i = 0; i < stencilPointCount(contact.type); ++i)
-            {
-                const PointIdx point = contact.geometryIds[i];
-                barrier.x[i] = geometry.worldPosition(point);
-                barrier.restX[i] = geometry.restPosition(point);
-            }
-            barrier.type = barrierStencilType(contact.type);
-            barrier.dHat = contact.dHat;
-            barrier.reservedDist = contact.thickness;
-            barrier.kappa = contact.stiffness;
+            const engine::contact::GIPCBarrierStencil barrier =
+                constructBarrierStencil(geometry, contact);
             energy += engine::contact::computeGIPCBarrierEnergy(barrier);
         }
         return energy;
     }
 
-    ContactPotentialGradient computeContactGradient(
+    ContactPotentialGradient computeContactGradientWrtGeometry(
         const GlobalGeometryManager& geometry,
         const ContactStencils& contacts)
     {
@@ -231,18 +209,15 @@ namespace ksk::runtime
 
         for (const ContactStencil& contact : contacts)
         {
-            engine::contact::GIPCBarrierStencil barrier;
-            for (int i = 0; i < stencilPointCount(contact.type); ++i)
-            {
-                const PointIdx point = contact.geometryIds[i];
-                barrier.x[i] = geometry.worldPosition(point);
-                barrier.restX[i] = geometry.restPosition(point);
-            }
-            barrier.type = barrierStencilType(contact.type);
-            barrier.dHat = contact.dHat;
-            barrier.reservedDist = contact.thickness;
-            barrier.kappa = contact.stiffness;
-            auto localGradient = engine::contact::computeGIPCBarrierGradient(barrier);
+            const engine::contact::GIPCBarrierStencil barrier =
+                constructBarrierStencil(geometry, contact);
+            const engine::contact::LocalBarrierGradient localGradient =
+                engine::contact::computeGIPCBarrierGradient(barrier);
+            scatterBarrierValues(contact,
+                                 localGradient.gradient,
+                                 points,
+                                 values,
+                                 offsets);
         }
 
         return ContactPotentialGradient{
@@ -251,7 +226,35 @@ namespace ksk::runtime
         };
     }
 
-    ContactPotentialGradient computeContactHessianProduct(
+    ContactPotentialGradient computeContactGradient(
+        const GlobalGeometryManager& geometry,
+        const ContactStencils& contacts)
+    {
+        return computeContactGradientWrtGeometry(geometry, contacts);
+    }
+
+    ContactGeometryHessian computeContactHessianWrtGeometry(
+        const GlobalGeometryManager& geometry,
+        const ContactStencils& contacts)
+    {
+        std::vector<ContactGeometryHessianBlock> blocks;
+        std::unordered_map<std::uint64_t, int> offsets;
+
+        for (const ContactStencil& contact : contacts)
+        {
+            const engine::contact::GIPCBarrierStencil barrier =
+                constructBarrierStencil(geometry, contact);
+            const engine::contact::LocalBarrierHessian hessian =
+                engine::contact::computeGIPCBarrierHessian(barrier);
+            scatterBarrierHessian(contact, hessian, blocks, offsets);
+        }
+
+        return ContactGeometryHessian{
+            .blocks = std::move(blocks),
+        };
+    }
+
+    ContactPotentialGradient computeContactHessianProductWrtGeometry(
         const GlobalGeometryManager& geometry,
         const ContactStencils& contacts,
         ConstGeometryView geometryDirection)
@@ -268,20 +271,28 @@ namespace ksk::runtime
 
         for (const ContactStencil& stencil : contacts)
         {
-            evaluateStencil(stencil,
-                            geometry,
-                            nullptr,
-                            nullptr,
-                            nullptr,
-                            &geometryDirection,
-                            &points,
-                            &values,
-                            &offsets);
+            const engine::contact::GIPCBarrierStencil barrier =
+                constructBarrierStencil(geometry, stencil);
+            const std::array<glm::dvec3, 4> product =
+                ksk::engine::contact::computeGIPCBarrierHessianProduct(
+                    barrier, gatherBarrierDirection(stencil, geometryDirection));
+            scatterBarrierValues(stencil, product, points, values, offsets);
         }
 
         return ContactPotentialGradient{
             .points = std::move(points),
             .gradient = GeometryBuffer::FromCPU(std::move(values)),
         };
+    }
+
+    ContactPotentialGradient computeContactHessianProduct(
+        const GlobalGeometryManager& geometry,
+        const ContactStencils& contacts,
+        ConstGeometryView geometryDirection)
+    {
+        return computeContactHessianProductWrtGeometry(
+            geometry,
+            contacts,
+            geometryDirection);
     }
 } // namespace ksk::runtime

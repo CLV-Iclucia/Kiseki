@@ -50,6 +50,7 @@ struct GeometryPoint {
   int localSampleId = -1;
   GeometryInstanceId instance = -1;
   int instanceVertex = -1;
+  Real radius = 0.0;
   glm::dvec3 x{0.0};
   glm::dvec3 restX{0.0};
 };
@@ -108,7 +109,16 @@ struct GlobalGeometryManager {
   [[nodiscard]] PointIdx addPoint(SubsystemId subsystem,
                                             int localSampleId,
                                             const glm::dvec3& position,
+                                            Real radius);
+  [[nodiscard]] PointIdx addPoint(SubsystemId subsystem,
+                                            int localSampleId,
+                                            const glm::dvec3& position,
                                             const glm::dvec3& restPosition);
+  [[nodiscard]] PointIdx addPoint(SubsystemId subsystem,
+                                            int localSampleId,
+                                            const glm::dvec3& position,
+                                            const glm::dvec3& restPosition,
+                                            Real radius);
   [[nodiscard]] PointIdx addColliderPoint(
       int collider,
       int localSampleId,
@@ -117,7 +127,18 @@ struct GlobalGeometryManager {
       int collider,
       int localSampleId,
       const glm::dvec3& position,
+      Real radius);
+  [[nodiscard]] PointIdx addColliderPoint(
+      int collider,
+      int localSampleId,
+      const glm::dvec3& position,
       const glm::dvec3& restPosition);
+  [[nodiscard]] PointIdx addColliderPoint(
+      int collider,
+      int localSampleId,
+      const glm::dvec3& position,
+      const glm::dvec3& restPosition,
+      Real radius);
   [[nodiscard]] int addEdge(PointIdx p0,
                                PointIdx p1,
                                Real radius = 0.0);
@@ -204,6 +225,7 @@ struct GlobalGeometryManager {
       int localSampleId,
       const glm::dvec3& position,
       const glm::dvec3& restPosition,
+      Real radius,
       GeometryInstanceId instance,
       int instanceVertex);
   [[nodiscard]] GeometryInstanceId addInstance(

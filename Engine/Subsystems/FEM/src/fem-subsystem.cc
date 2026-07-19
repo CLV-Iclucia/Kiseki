@@ -259,6 +259,23 @@ void FEMSubsystem::scatterContactGradient(
   cpu_backend_->scatterContactGradient(points, pointGradient, g);
 }
 
+void FEMSubsystem::applyContactGeometryHessianProduct(
+    std::span<const runtime::PointIdx> gradientPoints,
+    runtime::ConstGeometryView pointGradient,
+    std::span<const runtime::PointIdx> productPoints,
+    runtime::ConstGeometryView pointHessianProduct,
+    runtime::ConstDofView localDq,
+    runtime::DofView localY) const
+{
+  cpu_backend_->applyContactGeometryHessianProduct(
+      gradientPoints,
+      pointGradient,
+      productPoints,
+      pointHessianProduct,
+      localDq,
+      localY);
+}
+
 void FEMSubsystem::applyInternalContactHessian(runtime::ConstDofView localDq,
                                                runtime::DofView localY) const
 {

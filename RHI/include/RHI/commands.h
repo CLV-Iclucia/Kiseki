@@ -220,7 +220,7 @@ class PushConstants {
 };
 
 // ---- CommandList -----------------------------------------------------------
-class CommandList : public ksk::core::NonCopyable {
+class CommandList : public core::NonCopyable {
  public:
   virtual ~CommandList() = default;
 

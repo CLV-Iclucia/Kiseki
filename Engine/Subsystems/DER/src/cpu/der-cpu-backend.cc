@@ -8,6 +8,9 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
+#include <fstream>
+#include <iomanip>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -244,6 +247,81 @@ namespace ksk::der
                     gatherBarrierDirection(*local, dq));
             scatterBarrierValues(*local, product, y);
         }
+
+        void appendContactHessianTriplets(
+            const DERSubsystem& subsystem,
+            const runtime::ContactStencil& contact,
+            std::vector<Eigen::Triplet<double>>& triplets)
+        {
+            const std::optional<LocalContactStencil> local =
+                gatherLocalContact(subsystem, contact);
+            if (!local)
+            {
+                return;
+            }
+
+            const engine::contact::LocalBarrierHessian hessian =
+                engine::contact::computeGIPCBarrierHessian(
+                    makeBarrierStencil(*local, contact.type));
+            for (int row_point = 0; row_point < local->count; row_point++)
+            {
+                const int row_offset = local->qOffsets[row_point];
+                for (int col_point = 0; col_point < local->count; col_point++)
+                {
+                    const int col_offset = local->qOffsets[col_point];
+                    const glm::dmat3& block =
+                        hessian.blocks[row_point][col_point];
+                    for (int row = 0; row < 3; row++)
+                    {
+                        for (int col = 0; col < 3; col++)
+                        {
+                            const double value = block[col][row];
+                            if (value != 0.0)
+                            {
+                                if (!std::isfinite(value))
+                                {
+                                    throw std::runtime_error(
+                                        "DER internal contact Hessian contains a non-finite value");
+                                }
+                                triplets.emplace_back(row_offset + row,
+                                                      col_offset + col,
+                                                      value);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        void dumpDenseMatrix(const Eigen::SparseMatrix<double>& matrix,
+                             const char* path)
+        {
+            std::ofstream out(path);
+            if (!out)
+            {
+                return;
+            }
+
+            out << "# DER CPU backend local matrix\n";
+            out << "# format: dense rows, whitespace-separated values\n";
+            out << "rows " << matrix.rows() << '\n';
+            out << "cols " << matrix.cols() << '\n';
+            out << "nonzeros " << matrix.nonZeros() << '\n';
+            out << std::scientific << std::setprecision(17);
+            const Eigen::MatrixXd dense = Eigen::MatrixXd(matrix);
+            for (int row = 0; row < dense.rows(); ++row)
+            {
+                for (int col = 0; col < dense.cols(); ++col)
+                {
+                    if (col > 0)
+                    {
+                        out << ' ';
+                    }
+                    out << dense(row, col);
+                }
+                out << '\n';
+            }
+        }
     } // namespace
 
     DERCPUBackend::DERCPUBackend(DERSubsystem& subsystem)
@@ -421,6 +499,9 @@ namespace ksk::der
         evaluations_.reserve(rods.size());
 
         std::vector<Eigen::Triplet<double>> triplets;
+        triplets.reserve(static_cast<size_t>(
+            subsystem_.localScalarCount() +
+            144 * subsystem_.internal_contacts_.size()));
         if (mass_diagonal_.size() != subsystem_.localScalarCount())
         {
             mass_diagonal_ = Eigen::VectorXd::Zero(subsystem_.localScalarCount());
@@ -463,6 +544,10 @@ namespace ksk::der
             }
 
             evaluations_.push_back(std::move(evaluation));
+        }
+        for (const runtime::ContactStencil& contact : subsystem_.internal_contacts_)
+        {
+            appendContactHessianTriplets(subsystem_, contact, triplets);
         }
 
         local_matrix_.resize(subsystem_.localScalarCount(),
@@ -555,6 +640,7 @@ namespace ksk::der
         solver.compute(local_matrix_);
         if (solver.info() != Eigen::Success)
         {
+            dumpDenseMatrix(local_matrix_, "der-local-matrix-factor-failure.txt");
             throw std::runtime_error("failed to factor DER CPU backend local matrix");
         }
         const Eigen::VectorXd local_x = solver.solve(gatherLocalVector(b));
@@ -630,6 +716,32 @@ namespace ksk::der
             addToVector(g, offset + 1, point_gradient.y);
             addToVector(g, offset + 2, point_gradient.z);
         }
+    }
+
+    void DERCPUBackend::applyContactGeometryHessianProduct(
+        std::span<const runtime::PointIdx> gradientPoints,
+        runtime::ConstGeometryView pointGradient,
+        std::span<const runtime::PointIdx> productPoints,
+        runtime::ConstGeometryView pointHessianProduct,
+        runtime::ConstDofView localDq,
+        runtime::DofView localY) const
+    {
+        requireCPU(pointGradient, "DERCpuBackend::applyContactGeometryHessianProduct");
+        requireCPU(pointHessianProduct, "DERCpuBackend::applyContactGeometryHessianProduct");
+        requireCPU(localDq, "DERCpuBackend::applyContactGeometryHessianProduct");
+        requireCPU(localY, "DERCpuBackend::applyContactGeometryHessianProduct");
+        if (gradientPoints.size() != static_cast<size_t>(pointGradient.pointCount()))
+        {
+            throw std::invalid_argument("contact point and gradient counts differ");
+        }
+        requireDofCount(localDq,
+                        subsystem_.localScalarCount(),
+                        "DERCpuBackend::applyContactGeometryHessianProduct");
+
+        (void)gradientPoints;
+        (void)localDq;
+
+        scatterContactGradient(productPoints, pointHessianProduct, localY);
     }
 
     void DERCPUBackend::applyInternalContactHessian(

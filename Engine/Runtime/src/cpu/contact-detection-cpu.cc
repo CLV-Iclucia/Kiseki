@@ -1,6 +1,6 @@
 ﻿#include <Runtime/contact-detection.h>
 
-#include "../contact-detection-backends.h"
+#include "../contact-detection-impl.h"
 
 #include <Spatify/lbvh.h>
 
@@ -19,12 +19,6 @@ namespace {
 
 constexpr int kMaxACCDIterations = 2000;
 constexpr Real kACCDGapFraction = 0.1;
-
-enum class PrimitiveType {
-  Point,
-  Edge,
-  Triangle,
-};
 
 enum class PointTriangleDistanceType {
   P_A,
@@ -73,15 +67,65 @@ struct PrimitiveAccessor {
 ContactStencil makeStencil(ContactCase type,
                            std::array<int, 4> ids,
                            const ContactDetectionConfig& config,
-                           Real primitive_thickness = 0.0)
+                           Real reserved_dist = 0.0)
 {
   return ContactStencil{
       .type = type,
       .geometryIds = ids,
       .dHat = config.dHat,
       .stiffness = config.stiffness,
-      .thickness = primitive_thickness,
+      .thickness = reserved_dist,
   };
+}
+
+ContactStencil makeCandidate(ContactCase type,
+                             std::array<int, 4> ids,
+                             const ContactDetectionConfig& config,
+                             Real primitive_thickness = 0.0)
+{
+  return makeStencil(type, ids, config, primitive_thickness);
+}
+
+Real pointRadius(const GlobalGeometryManager& geometry, PointIdx point)
+{
+  return geometry.points.at(static_cast<size_t>(point)).radius;
+}
+
+Real triangleSurfaceOffset(const GlobalGeometryManager& geometry,
+                           const std::array<PointIdx, 3>& triangle)
+{
+  Real offset = 0.0;
+  for (const GeometryTriangle& candidate : geometry.triangles) {
+    const std::array points{candidate.p0, candidate.p1, candidate.p2};
+    const bool same =
+        (points[0] == triangle[0] || points[0] == triangle[1] ||
+         points[0] == triangle[2]) &&
+        (points[1] == triangle[0] || points[1] == triangle[1] ||
+         points[1] == triangle[2]) &&
+        (points[2] == triangle[0] || points[2] == triangle[1] ||
+         points[2] == triangle[2]);
+    if (same) {
+      offset = std::max(offset, candidate.thickness);
+    }
+  }
+  return offset;
+}
+
+Real edgeSurfaceOffset(const GlobalGeometryManager& geometry,
+                       PointIdx p0,
+                       PointIdx p1,
+                       Real fallback = 0.0)
+{
+  Real offset = std::max({pointRadius(geometry, p0),
+                          pointRadius(geometry, p1),
+                          fallback});
+  for (const GeometryEdge& edge : geometry.edges) {
+    if ((edge.p0 == p0 && edge.p1 == p1) ||
+        (edge.p0 == p1 && edge.p1 == p0)) {
+      offset = std::max(offset, edge.radius);
+    }
+  }
+  return offset;
 }
 
 Real distanceSqrPointPoint(const glm::dvec3& a, const glm::dvec3& b)
@@ -447,8 +491,7 @@ bool shouldKeepByDistanceOrCCD(Real distance_sqr,
                                Real primitive_thickness)
 {
   const Real threshold =
-      std::max(config.detectionDistance, config.dHat) + config.thickness +
-      primitive_thickness;
+      std::max(config.detectionDistance, config.dHat) + primitive_thickness;
   return distance_sqr <= threshold * threshold ||
          (ccd_toi && *ccd_toi <= config.toi);
 }
@@ -465,6 +508,10 @@ std::optional<ContactStencil> createPointTriangleStencil(
   const glm::dvec3 a = geometry.worldPosition(triangle[0]);
   const glm::dvec3 b = geometry.worldPosition(triangle[1]);
   const glm::dvec3 c = geometry.worldPosition(triangle[2]);
+  const Real point_offset = pointRadius(geometry, point);
+  const Real triangle_offset =
+      std::max(primitive_thickness,
+               triangleSurfaceOffset(geometry, triangle));
   const PointTriangleDistanceType type =
       decidePointTriangleDistanceType(p, a, b, c);
   const Real distance_sqr = pointTriangleDistanceSqrByType(type, p, a, b, c);
@@ -476,37 +523,58 @@ std::optional<ContactStencil> createPointTriangleStencil(
                direction[triangle[1]],
                direction[triangle[2]]},
               config.toi,
-              config.thickness + primitive_thickness);
+              point_offset + triangle_offset);
   if (!shouldKeepByDistanceOrCCD(
-          distance_sqr, toi, config, primitive_thickness)) {
+          distance_sqr, toi, config, point_offset + triangle_offset)) {
     return std::nullopt;
   }
 
   switch (type) {
     case PointTriangleDistanceType::P_A:
       return makeStencil(
-          ContactCase::PP, {point, triangle[0], -1, -1}, config, primitive_thickness);
+          ContactCase::PP,
+          {point, triangle[0], -1, -1},
+          config,
+          point_offset + pointRadius(geometry, triangle[0]));
     case PointTriangleDistanceType::P_B:
       return makeStencil(
-          ContactCase::PP, {point, triangle[1], -1, -1}, config, primitive_thickness);
+          ContactCase::PP,
+          {point, triangle[1], -1, -1},
+          config,
+          point_offset + pointRadius(geometry, triangle[1]));
     case PointTriangleDistanceType::P_C:
       return makeStencil(
-          ContactCase::PP, {point, triangle[2], -1, -1}, config, primitive_thickness);
+          ContactCase::PP,
+          {point, triangle[2], -1, -1},
+          config,
+          point_offset + pointRadius(geometry, triangle[2]));
     case PointTriangleDistanceType::P_AB:
       return makeStencil(
-          ContactCase::PE, {point, triangle[0], triangle[1], -1}, config, primitive_thickness);
+          ContactCase::PE,
+          {point, triangle[0], triangle[1], -1},
+          config,
+          point_offset +
+              edgeSurfaceOffset(geometry, triangle[0], triangle[1], triangle_offset));
     case PointTriangleDistanceType::P_BC:
       return makeStencil(
-          ContactCase::PE, {point, triangle[1], triangle[2], -1}, config, primitive_thickness);
+          ContactCase::PE,
+          {point, triangle[1], triangle[2], -1},
+          config,
+          point_offset +
+              edgeSurfaceOffset(geometry, triangle[1], triangle[2], triangle_offset));
     case PointTriangleDistanceType::P_CA:
       return makeStencil(
-          ContactCase::PE, {point, triangle[2], triangle[0], -1}, config, primitive_thickness);
+          ContactCase::PE,
+          {point, triangle[2], triangle[0], -1},
+          config,
+          point_offset +
+              edgeSurfaceOffset(geometry, triangle[2], triangle[0], triangle_offset));
     case PointTriangleDistanceType::P_ABC:
       return makeStencil(
           ContactCase::PT,
           {point, triangle[0], triangle[1], triangle[2]},
           config,
-          primitive_thickness);
+          point_offset + triangle_offset);
   }
   return std::nullopt;
 }
@@ -523,6 +591,11 @@ std::optional<ContactStencil> createEdgeEdgeStencil(
   const glm::dvec3 a1 = geometry.worldPosition(first[1]);
   const glm::dvec3 b0 = geometry.worldPosition(second[0]);
   const glm::dvec3 b1 = geometry.worldPosition(second[1]);
+  const Real first_offset =
+      edgeSurfaceOffset(geometry, first[0], first[1], primitive_thickness);
+  const Real second_offset =
+      edgeSurfaceOffset(geometry, second[0], second[1], primitive_thickness);
+  const Real reserved_dist = first_offset + second_offset;
   const EdgeEdgeDistanceType type = decideEdgeEdgeDistanceType(a0, a1, b0, b1);
   const Real distance_sqr =
       edgeEdgeDistanceSqrByType(type, a0, a1, b0, b1);
@@ -534,9 +607,9 @@ std::optional<ContactStencil> createEdgeEdgeStencil(
                direction[second[0]],
                direction[second[1]]},
               config.toi,
-              config.thickness + primitive_thickness);
+              reserved_dist);
   if (!shouldKeepByDistanceOrCCD(
-          distance_sqr, toi, config, primitive_thickness)) {
+          distance_sqr, toi, config, reserved_dist)) {
     return std::nullopt;
   }
 
@@ -544,7 +617,7 @@ std::optional<ContactStencil> createEdgeEdgeStencil(
       ContactCase::EE,
       {first[0], first[1], second[0], second[1]},
       config,
-      primitive_thickness);
+      reserved_dist);
 }
 
 void validateCPUCCDInput(const GlobalGeometryManager& geometry,
@@ -568,10 +641,13 @@ std::vector<PrimitiveRef> buildPointPrimitives(
   std::vector<PrimitiveRef> primitives;
   primitives.reserve(static_cast<size_t>(geometry.pointCount()));
   for (int point = 0; point < geometry.pointCount(); ++point) {
+    const Real radius = geometry.points[static_cast<size_t>(point)].radius;
     primitives.push_back(PrimitiveRef{
         .id = point,
-        .reserved_dist = 0.0,
-        .bounds = geometry.trajectoryPointBounds(point, direction.cpu(), toi),
+        .reserved_dist = radius,
+        .bounds =
+            geometry.trajectoryPointBounds(point, direction.cpu(), toi)
+                .dilate(radius),
     });
   }
   return primitives;
@@ -589,7 +665,9 @@ std::vector<PrimitiveRef> buildEdgePrimitives(
     primitives.push_back(PrimitiveRef{
         .id = edge,
         .reserved_dist = radius,
-        .bounds = geometry.trajectoryEdgeBounds(edge, direction.cpu(), toi, radius),
+        .bounds =
+            geometry.trajectoryEdgeBounds(edge, direction.cpu(), toi, radius)
+                .dilate(radius),
     });
   }
   return primitives;
@@ -607,16 +685,13 @@ std::vector<PrimitiveRef> buildTrianglePrimitives(
     primitives.push_back(PrimitiveRef{
         .id = triangle,
         .reserved_dist = thickness,
-        .bounds = geometry.trajectoryTriangleBounds(triangle, direction.cpu(), toi, thickness),
+        .bounds =
+            geometry.trajectoryTriangleBounds(
+                triangle, direction.cpu(), toi, thickness)
+                .dilate(thickness),
     });
   }
   return primitives;
-}
-
-ContactStencils& internalTableFor(GlobalContactRouter& routed, SubsystemId subsystem)
-{
-  auto& subsystem_contacts = routed.subsystemInternalContacts[subsystem];
-  return subsystem_contacts.contacts;
 }
 
 int stencilPointCount(ContactCase type)
@@ -640,30 +715,167 @@ void routeStencil(GlobalContactRouter& routed,
   const int point_count = stencilPointCount(stencil.type);
   const GeometryStencilInfo info = geometry_manager.classify(std::span(stencil.geometryIds.data(), point_count));
   if (info.subsystemCount == 1) {
-    routed.subsystemInternalContacts[info.subsystems[0]].contacts.push_back(stencil);
+    auto& subsystem_contacts = routed.subsystemInternalContacts[info.subsystems[0]];
+    subsystem_contacts.subsystem = info.subsystems[0];
+    subsystem_contacts.contacts.push_back(stencil);
     return;
   }
   routed.globalContacts.push_back(stencil);
+}
+
+std::optional<ContactStencil> createActiveStencilFromCandidate(
+    const ContactStencil& candidate,
+    const GlobalGeometryManager& geometry,
+    const ContactDetectionConfig& config)
+{
+  const Real threshold = config.dHat + candidate.thickness;
+  const std::vector<glm::dvec3> zero_direction(
+      static_cast<size_t>(geometry.pointCount()), glm::dvec3(0.0));
+  switch (candidate.type) {
+    case ContactCase::PT:
+      return createPointTriangleStencil(
+          PointIdx{candidate.geometryIds[0]},
+          {PointIdx{candidate.geometryIds[1]},
+           PointIdx{candidate.geometryIds[2]},
+           PointIdx{candidate.geometryIds[3]}},
+          geometry,
+          zero_direction,
+          config,
+          0.0);
+    case ContactCase::EE:
+      return createEdgeEdgeStencil(
+          {PointIdx{candidate.geometryIds[0]},
+           PointIdx{candidate.geometryIds[1]}},
+          {PointIdx{candidate.geometryIds[2]},
+           PointIdx{candidate.geometryIds[3]}},
+          geometry,
+          zero_direction,
+          config,
+          0.0);
+    case ContactCase::PP: {
+      const Real distance_sqr = distanceSqrPointPoint(
+          geometry.worldPosition(PointIdx{candidate.geometryIds[0]}),
+          geometry.worldPosition(PointIdx{candidate.geometryIds[1]}));
+      if (distance_sqr > threshold * threshold) {
+        return std::nullopt;
+      }
+      return makeStencil(
+          ContactCase::PP,
+          {candidate.geometryIds[0], candidate.geometryIds[1], -1, -1},
+          config,
+          candidate.thickness);
+    }
+    case ContactCase::PE: {
+      const Real distance_sqr = distanceSqrPointLine(
+          geometry.worldPosition(PointIdx{candidate.geometryIds[0]}),
+          geometry.worldPosition(PointIdx{candidate.geometryIds[1]}),
+          geometry.worldPosition(PointIdx{candidate.geometryIds[2]}));
+      if (distance_sqr > threshold * threshold) {
+        return std::nullopt;
+      }
+      return makeStencil(
+          ContactCase::PE,
+          {candidate.geometryIds[0],
+           candidate.geometryIds[1],
+           candidate.geometryIds[2],
+           -1},
+          config,
+          candidate.thickness);
+    }
+  }
+  return std::nullopt;
+}
+
+std::optional<Real> computeCandidateTimeOfImpact(
+    const GlobalGeometryManager& geometry,
+    std::span<const glm::dvec3> direction,
+    const ContactStencil& candidate,
+    Real toi)
+{
+  switch (candidate.type) {
+    case ContactCase::PT: {
+      const PointIdx point{candidate.geometryIds[0]};
+      const std::array<PointIdx, 3> triangle{
+          PointIdx{candidate.geometryIds[1]},
+          PointIdx{candidate.geometryIds[2]},
+          PointIdx{candidate.geometryIds[3]}};
+      return runACCD(false,
+                     {geometry.worldPosition(point),
+                      geometry.worldPosition(triangle[0]),
+                      geometry.worldPosition(triangle[1]),
+                      geometry.worldPosition(triangle[2])},
+                     {direction[point],
+                      direction[triangle[0]],
+                      direction[triangle[1]],
+                      direction[triangle[2]]},
+                     toi,
+                     candidate.thickness);
+    }
+    case ContactCase::EE: {
+      const std::array<PointIdx, 2> first{
+          PointIdx{candidate.geometryIds[0]},
+          PointIdx{candidate.geometryIds[1]}};
+      const std::array<PointIdx, 2> second{
+          PointIdx{candidate.geometryIds[2]},
+          PointIdx{candidate.geometryIds[3]}};
+      return runACCD(true,
+                     {geometry.worldPosition(first[0]),
+                      geometry.worldPosition(first[1]),
+                      geometry.worldPosition(second[0]),
+                      geometry.worldPosition(second[1])},
+                     {direction[first[0]],
+                      direction[first[1]],
+                      direction[second[0]],
+                      direction[second[1]]},
+                     toi,
+                     candidate.thickness);
+    }
+    case ContactCase::PP:
+    case ContactCase::PE:
+      return std::nullopt;
+  }
+  return std::nullopt;
 }
 
 }  // namespace
 
 namespace detail {
 
-GlobalContactRouter runCCDOnCPU(
+namespace {
+
+void addCandidate(ContactCandidateDetectionResult& result,
+                  const GlobalGeometryManager& geometry,
+                  const GeometryBuffer& geometryDirection,
+                  const ContactDetectionConfig& config,
+                  bool compute_step_size,
+                  ContactStencil candidate)
+{
+  if (compute_step_size) {
+    const std::optional<Real> toi = computeCandidateTimeOfImpact(
+        geometry, geometryDirection.cpu(), candidate, config.toi);
+    if (toi) {
+      result.stepSizeUpperBound =
+          std::min(result.stepSizeUpperBound, std::clamp(*toi, 0.0, 1.0));
+    }
+  }
+  result.candidates.push_back(std::move(candidate));
+}
+
+ContactCandidateDetectionResult detectContactCandidatesAlongDirectionOnCPUImpl(
     const GlobalGeometryManager& geometry,
     const GeometryBuffer& geometryDirection,
-    const ContactDetectionConfig& config)
+    const ContactDetectionConfig& config,
+    bool compute_step_size)
 {
   if (config.storage == ContactDetectionStorage::Device) {
     throw std::runtime_error(
         "CPU contact detection cannot produce device contact tables");
   }
-  GlobalContactRouter routed;
+  ContactCandidateDetectionResult result;
   validateCPUCCDInput(geometry, geometryDirection);
 
   const Real query_dilation =
-      std::max(config.detectionDistance, config.dHat) + config.thickness;
+      std::max(config.detectionDistance, config.dHat);
 
   std::vector<PrimitiveRef> points =
       buildPointPrimitives(geometry, geometryDirection, config.toi);
@@ -677,7 +889,7 @@ GlobalContactRouter runCCDOnCPU(
 
     for (const PrimitiveRef& point : points) {
       const spatify::BBox<Real, 3> query_bounds =
-          point.bounds.dilate(query_dilation + point.reserved_dist);
+          point.bounds.dilate(query_dilation);
 
       triangle_bvh.runSpatialQuery(
           [&](int triangle_index) -> bool {
@@ -686,17 +898,18 @@ GlobalContactRouter runCCDOnCPU(
               return false;
             }
             const auto vertices = geometry.globalTriangle(triangle.id);
-            std::optional<ContactStencil> stencil =
-                createPointTriangleStencil(point.id,
-                                           vertices,
-                                           geometry,
-                                           geometryDirection.cpu(),
-                                           config,
-                                           point.reserved_dist + triangle.reserved_dist);
-            if (stencil)
-              routeStencil(routed, geometry, *stencil);
+            addCandidate(result,
+                         geometry,
+                         geometryDirection,
+                         config,
+                         compute_step_size,
+                         makeCandidate(
+                             ContactCase::PT,
+                             {point.id, vertices[0], vertices[1], vertices[2]},
+                             config,
+                             point.reserved_dist + triangle.reserved_dist));
 
-            return stencil.has_value();
+            return false;
           },
           [&](const spatify::BBox<Real, 3>& bounds) -> bool {
             return query_bounds.overlap(bounds);
@@ -706,7 +919,7 @@ GlobalContactRouter runCCDOnCPU(
 
   std::vector<PrimitiveRef> edges = buildEdgePrimitives(geometry, geometryDirection, config.toi);
   if (edges.empty()) {
-    return routed;
+    return result;
   }
 
   spatify::LBVH<Real> edge_bvh;
@@ -715,7 +928,7 @@ GlobalContactRouter runCCDOnCPU(
   for (int query_index = 0; query_index < edges.size(); query_index++) {
     const PrimitiveRef& query_edge = edges[query_index];
     const spatify::BBox<Real, 3> query_bounds =
-        query_edge.bounds.dilate(query_dilation + query_edge.reserved_dist);
+        query_edge.bounds.dilate(query_dilation);
 
     edge_bvh.runSpatialQuery(
         [&](int candidate_index) -> bool {
@@ -726,25 +939,76 @@ GlobalContactRouter runCCDOnCPU(
           if (geometry.edgesAdjacent(query_edge.id, candidate.id)) {
             return false;
           }
-          std::optional<ContactStencil> stencil =
-              createEdgeEdgeStencil(
-              geometry.globalEdge(query_edge.id),
-              geometry.globalEdge(candidate.id),
-              geometry,
-              geometryDirection.cpu(),
-              config,
-              query_edge.reserved_dist + candidate.reserved_dist);
+          const auto first = geometry.globalEdge(query_edge.id);
+          const auto second = geometry.globalEdge(candidate.id);
+          addCandidate(result,
+                       geometry,
+                       geometryDirection,
+                       config,
+                       compute_step_size,
+                       makeCandidate(
+                           ContactCase::EE,
+                           {first[0], first[1], second[0], second[1]},
+                           config,
+                           query_edge.reserved_dist + candidate.reserved_dist));
 
-          if (stencil)
-            routeStencil(routed, geometry, *stencil);
-
-          return stencil.has_value();
+          return false;
         },
         [&](const spatify::BBox<Real, 3>& bounds) -> bool {
           return query_bounds.overlap(bounds);
         });
        }
+  return result;
+}
+
+}  // namespace
+
+ContactCandidates detectContactCandidatesAlongDirectionOnCPU(
+    const GlobalGeometryManager& geometry,
+    const GeometryBuffer& geometryDirection,
+    const ContactDetectionConfig& config)
+{
+  return detectContactCandidatesAlongDirectionOnCPUImpl(
+             geometry, geometryDirection, config, false)
+      .candidates;
+}
+
+ContactCandidateDetectionResult
+detectContactCandidatesAndStepSizeAlongDirectionOnCPU(
+    const GlobalGeometryManager& geometry,
+    const GeometryBuffer& geometryDirection,
+    const ContactDetectionConfig& config)
+{
+  return detectContactCandidatesAlongDirectionOnCPUImpl(
+      geometry, geometryDirection, config, true);
+}
+
+GlobalContactRouter refreshActiveContactsFromCandidatesOnCPU(
+    const GlobalGeometryManager& geometry,
+    const ContactCandidates& candidates,
+    const ContactDetectionConfig& config)
+{
+  GlobalContactRouter routed;
+  for (const ContactStencil& candidate : candidates) {
+    std::optional<ContactStencil> active =
+        createActiveStencilFromCandidate(candidate, geometry, config);
+    if (active) {
+      routeStencil(routed, geometry, *active);
+    }
+  }
   return routed;
+}
+
+GlobalContactRouter runCCDOnCPU(
+    const GlobalGeometryManager& geometry,
+    const GeometryBuffer& geometryDirection,
+    const ContactDetectionConfig& config)
+{
+  ContactCandidates candidates =
+      detectContactCandidatesAlongDirectionOnCPU(
+          geometry, geometryDirection, config);
+  return refreshActiveContactsFromCandidatesOnCPU(
+      geometry, candidates, config);
 }
 
 }  // namespace detail

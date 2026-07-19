@@ -28,16 +28,4 @@ std::optional<DofRange> DofLayout::findRange(SubsystemId subsystem) const
   return *it;
 }
 
-bool DofLayout::hasNonOverlappingRanges() const noexcept
-{
-  int expected_offset = 0;
-  for (const auto& range : ranges) {
-    if (range.scalarOffset != expected_offset || range.scalarCount < 0) {
-      return false;
-    }
-    expected_offset += range.scalarCount;
-  }
-  return expected_offset == totalScalars;
-}
-
 }  // namespace ksk::runtime

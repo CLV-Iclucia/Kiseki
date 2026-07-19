@@ -22,7 +22,6 @@ struct DofLayout {
                                      int scalarCount,
                                      int blockSize = 0);
   [[nodiscard]] std::optional<DofRange> findRange(SubsystemId subsystem) const;
-  [[nodiscard]] bool hasNonOverlappingRanges() const noexcept;
 };
 
 }  // namespace ksk::runtime

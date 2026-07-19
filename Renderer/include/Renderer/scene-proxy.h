@@ -16,6 +16,13 @@ struct MeshProxy {
   core::Vec3f objectColor{-1.0f};
 };
 
+
+  struct VolumeProxy
+  {
+    std::string name;
+
+  };
+
 struct WireframeProxy {
   std::string name;
   std::vector<core::Vec3f> positions;
@@ -43,6 +50,7 @@ struct SceneProxy {
   std::vector<MeshProxy> meshes;
   std::vector<WireframeProxy> wireframes;
   std::vector<ParticleProxy> particles;
+  std::vector<VolumeProxy> volumes;
   CameraState camera;
   float simulationTime = 0.0f;
   int frameIndex = 0;

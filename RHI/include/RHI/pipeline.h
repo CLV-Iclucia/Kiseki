@@ -88,6 +88,11 @@ struct GraphicsPipelineDesc {
   bool operator<(const GraphicsPipelineDesc& o) const;
 };
 
+  struct RayTracingPipelineDesc
+  {
+
+  };
+
 // ComputePipelineDesc comparison (simple: just shader pointer)
 inline bool ComputePipelineDesc::operator<(const ComputePipelineDesc& o) const {
   return shader.get() < o.shader.get();
@@ -112,7 +117,7 @@ inline bool GraphicsPipelineDesc::operator<(const GraphicsPipelineDesc& o) const
   return vertexBindings < o.vertexBindings;
 }
 
-class Pipeline : public ksk::core::NonCopyable {
+class Pipeline : public core::NonCopyable {
  public:
   void addRef() noexcept { m_rc.fetch_add(1, std::memory_order_relaxed); }
   void release() noexcept {

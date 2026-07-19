@@ -4,8 +4,6 @@ add_library(Deform STATIC ${srcs})
 add_library(Kiseki::Deform ALIAS Deform)
 target_link_libraries(Deform PUBLIC Kiseki::Maths)
 target_include_directories(Deform PUBLIC include)
-add_executable(deform-explore apps/deform-explore.cc)
-target_link_libraries(deform-explore PUBLIC Kiseki::Deform)
 
 file(GLOB TESTS tests/*.cc)
 foreach (test ${TESTS})

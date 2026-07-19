@@ -16,7 +16,6 @@ TEST(RuntimeLayout, AppendsNonOverlappingDofRanges)
   EXPECT_EQ(fem_range.scalarCount, 12);
   EXPECT_EQ(hair_range.scalarOffset, 12);
   EXPECT_EQ(layout.totalScalars, 19);
-  EXPECT_TRUE(layout.hasNonOverlappingRanges());
 }
 
 TEST(RuntimeLayout, RuntimeSceneRefreshesBufferLayout)

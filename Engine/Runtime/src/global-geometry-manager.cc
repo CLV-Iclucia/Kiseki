@@ -8,7 +8,15 @@ PointIdx GlobalGeometryManager::addPoint(SubsystemId subsystem,
                                            int localSampleId,
                                            const glm::dvec3& position)
 {
-  return addPoint(subsystem, localSampleId, position, position);
+  return addPoint(subsystem, localSampleId, position, position, 0.0);
+}
+
+PointIdx GlobalGeometryManager::addPoint(SubsystemId subsystem,
+                                           int localSampleId,
+                                           const glm::dvec3& position,
+                                           Real radius)
+{
+  return addPoint(subsystem, localSampleId, position, position, radius);
 }
 
 PointIdx GlobalGeometryManager::addPoint(
@@ -17,12 +25,23 @@ PointIdx GlobalGeometryManager::addPoint(
     const glm::dvec3& position,
     const glm::dvec3& restPosition)
 {
+  return addPoint(subsystem, localSampleId, position, restPosition, 0.0);
+}
+
+PointIdx GlobalGeometryManager::addPoint(
+    SubsystemId subsystem,
+    int localSampleId,
+    const glm::dvec3& position,
+    const glm::dvec3& restPosition,
+    Real radius)
+{
   return addPoint(GeometryOwner{
                          .subsystem = subsystem,
                      },
                      localSampleId,
                      position,
                      restPosition,
+                     radius,
                      -1,
                      -1);
 }
@@ -32,7 +51,16 @@ PointIdx GlobalGeometryManager::addColliderPoint(
     int localSampleId,
     const glm::dvec3& position)
 {
-  return addColliderPoint(collider, localSampleId, position, position);
+  return addColliderPoint(collider, localSampleId, position, position, 0.0);
+}
+
+PointIdx GlobalGeometryManager::addColliderPoint(
+    int collider,
+    int localSampleId,
+    const glm::dvec3& position,
+    Real radius)
+{
+  return addColliderPoint(collider, localSampleId, position, position, radius);
 }
 
 PointIdx GlobalGeometryManager::addColliderPoint(
@@ -41,12 +69,23 @@ PointIdx GlobalGeometryManager::addColliderPoint(
     const glm::dvec3& position,
     const glm::dvec3& restPosition)
 {
+  return addColliderPoint(collider, localSampleId, position, restPosition, 0.0);
+}
+
+PointIdx GlobalGeometryManager::addColliderPoint(
+    int collider,
+    int localSampleId,
+    const glm::dvec3& position,
+    const glm::dvec3& restPosition,
+    Real radius)
+{
   return addPoint(GeometryOwner{
                          .collider = collider,
                      },
                      localSampleId,
                      position,
                      restPosition,
+                     radius,
                      -1,
                      -1);
 }
@@ -56,6 +95,7 @@ PointIdx GlobalGeometryManager::addPoint(
     int localSampleId,
     const glm::dvec3& position,
     const glm::dvec3& restPosition,
+    Real radius,
     GeometryInstanceId instance,
     int instanceVertex)
 {
@@ -73,6 +113,7 @@ PointIdx GlobalGeometryManager::addPoint(
       .localSampleId = localSampleId,
       .instance = instance,
       .instanceVertex = instanceVertex,
+      .radius = radius,
       .x = position,
       .restX = restPosition,
   });
@@ -205,6 +246,7 @@ GeometryInstanceId GlobalGeometryManager::addInstance(
                 vertex,
                 mesh.vertices[static_cast<size_t>(vertex)],
                 mesh.vertices[static_cast<size_t>(vertex)],
+                mesh.radius,
                 instance_id,
                 vertex);
   }

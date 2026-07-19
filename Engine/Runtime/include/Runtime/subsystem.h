@@ -44,6 +44,14 @@ class Subsystem {
       std::span<const PointIdx> points,
       ConstGeometryView pointGradient,
       DofView g) const = 0;
+  // Pull back contact derivatives from geometry space to local DOF space.
+  virtual void applyContactGeometryHessianProduct(
+      std::span<const PointIdx> gradientPoints,
+      ConstGeometryView pointGradient,
+      std::span<const PointIdx> productPoints,
+      ConstGeometryView pointHessianProduct,
+      ConstDofView localDq,
+      DofView localY) const = 0;
   virtual void applyInternalContactHessian(ConstDofView localDq,
                                            DofView localY) const = 0;
   virtual void visit(CpuSubsystemBackend& backend) = 0;

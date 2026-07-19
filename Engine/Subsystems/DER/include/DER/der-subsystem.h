@@ -74,6 +74,13 @@ class DERSubsystem final : public runtime::Subsystem {
       std::span<const runtime::PointIdx> points,
       runtime::ConstGeometryView pointGradient,
       runtime::DofView g) const override;
+  void applyContactGeometryHessianProduct(
+      std::span<const runtime::PointIdx> gradientPoints,
+      runtime::ConstGeometryView pointGradient,
+      std::span<const runtime::PointIdx> productPoints,
+      runtime::ConstGeometryView pointHessianProduct,
+      runtime::ConstDofView localDq,
+      runtime::DofView localY) const override;
   void applyInternalContactHessian(runtime::ConstDofView localDq,
                                    runtime::DofView localY) const override;
   void visit(runtime::CpuSubsystemBackend& backend) override;

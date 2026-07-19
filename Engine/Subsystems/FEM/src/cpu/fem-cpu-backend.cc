@@ -272,6 +272,77 @@ namespace ksk::engine::fem
                     gatherBarrierDirection(*local, dq));
             scatterBarrierValues(*local, product, y);
         }
+
+        void appendContactHessianTriplets(
+            const FEMSubsystem& subsystem,
+            const runtime::ContactStencil& contact,
+            std::vector<Eigen::Triplet<double>>& triplets)
+        {
+            const std::optional<LocalContactStencil> local =
+                gatherLocalContact(subsystem, contact);
+            if (!local)
+            {
+                return;
+            }
+
+            const ksk::engine::contact::LocalBarrierHessian hessian =
+                ksk::engine::contact::computeGIPCBarrierHessian(
+                    makeBarrierStencil(*local, contact.type));
+            for (int row_point = 0; row_point < local->count; row_point++)
+            {
+                const int row_offset = local->qOffsets[row_point];
+                for (int col_point = 0; col_point < local->count; col_point++)
+                {
+                    const int col_offset = local->qOffsets[col_point];
+                    const glm::dmat3& block =
+                        hessian.blocks[row_point][col_point];
+                    for (int row = 0; row < 3; row++)
+                    {
+                        for (int col = 0; col < 3; col++)
+                        {
+                            const double value = block[col][row];
+                            if (value != 0.0)
+                            {
+                                triplets.emplace_back(row_offset + row,
+                                                      col_offset + col,
+                                                      value);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        double gravityPotential(const Eigen::VectorXd& localQ,
+                                const Eigen::VectorXd& massDiagonal,
+                                const glm::dvec3& gravity)
+        {
+            double energy = 0.0;
+            for (int vertex = 0; 3 * vertex + 2 < localQ.size(); ++vertex)
+            {
+                const int offset = 3 * vertex;
+                const double mass = massDiagonal[offset];
+                energy -= mass *
+                    (gravity.x * localQ[offset + 0] +
+                     gravity.y * localQ[offset + 1] +
+                     gravity.z * localQ[offset + 2]);
+            }
+            return energy;
+        }
+
+        void addGravityGradient(Eigen::VectorXd& gradient,
+                                const Eigen::VectorXd& massDiagonal,
+                                const glm::dvec3& gravity)
+        {
+            for (int vertex = 0; 3 * vertex + 2 < gradient.size(); ++vertex)
+            {
+                const int offset = 3 * vertex;
+                const double mass = massDiagonal[offset];
+                gradient[offset + 0] -= mass * gravity.x;
+                gradient[offset + 1] -= mass * gravity.y;
+                gradient[offset + 2] -= mass * gravity.z;
+            }
+        }
     } // namespace
 
     FEMCPUBackend::FEMCPUBackend(FEMSubsystem& subsystem)
@@ -391,6 +462,8 @@ namespace ksk::engine::fem
             (mass_diagonal_.array() * residual.array().square()).sum() /
             (dt * dt);
         objective += subsystem_.elasticEnergy(local_q);
+        objective += gravityPotential(
+            local_q, mass_diagonal_, subsystem_.gravity_);
 
         for (const FEMSubsystem::ActiveConstraint& constraint :
              subsystem_.active_constraints_)
@@ -419,7 +492,10 @@ namespace ksk::engine::fem
         }
 
         std::vector<Eigen::Triplet<double>> triplets;
-        triplets.reserve(static_cast<size_t>(subsystem_.range_.scalarCount + 144));
+        triplets.reserve(static_cast<size_t>(
+            subsystem_.range_.scalarCount +
+            144 +
+            144 * subsystem_.internal_contacts_.size()));
         for (int i = 0; i < subsystem_.range_.scalarCount; ++i)
         {
             triplets.emplace_back(i, i, mass_diagonal_[i] / (dt * dt));
@@ -431,6 +507,10 @@ namespace ksk::engine::fem
                 constraint.qOffset, constraint.qOffset, constraint.stiffness);
         }
         subsystem_.assembleElasticHessian(subsystem_.gatherCurrentState(), triplets);
+        for (const runtime::ContactStencil& contact : subsystem_.internal_contacts_)
+        {
+            appendContactHessianTriplets(subsystem_, contact, triplets);
+        }
 
         local_matrix_.resize(subsystem_.range_.scalarCount,
                              subsystem_.range_.scalarCount);
@@ -452,6 +532,8 @@ namespace ksk::engine::fem
             (mass_diagonal_.array() * (current - inertial_target_).array()).matrix() /
             (step_dt_ * step_dt_);
         subsystem_.assembleElasticGradient(current, local_gradient);
+        addGravityGradient(
+            local_gradient, mass_diagonal_, subsystem_.gravity_);
         for (const FEMSubsystem::ActiveConstraint& constraint :
              subsystem_.active_constraints_)
         {
@@ -576,6 +658,32 @@ namespace ksk::engine::fem
             g[offset + 1] += pointGradient[static_cast<int>(i)].y;
             g[offset + 2] += pointGradient[static_cast<int>(i)].z;
         }
+    }
+
+    void FEMCPUBackend::applyContactGeometryHessianProduct(
+        std::span<const runtime::PointIdx> gradientPoints,
+        runtime::ConstGeometryView pointGradient,
+        std::span<const runtime::PointIdx> productPoints,
+        runtime::ConstGeometryView pointHessianProduct,
+        runtime::ConstDofView localDq,
+        runtime::DofView localY) const
+    {
+        requireCPU(pointGradient, "FEMCPUBackend::applyContactGeometryHessianProduct");
+        requireCPU(pointHessianProduct, "FEMCPUBackend::applyContactGeometryHessianProduct");
+        requireCPU(localDq, "FEMCPUBackend::applyContactGeometryHessianProduct");
+        requireCPU(localY, "FEMCPUBackend::applyContactGeometryHessianProduct");
+        if (gradientPoints.size() != static_cast<size_t>(pointGradient.pointCount()))
+        {
+            throw std::invalid_argument("contact point and gradient counts differ");
+        }
+        requireDofCount(localDq,
+                        subsystem_.range_.scalarCount,
+                        "FEMCPUBackend::applyContactGeometryHessianProduct");
+
+        (void)gradientPoints;
+        (void)localDq;
+
+        scatterContactGradient(productPoints, pointHessianProduct, localY);
     }
 
     void FEMCPUBackend::applyInternalContactHessian(

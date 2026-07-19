@@ -9,7 +9,7 @@
 namespace ksk::runtime {
 
 enum class ContactCase : std::uint16_t {
-  PP = 2,
+  PP,
   PE,
   PT,
   EE,
@@ -20,6 +20,8 @@ struct ContactStencil {
   std::array<int, 4> geometryIds{-1, -1, -1, -1};
   Real dHat = 0.0;
   Real stiffness = 0.0;
+  // Total surface offset reserved from geometric distance before evaluating
+  // the barrier, computed from the involved primitive radii/thicknesses.
   Real thickness = 0.0;
 };
 

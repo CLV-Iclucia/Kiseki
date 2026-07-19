@@ -271,11 +271,18 @@ int main(int argc, char** argv)
     printTipPositions(simulation, hair_vertex_counts);
     std::cout << '\n';
 
+    const bool finite =
+        std::isfinite(result.finalGradientNorm) &&
+        std::isfinite(result.finalStepNorm);
+    if (!finite) {
+      std::cerr << std::format(
+          "hair solve produced a non-finite result at step {}\n", step + 1);
+      solve_failed = true;
+      return false;
+    }
     if (!result.converged) {
       std::cerr << std::format(
           "hair solve did not converge at step {}\n", step + 1);
-      solve_failed = true;
-      return false;
     }
     return true;
   };

@@ -88,7 +88,7 @@ struct SwapchainDesc {
 //
 // See docs/rhi-r7-swapchain-plan.md §2 for the full pattern.
 //
-class Swapchain : public ksk::core::NonCopyable {
+class Swapchain : public core::NonCopyable {
  public:
   virtual ~Swapchain() = default;
 

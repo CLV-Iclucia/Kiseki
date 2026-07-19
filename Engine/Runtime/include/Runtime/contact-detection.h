@@ -22,6 +22,8 @@ struct GlobalContactRouter {
   std::map<SubsystemId, SubsystemContactData> subsystemInternalContacts;
 };
 
+using ContactCandidates = ContactStencils;
+
 struct DeviceContactTable {
   rhi::BufferRef stencils;
   rhi::BufferRef batches;
@@ -41,6 +43,11 @@ struct DeviceRoutedContactTables {
 using ContactDetectionOutput =
     std::variant<GlobalContactRouter, DeviceRoutedContactTables>;
 
+struct ContactCandidateDetectionResult {
+  ContactCandidates candidates;
+  Real stepSizeUpperBound = 1.0;
+};
+
 enum class ContactDetectionStorage {
   Auto,
   Host,
@@ -52,13 +59,28 @@ struct ContactDetectionConfig {
   Real detectionDistance = 1.0e-3;
   Real dHat = 1.0e-3;
   Real stiffness = 1.0e5;
-  Real thickness = 0.0;
   Real toi = 1.0;
 };
 
 [[nodiscard]] GlobalContactRouter runCCD(
     const GlobalGeometryManager& geometry,
     const GeometryBuffer& geometryDirection,
+    const ContactDetectionConfig& config = {});
+
+[[nodiscard]] ContactCandidates detectContactCandidatesAlongDirection(
+    const GlobalGeometryManager& geometry,
+    const GeometryBuffer& geometryDirection,
+    const ContactDetectionConfig& config = {});
+
+[[nodiscard]] ContactCandidateDetectionResult
+detectContactCandidatesAndStepSizeAlongDirection(
+    const GlobalGeometryManager& geometry,
+    const GeometryBuffer& geometryDirection,
+    const ContactDetectionConfig& config = {});
+
+[[nodiscard]] GlobalContactRouter refreshActiveContactsFromCandidates(
+    const GlobalGeometryManager& geometry,
+    const ContactCandidates& candidates,
     const ContactDetectionConfig& config = {});
 
 [[nodiscard]] ContactDetectionOutput detectContactTablesAlongDirection(

@@ -97,8 +97,11 @@ void DERSubsystem::declareGeometry(runtime::GlobalGeometryManager& geometry)
     for (int vertex = 0; vertex < static_cast<int>(rod.state().size());
          ++vertex) {
       const int sample = sample_base + vertex;
-      geometry_points_.push_back(
-          geometry.addPoint(id_, sample, rod.state().position(vertex)));
+      geometry_points_.push_back(geometry.addPoint(
+          id_,
+          sample,
+          rod.state().position(vertex),
+          rod.material().radius));
     }
 
     for (int edge = 0; edge + 1 < static_cast<int>(rod.state().size());
@@ -245,6 +248,34 @@ void DERSubsystem::scatterContactGradient(
     return;
   }
   cpu_backend_->scatterContactGradient(points, pointGradient, g);
+}
+
+void DERSubsystem::applyContactGeometryHessianProduct(
+    std::span<const runtime::PointIdx> gradientPoints,
+    runtime::ConstGeometryView pointGradient,
+    std::span<const runtime::PointIdx> productPoints,
+    runtime::ConstGeometryView pointHessianProduct,
+    runtime::ConstDofView localDq,
+    runtime::DofView localY) const
+{
+  if (usesGPU(pointGradient) || usesGPU(pointHessianProduct) ||
+      usesGPU(localDq) || usesGPU(localY)) {
+    gpu_backend_->applyContactGeometryHessianProduct(
+        gradientPoints,
+        pointGradient,
+        productPoints,
+        pointHessianProduct,
+        localDq,
+        localY);
+    return;
+  }
+  cpu_backend_->applyContactGeometryHessianProduct(
+      gradientPoints,
+      pointGradient,
+      productPoints,
+      pointHessianProduct,
+      localDq,
+      localY);
 }
 
 void DERSubsystem::applyInternalContactHessian(runtime::ConstDofView localDq,
