@@ -33,12 +33,26 @@ private:
   float m_yaw = -60.0f;
   float m_pitch = 25.0f;
   float m_distance = 5.0f;
+  double m_lastInputTime = 0.0;
+  float m_deltaTime = 0.0f;
+  float m_keyboardMoveSpeed = 2.5f;
+  float m_keyboardFastMultiplier = 4.0f;
+  float m_mouseSensitivity = 0.5f;
+  float m_zoomSensitivity = 0.15f;
+  bool m_showUi = true;
+  bool m_uiInitialized = false;
   bool m_cameraInitialized = false;
 
   glm::mat4 computeViewMatrix() const;
   glm::mat4 computeProjectionMatrix() const;
 
   void setupInputCallbacks();
+  void initializeUi();
+  void renderUi(const SceneProxy& scene);
+  void cleanupUi();
+  bool uiWantsKeyboard() const;
+  bool uiWantsMouse() const;
+  void handleKeyboardMovement(float deltaTime);
   void updateCameraFromInput();
 
   SceneBounds computeSceneBounds(const SceneProxy& scene) const;

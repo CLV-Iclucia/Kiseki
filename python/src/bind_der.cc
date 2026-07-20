@@ -167,8 +167,6 @@ void bind_der(py::module_& m)
                      &runtime::GlobalSolverConfig::newtonStepTolerance)
       .def_readwrite("line_search_armijo",
                      &runtime::GlobalSolverConfig::lineSearchArmijo)
-      .def_readwrite("line_search_shrink",
-                     &runtime::GlobalSolverConfig::lineSearchShrink)
       .def_readwrite("ccd_step_size_scale",
                      &runtime::GlobalSolverConfig::ccdStepSizeScale)
       .def_readwrite("pcg_tolerance",

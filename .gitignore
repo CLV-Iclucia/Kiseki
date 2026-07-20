@@ -4,6 +4,7 @@ build/
 .idea/
 cmake-build-*/
 docs/
+scripts/
 dev_setup.py
 fast-cloc.bat
 fast-cloc.sh

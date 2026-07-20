@@ -5,6 +5,9 @@
 
 #include <GLFW/glfw3.h>
 #include <glm/gtc/matrix_transform.hpp>
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_opengl3.h>
 
 #include <algorithm>
 #include <cmath>
@@ -12,6 +15,16 @@
 #include <limits>
 
 namespace ksk::renderer {
+
+namespace {
+
+constexpr const char* IMGUI_GLSL_VERSION = "#version 330";
+
+bool isKeyDown(GLFWwindow* window, int key) {
+  return glfwGetKey(window, key) == GLFW_PRESS;
+}
+
+} // namespace
 
 void InteractiveRenderer::initialize(const RendererConfig& config) {
   m_config = config;
@@ -50,7 +63,9 @@ void InteractiveRenderer::initialize(const RendererConfig& config) {
     return;
   }
 
+  initializeUi();
   setupInputCallbacks();
+  m_lastInputTime = glfwGetTime();
 
   std::cout << "InteractiveRenderer initialized successfully" << std::endl;
 }
@@ -89,6 +104,7 @@ void InteractiveRenderer::drawFrame(const SceneProxy& scene) {
   };
 
   m_backend->renderFrame(scene, context);
+  renderUi(scene);
 }
 
 glm::mat4 InteractiveRenderer::computeViewMatrix() const {
@@ -115,6 +131,12 @@ bool InteractiveRenderer::pollAndSwap() {
     return false;
   }
 
+  double currentTime = glfwGetTime();
+  float deltaTime = static_cast<float>(currentTime - m_lastInputTime);
+  m_lastInputTime = currentTime;
+  m_deltaTime = deltaTime;
+
+  handleKeyboardMovement(deltaTime);
   updateCameraFromInput();
   return !m_backend || m_backend->present();
 }
@@ -124,6 +146,8 @@ void InteractiveRenderer::cleanup() {
     m_backend->cleanup();
     m_backend.reset();
   }
+
+  cleanupUi();
 
   if (m_window) {
     glfwDestroyWindow(m_window);
@@ -142,10 +166,16 @@ void InteractiveRenderer::setupInputCallbacks() {
   glfwSetKeyCallback(m_window, [](GLFWwindow* window, int key, int scancode,
                                   int action, int mods) {
     auto* renderer = static_cast<InteractiveRenderer*>(glfwGetWindowUserPointer(window));
+    ImGui_ImplGlfw_KeyCallback(window, key, scancode, action, mods);
     if (action != GLFW_PRESS) return;
 
     switch (key) {
+      case GLFW_KEY_F1:
+        renderer->m_showUi = !renderer->m_showUi;
+        break;
+
       case GLFW_KEY_R:
+        if (renderer->uiWantsKeyboard()) break;
         renderer->m_cameraInitialized = false;
         break;
 
@@ -161,6 +191,9 @@ void InteractiveRenderer::setupInputCallbacks() {
   glfwSetMouseButtonCallback(m_window, [](GLFWwindow* window, int button,
                                           int action, int mods) {
     auto* renderer = static_cast<InteractiveRenderer*>(glfwGetWindowUserPointer(window));
+    ImGui_ImplGlfw_MouseButtonCallback(window, button, action, mods);
+    if (renderer->uiWantsMouse()) return;
+
     if (button == GLFW_MOUSE_BUTTON_LEFT) {
       renderer->m_mousePressed = (action == GLFW_PRESS);
       if (renderer->m_mousePressed) {
@@ -173,12 +206,20 @@ void InteractiveRenderer::setupInputCallbacks() {
   glfwSetCursorPosCallback(m_window, [](GLFWwindow* window, double xpos,
                                         double ypos) {
     auto* renderer = static_cast<InteractiveRenderer*>(glfwGetWindowUserPointer(window));
+    ImGui_ImplGlfw_CursorPosCallback(window, xpos, ypos);
+    if (renderer->uiWantsMouse()) {
+      renderer->m_mousePressed = false;
+      renderer->m_lastMouseX = xpos;
+      renderer->m_lastMouseY = ypos;
+      return;
+    }
+
     if (renderer->m_mousePressed) {
       double dx = xpos - renderer->m_lastMouseX;
       double dy = ypos - renderer->m_lastMouseY;
 
-      renderer->m_yaw -= static_cast<float>(dx) * 0.5f;
-      renderer->m_pitch -= static_cast<float>(dy) * 0.5f;
+      renderer->m_yaw -= static_cast<float>(dx) * renderer->m_mouseSensitivity;
+      renderer->m_pitch -= static_cast<float>(dy) * renderer->m_mouseSensitivity;
       renderer->m_pitch = std::max(-89.0f, std::min(89.0f, renderer->m_pitch));
 
       renderer->m_lastMouseX = xpos;
@@ -189,10 +230,133 @@ void InteractiveRenderer::setupInputCallbacks() {
   glfwSetScrollCallback(m_window, [](GLFWwindow* window, double xoffset,
                                      double yoffset) {
     auto* renderer = static_cast<InteractiveRenderer*>(glfwGetWindowUserPointer(window));
-    float zoomFactor = 1.0f - static_cast<float>(yoffset) * 0.15f;
+    ImGui_ImplGlfw_ScrollCallback(window, xoffset, yoffset);
+    if (renderer->uiWantsMouse()) return;
+
+    float zoomFactor = 1.0f - static_cast<float>(yoffset) * renderer->m_zoomSensitivity;
     renderer->m_distance *= zoomFactor;
     renderer->m_distance = std::max(0.01f, renderer->m_distance);
   });
+
+  glfwSetCharCallback(m_window, [](GLFWwindow* window, unsigned int codepoint) {
+    ImGui_ImplGlfw_CharCallback(window, codepoint);
+  });
+}
+
+void InteractiveRenderer::initializeUi() {
+  if (!m_window || m_uiInitialized) return;
+
+  IMGUI_CHECKVERSION();
+  ImGui::CreateContext();
+
+  ImGuiIO& io = ImGui::GetIO();
+  io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+
+  ImGui::StyleColorsDark();
+  ImGuiStyle& style = ImGui::GetStyle();
+  style.WindowRounding = 6.0f;
+  style.FrameRounding = 4.0f;
+  style.GrabRounding = 4.0f;
+
+  ImGui_ImplGlfw_InitForOpenGL(m_window, false);
+  ImGui_ImplOpenGL3_Init(IMGUI_GLSL_VERSION);
+  m_uiInitialized = true;
+}
+
+void InteractiveRenderer::renderUi(const SceneProxy& scene) {
+  if (!m_uiInitialized) return;
+
+  ImGui_ImplOpenGL3_NewFrame();
+  ImGui_ImplGlfw_NewFrame();
+  ImGui::NewFrame();
+
+  if (m_showUi) {
+    ImGui::SetNextWindowPos(ImVec2(12.0f, 12.0f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(330.0f, 0.0f), ImGuiCond_FirstUseEver);
+
+    if (ImGui::Begin("Renderer")) {
+      ImGui::Text("Frame %d  Time %.3f", scene.frameIndex, scene.simulationTime);
+      ImGui::Text("FPS %.1f  dt %.3f ms",
+                  m_deltaTime > 0.0f ? 1.0f / m_deltaTime : 0.0f,
+                  m_deltaTime * 1000.0f);
+      ImGui::Separator();
+
+      ImGui::Text("Camera");
+      ImGui::DragFloat3("Target", &m_camera.target.x, 0.01f);
+      ImGui::DragFloat("Distance", &m_distance, 0.05f, 0.01f, 10000.0f);
+      ImGui::SliderFloat("Yaw", &m_yaw, -180.0f, 180.0f);
+      ImGui::SliderFloat("Pitch", &m_pitch, -89.0f, 89.0f);
+      ImGui::SliderFloat("FOV", &m_camera.fov, 10.0f, 100.0f);
+
+      if (ImGui::Button("Reset Camera")) {
+        m_cameraInitialized = false;
+      }
+
+      ImGui::Separator();
+      ImGui::Text("Controls");
+      ImGui::DragFloat("Move Speed", &m_keyboardMoveSpeed, 0.05f, 0.01f, 100.0f);
+      ImGui::DragFloat("Fast Multiplier", &m_keyboardFastMultiplier, 0.05f,
+                       1.0f, 20.0f);
+      ImGui::DragFloat("Mouse Sensitivity", &m_mouseSensitivity, 0.01f,
+                       0.01f, 5.0f);
+      ImGui::DragFloat("Zoom Sensitivity", &m_zoomSensitivity, 0.01f,
+                       0.01f, 1.0f);
+
+      ImGui::Separator();
+      ImGui::Text("Scene");
+      ImGui::Text("Meshes: %zu", scene.meshes.size());
+      ImGui::Text("Wireframes: %zu", scene.wireframes.size());
+      ImGui::Text("Particles: %zu", scene.particles.size());
+      ImGui::Text("F1 toggles this panel");
+    }
+    ImGui::End();
+  }
+
+  ImGui::Render();
+  ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+}
+
+void InteractiveRenderer::cleanupUi() {
+  if (!m_uiInitialized) return;
+
+  ImGui_ImplOpenGL3_Shutdown();
+  ImGui_ImplGlfw_Shutdown();
+  ImGui::DestroyContext();
+  m_uiInitialized = false;
+}
+
+bool InteractiveRenderer::uiWantsKeyboard() const {
+  return m_uiInitialized && m_showUi && ImGui::GetIO().WantCaptureKeyboard;
+}
+
+bool InteractiveRenderer::uiWantsMouse() const {
+  return m_uiInitialized && m_showUi && ImGui::GetIO().WantCaptureMouse;
+}
+
+void InteractiveRenderer::handleKeyboardMovement(float deltaTime) {
+  if (!m_window || deltaTime <= 0.0f || uiWantsKeyboard()) return;
+
+  glm::vec3 forward = glm::normalize(m_camera.target - m_camera.position);
+  glm::vec3 right = glm::normalize(glm::cross(forward, m_camera.up));
+  glm::vec3 movement(0.0f);
+
+  if (isKeyDown(m_window, GLFW_KEY_W)) movement += forward;
+  if (isKeyDown(m_window, GLFW_KEY_S)) movement -= forward;
+  if (isKeyDown(m_window, GLFW_KEY_D)) movement += right;
+  if (isKeyDown(m_window, GLFW_KEY_A)) movement -= right;
+  if (isKeyDown(m_window, GLFW_KEY_E)) movement += m_camera.up;
+  if (isKeyDown(m_window, GLFW_KEY_Q)) movement -= m_camera.up;
+
+  float movementLength = glm::length(movement);
+  if (movementLength <= 0.0f) return;
+
+  float speed = m_keyboardMoveSpeed * std::max(m_distance, 0.1f);
+  if (isKeyDown(m_window, GLFW_KEY_LEFT_SHIFT) ||
+      isKeyDown(m_window, GLFW_KEY_RIGHT_SHIFT)) {
+    speed *= m_keyboardFastMultiplier;
+  }
+
+  m_camera.target += (movement / movementLength) * speed * deltaTime;
 }
 
 void InteractiveRenderer::updateCameraFromInput() {

@@ -72,6 +72,15 @@ struct GeometryTriangle {
   Real thickness = 0.0;
 };
 
+struct GeometryTet {
+  int id = -1;
+  GeometryReference ref;
+  PointIdx p0 = -1;
+  PointIdx p1 = -1;
+  PointIdx p2 = -1;
+  PointIdx p3 = -1;
+};
+
 struct GeometryMeshDesc {
   std::vector<glm::dvec3> vertices;
   std::vector<std::array<int, 2>> edges;
@@ -93,6 +102,7 @@ struct GeometryStencilInfo {
   bool valid = true;
   bool hasCollider = false;
   bool hasInstanceGeometry = false;
+  bool crossesSubsystems = false;
   int subsystemCount = 0;
   std::array<SubsystemId, 2> subsystems{};
 };
@@ -101,6 +111,7 @@ struct GlobalGeometryManager {
   std::vector<GeometryPoint> points;
   std::vector<GeometryEdge> edges;
   std::vector<GeometryTriangle> triangles;
+  std::vector<GeometryTet> tets;
   std::vector<GeometryInstance> instances;
 
   [[nodiscard]] PointIdx addPoint(SubsystemId subsystem,
@@ -143,6 +154,7 @@ struct GlobalGeometryManager {
                                PointIdx p1,
                                Real radius = 0.0);
   [[nodiscard]] int addTriangle(PointIdx p0, PointIdx p1, PointIdx p2, Real thickness = 0.0);
+  [[nodiscard]] int addTet(PointIdx p0, PointIdx p1, PointIdx p2, PointIdx p3);
   [[nodiscard]] GeometryInstanceId addInstance(
       SubsystemId subsystem,
       int localInstanceId,
@@ -158,10 +170,12 @@ struct GlobalGeometryManager {
   [[nodiscard]] int pointCount() const noexcept;
   [[nodiscard]] int edgeCount() const noexcept;
   [[nodiscard]] int triangleCount() const noexcept;
+  [[nodiscard]] int tetCount() const noexcept;
 
   [[nodiscard]] GeometryRange pointRange(SubsystemId subsystem) const noexcept;
   [[nodiscard]] GeometryRange edgeRange(SubsystemId subsystem) const noexcept;
   [[nodiscard]] GeometryRange triangleRange(SubsystemId subsystem) const noexcept;
+  [[nodiscard]] GeometryRange tetRange(SubsystemId subsystem) const noexcept;
   [[nodiscard]] GeometryRange colliderPointRange(int collider) const noexcept;
   [[nodiscard]] GeometryRange colliderEdgeRange(int collider) const noexcept;
   [[nodiscard]] GeometryRange colliderTriangleRange(int collider) const noexcept;
@@ -169,6 +183,7 @@ struct GlobalGeometryManager {
   [[nodiscard]] GeometryReference pointRef(PointIdx point) const;
   [[nodiscard]] GeometryReference edgeRef(int edge) const;
   [[nodiscard]] GeometryReference triangleRef(int triangle) const;
+  [[nodiscard]] GeometryReference tetRef(int tet) const;
 
   [[nodiscard]] GeometryOwner pointOwner(PointIdx point) const;
   [[nodiscard]] bool sameSubsystem(std::span<const PointIdx> stencil) const;
@@ -183,6 +198,7 @@ struct GlobalGeometryManager {
       int localSampleId) const;
   [[nodiscard]] std::array<PointIdx, 2> globalEdge(int edge) const;
   [[nodiscard]] std::array<PointIdx, 3> globalTriangle(int triangle) const;
+  [[nodiscard]] std::array<PointIdx, 4> globalTet(int tet) const;
 
   [[nodiscard]] bool triangleContainsPoint(int triangle,
                                            PointIdx point) const;
@@ -237,6 +253,7 @@ struct GlobalGeometryManager {
   [[nodiscard]] GeometryPoint& checkedPoint(PointIdx point);
   [[nodiscard]] const GeometryEdge& checkedEdge(int edge) const;
   [[nodiscard]] const GeometryTriangle& checkedTriangle(int triangle) const;
+  [[nodiscard]] const GeometryTet& checkedTet(int tet) const;
   [[nodiscard]] const GeometryInstance& checkedInstance(
       GeometryInstanceId instance) const;
   [[nodiscard]] GeometryInstance& checkedInstance(GeometryInstanceId instance);
@@ -244,6 +261,7 @@ struct GlobalGeometryManager {
   std::vector<GeometryRange> point_ranges_;
   std::vector<GeometryRange> edge_ranges_;
   std::vector<GeometryRange> triangle_ranges_;
+  std::vector<GeometryRange> tet_ranges_;
   std::vector<GeometryRange> collider_point_ranges_;
   std::vector<GeometryRange> collider_edge_ranges_;
   std::vector<GeometryRange> collider_triangle_ranges_;

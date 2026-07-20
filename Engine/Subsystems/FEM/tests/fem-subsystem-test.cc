@@ -53,7 +53,51 @@ TEST(FEMSubsystem, EmitsSurfaceGeometry)
   EXPECT_EQ(geometry.points.size(), 4);
   EXPECT_EQ(geometry.edges.size(), 6);
   EXPECT_EQ(geometry.triangles.size(), 4);
+  EXPECT_EQ(geometry.tets.size(), 1);
   EXPECT_EQ(geometry.points[2].localSampleId, 2);
+}
+
+TEST(FEMSubsystem, RemapsMultipleMeshTopologyIntoRuntimeGeometry)
+{
+  TetMeshDesc first = makeSingleTet();
+  TetMeshDesc second = makeSingleTet();
+  for (glm::dvec3& vertex : second.vertices) {
+    vertex += glm::dvec3(10.0, 0.0, 0.0);
+  }
+  second.surfaceTriangles = {
+      std::array<int, 3>{0, 2, 3},
+  };
+  second.tets = {
+      std::array<int, 4>{3, 2, 1, 0},
+  };
+
+  FEMSubsystem subsystem(runtime::SubsystemId{3}, {first, second});
+  runtime::GlobalGeometryManager geometry;
+
+  subsystem.declareGeometry(geometry);
+
+  ASSERT_EQ(geometry.pointCount(), 8);
+  ASSERT_EQ(geometry.triangleCount(), 5);
+  ASSERT_EQ(geometry.tetCount(), 2);
+  ASSERT_EQ(subsystem.runtimeMeshes().size(), 2);
+
+  const FEMMeshRuntimeRef& second_ref = subsystem.runtimeMeshes()[1];
+  EXPECT_EQ(second_ref.points.first, 4);
+  EXPECT_EQ(second_ref.points.count, 4);
+  EXPECT_EQ(second_ref.transfer.localToGlobalPoint[0], 4);
+  EXPECT_EQ(second_ref.transfer.localToGlobalPoint[3], 7);
+
+  const auto triangle =
+      geometry.globalTriangle(second_ref.transfer.localToGlobalTriangle[0]);
+  EXPECT_EQ(triangle[0], 4);
+  EXPECT_EQ(triangle[1], 6);
+  EXPECT_EQ(triangle[2], 7);
+
+  const auto tet = geometry.globalTet(second_ref.transfer.localToGlobalTet[0]);
+  EXPECT_EQ(tet[0], 7);
+  EXPECT_EQ(tet[1], 6);
+  EXPECT_EQ(tet[2], 5);
+  EXPECT_EQ(tet[3], 4);
 }
 
 TEST(FEMSubsystem, MapsPositionDirectionToGeometry)

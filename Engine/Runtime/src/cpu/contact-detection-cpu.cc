@@ -19,6 +19,7 @@ namespace {
 
 constexpr int kMaxACCDIterations = 2000;
 constexpr Real kACCDGapFraction = 0.1;
+constexpr Real kBVHMinimumExtent = 1.0e-12;
 
 enum class PointTriangleDistanceType {
   P_A,
@@ -63,6 +64,50 @@ struct PrimitiveAccessor {
     return static_cast<int>(primitives->size());
   }
 };
+
+spatify::BBox<Real, 3> ensureFiniteBVHBounds(spatify::BBox<Real, 3> bounds)
+{
+  for (int axis = 0; axis < 3; ++axis) {
+    const Real extent = bounds.hi[axis] - bounds.lo[axis];
+    if (extent >= kBVHMinimumExtent) {
+      continue;
+    }
+    const Real centre = (bounds.lo[axis] + bounds.hi[axis]) * 0.5;
+    bounds.lo[axis] = centre - kBVHMinimumExtent;
+    bounds.hi[axis] = centre + kBVHMinimumExtent;
+  }
+  return bounds;
+}
+
+void makeBoundsSafeForLBVH(std::vector<PrimitiveRef>& primitives)
+{
+  for (PrimitiveRef& primitive : primitives) {
+    primitive.bounds = ensureFiniteBVHBounds(primitive.bounds);
+  }
+}
+
+[[nodiscard]] spatify::LBVH<Real> buildLBVH(
+    std::vector<PrimitiveRef>& primitives)
+{
+  makeBoundsSafeForLBVH(primitives);
+  spatify::LBVH<Real> tree;
+  if (!primitives.empty()) {
+    tree.update(PrimitiveAccessor{.primitives = &primitives});
+  }
+  return tree;
+}
+
+void sortUniquePairs(std::vector<std::array<int, 2>>& pairs)
+{
+  std::ranges::sort(pairs);
+  pairs.erase(std::ranges::unique(pairs).begin(), pairs.end());
+}
+
+void finalizeCollisionWorkList(ContactWorkList& work)
+{
+  sortUniquePairs(work.deformablePointTriangles);
+  sortUniquePairs(work.deformableEdgeEdges);
+}
 
 ContactStencil makeStencil(ContactCase type,
                            std::array<int, 4> ids,
@@ -633,7 +678,7 @@ void validateCPUCCDInput(const GlobalGeometryManager& geometry,
   }
 }
 
-std::vector<PrimitiveRef> buildPointPrimitives(
+[[nodiscard]] std::vector<PrimitiveRef> buildPointPrimitives(
     const GlobalGeometryManager& geometry,
     const GeometryBuffer& direction,
     Real toi)
@@ -653,7 +698,7 @@ std::vector<PrimitiveRef> buildPointPrimitives(
   return primitives;
 }
 
-std::vector<PrimitiveRef> buildEdgePrimitives(
+[[nodiscard]] std::vector<PrimitiveRef> buildEdgePrimitives(
     const GlobalGeometryManager& geometry,
     const GeometryBuffer& direction,
     Real toi)
@@ -673,7 +718,7 @@ std::vector<PrimitiveRef> buildEdgePrimitives(
   return primitives;
 }
 
-std::vector<PrimitiveRef> buildTrianglePrimitives(
+[[nodiscard]] std::vector<PrimitiveRef> buildTrianglePrimitives(
     const GlobalGeometryManager& geometry,
     const GeometryBuffer& direction,
     Real toi)
@@ -861,6 +906,180 @@ void addCandidate(ContactCandidateDetectionResult& result,
   result.candidates.push_back(std::move(candidate));
 }
 
+ContactWorkList gatherCollisionWorkListAlongDirectionOnCPUImpl(
+    const GlobalGeometryManager& geometry,
+    const GeometryBuffer& geometryDirection,
+    const ContactDetectionConfig& config)
+{
+  if (config.storage == ContactDetectionStorage::Device) {
+    throw std::runtime_error(
+        "CPU contact detection cannot produce device collision work lists");
+  }
+  ContactWorkList work;
+  validateCPUCCDInput(geometry, geometryDirection);
+
+  const Real query_dilation =
+      std::max(config.detectionDistance, config.dHat);
+
+  std::vector<PrimitiveRef> points =
+      buildPointPrimitives(geometry, geometryDirection, config.toi);
+  std::vector<PrimitiveRef> triangles =
+      buildTrianglePrimitives(geometry, geometryDirection, config.toi);
+  const spatify::LBVH<Real> triangle_tree = buildLBVH(triangles);
+
+  if (!triangles.empty()) {
+    for (const PrimitiveRef& point : points) {
+      const spatify::BBox<Real, 3> query_bounds =
+          ensureFiniteBVHBounds(point.bounds.dilate(query_dilation));
+      triangle_tree.runSpatialQuery(
+          [&](int primitive_index) {
+            const PrimitiveRef& triangle =
+                triangles[static_cast<size_t>(primitive_index)];
+            if (geometry.triangleContainsPoint(
+                    triangle.id, PointIdx{point.id})) {
+              return false;
+            }
+            work.deformablePointTriangles.push_back(
+                std::array<int, 2>{point.id, triangle.id});
+            return true;
+          },
+          [&](const spatify::BBox<Real, 3>& bounds) {
+            return query_bounds.overlap(bounds);
+          });
+    }
+  }
+
+  std::vector<PrimitiveRef> edges =
+      buildEdgePrimitives(geometry, geometryDirection, config.toi);
+  if (edges.empty()) {
+    finalizeCollisionWorkList(work);
+    return work;
+  }
+  const spatify::LBVH<Real> edge_tree = buildLBVH(edges);
+
+  for (int query_index = 0; query_index < static_cast<int>(edges.size());
+       query_index++) {
+    const PrimitiveRef& query_edge = edges[query_index];
+    const spatify::BBox<Real, 3> query_bounds =
+        ensureFiniteBVHBounds(query_edge.bounds.dilate(query_dilation));
+
+    edge_tree.runSpatialQuery(
+        [&](int primitive_index) {
+          if (primitive_index <= query_index) {
+            return false;
+          }
+          const PrimitiveRef& candidate =
+              edges[static_cast<size_t>(primitive_index)];
+          if (geometry.edgesAdjacent(query_edge.id, candidate.id)) {
+            return false;
+          }
+          work.deformableEdgeEdges.push_back(
+              std::array<int, 2>{query_edge.id, candidate.id});
+          return true;
+        },
+        [&](const spatify::BBox<Real, 3>& bounds) {
+          return query_bounds.overlap(bounds);
+        });
+  }
+
+  finalizeCollisionWorkList(work);
+  return work;
+}
+
+ContactCandidateDetectionResult dispatchCollisionWorkListOnCPUImpl(
+    const GlobalGeometryManager& geometry,
+    const GeometryBuffer& geometryDirection,
+    const ContactDetectionConfig& config,
+    const ContactWorkList& work,
+    bool compute_step_size)
+{
+  ContactCandidateDetectionResult result;
+  validateCPUCCDInput(geometry, geometryDirection);
+
+  for (const auto& pair : work.deformablePointTriangles) {
+    const PointIdx point = PointIdx{pair[0]};
+    const int triangle_id = pair[1];
+    const auto triangle = geometry.globalTriangle(triangle_id);
+    const Real primitive_thickness =
+        pointRadius(geometry, point) +
+        geometry.triangles.at(static_cast<size_t>(triangle_id)).thickness;
+    addCandidate(result,
+                 geometry,
+                 geometryDirection,
+                 config,
+                 compute_step_size,
+                 makeCandidate(
+                     ContactCase::PT,
+                     {point, triangle[0], triangle[1], triangle[2]},
+                     config,
+                     primitive_thickness));
+  }
+
+  for (const auto& pair : work.deformableEdgeEdges) {
+    const int first_id = pair[0];
+    const int second_id = pair[1];
+    const auto first = geometry.globalEdge(first_id);
+    const auto second = geometry.globalEdge(second_id);
+    const Real primitive_thickness =
+        geometry.edges.at(static_cast<size_t>(first_id)).radius +
+        geometry.edges.at(static_cast<size_t>(second_id)).radius;
+    addCandidate(result,
+                 geometry,
+                 geometryDirection,
+                 config,
+                 compute_step_size,
+                 makeCandidate(
+                     ContactCase::EE,
+                     {first[0], first[1], second[0], second[1]},
+                     config,
+                     primitive_thickness));
+  }
+
+  return result;
+}
+
+GlobalContactRouter resolveCollisionWorkListOnCPUImpl(
+    const GlobalGeometryManager& geometry,
+    const GeometryBuffer& geometryDirection,
+    const ContactDetectionConfig& config,
+    const ContactWorkList& work)
+{
+  GlobalContactRouter routed;
+  validateCPUCCDInput(geometry, geometryDirection);
+
+  for (const auto& pair : work.deformablePointTriangles) {
+    const PointIdx point = PointIdx{pair[0]};
+    const auto triangle = geometry.globalTriangle(pair[1]);
+    std::optional<ContactStencil> active =
+        createPointTriangleStencil(point,
+                                   triangle,
+                                   geometry,
+                                   geometryDirection.cpu(),
+                                   config,
+                                   0.0);
+    if (active) {
+      routeStencil(routed, geometry, *active);
+    }
+  }
+
+  for (const auto& pair : work.deformableEdgeEdges) {
+    const auto first = geometry.globalEdge(pair[0]);
+    const auto second = geometry.globalEdge(pair[1]);
+    std::optional<ContactStencil> active =
+        createEdgeEdgeStencil(first,
+                              second,
+                              geometry,
+                              geometryDirection.cpu(),
+                              config,
+                              0.0);
+    if (active) {
+      routeStencil(routed, geometry, *active);
+    }
+  }
+
+  return routed;
+}
+
 ContactCandidateDetectionResult detectContactCandidatesAlongDirectionOnCPUImpl(
     const GlobalGeometryManager& geometry,
     const GeometryBuffer& geometryDirection,
@@ -871,97 +1090,23 @@ ContactCandidateDetectionResult detectContactCandidatesAlongDirectionOnCPUImpl(
     throw std::runtime_error(
         "CPU contact detection cannot produce device contact tables");
   }
-  ContactCandidateDetectionResult result;
-  validateCPUCCDInput(geometry, geometryDirection);
-
-  const Real query_dilation =
-      std::max(config.detectionDistance, config.dHat);
-
-  std::vector<PrimitiveRef> points =
-      buildPointPrimitives(geometry, geometryDirection, config.toi);
-
-  std::vector<PrimitiveRef> triangles =
-      buildTrianglePrimitives(geometry, geometryDirection, config.toi);
-
-  if (!points.empty() && !triangles.empty()) {
-    spatify::LBVH<Real> triangle_bvh;
-    triangle_bvh.update(PrimitiveAccessor{.primitives = &triangles});
-
-    for (const PrimitiveRef& point : points) {
-      const spatify::BBox<Real, 3> query_bounds =
-          point.bounds.dilate(query_dilation);
-
-      triangle_bvh.runSpatialQuery(
-          [&](int triangle_index) -> bool {
-            const PrimitiveRef& triangle = triangles[triangle_index];
-            if (geometry.triangleContainsPoint(triangle.id, PointIdx{point.id})) {
-              return false;
-            }
-            const auto vertices = geometry.globalTriangle(triangle.id);
-            addCandidate(result,
-                         geometry,
-                         geometryDirection,
-                         config,
-                         compute_step_size,
-                         makeCandidate(
-                             ContactCase::PT,
-                             {point.id, vertices[0], vertices[1], vertices[2]},
-                             config,
-                             point.reserved_dist + triangle.reserved_dist));
-
-            return false;
-          },
-          [&](const spatify::BBox<Real, 3>& bounds) -> bool {
-            return query_bounds.overlap(bounds);
-          });
-    }
-  }
-
-  std::vector<PrimitiveRef> edges = buildEdgePrimitives(geometry, geometryDirection, config.toi);
-  if (edges.empty()) {
-    return result;
-  }
-
-  spatify::LBVH<Real> edge_bvh;
-  edge_bvh.update(PrimitiveAccessor{.primitives = &edges});
-
-  for (int query_index = 0; query_index < edges.size(); query_index++) {
-    const PrimitiveRef& query_edge = edges[query_index];
-    const spatify::BBox<Real, 3> query_bounds =
-        query_edge.bounds.dilate(query_dilation);
-
-    edge_bvh.runSpatialQuery(
-        [&](int candidate_index) -> bool {
-          if (candidate_index <= query_index) {
-            return false;
-          }
-          const PrimitiveRef& candidate = edges[candidate_index];
-          if (geometry.edgesAdjacent(query_edge.id, candidate.id)) {
-            return false;
-          }
-          const auto first = geometry.globalEdge(query_edge.id);
-          const auto second = geometry.globalEdge(candidate.id);
-          addCandidate(result,
-                       geometry,
-                       geometryDirection,
-                       config,
-                       compute_step_size,
-                       makeCandidate(
-                           ContactCase::EE,
-                           {first[0], first[1], second[0], second[1]},
-                           config,
-                           query_edge.reserved_dist + candidate.reserved_dist));
-
-          return false;
-        },
-        [&](const spatify::BBox<Real, 3>& bounds) -> bool {
-          return query_bounds.overlap(bounds);
-        });
-       }
-  return result;
+  const ContactWorkList work =
+      gatherCollisionWorkListAlongDirectionOnCPUImpl(
+          geometry, geometryDirection, config);
+  return dispatchCollisionWorkListOnCPUImpl(
+      geometry, geometryDirection, config, work, compute_step_size);
 }
 
 }  // namespace
+
+ContactWorkList gatherCollisionWorkListAlongDirectionOnCPU(
+    const GlobalGeometryManager& geometry,
+    const GeometryBuffer& geometryDirection,
+    const ContactDetectionConfig& config)
+{
+  return gatherCollisionWorkListAlongDirectionOnCPUImpl(
+      geometry, geometryDirection, config);
+}
 
 ContactCandidates detectContactCandidatesAlongDirectionOnCPU(
     const GlobalGeometryManager& geometry,
@@ -1004,11 +1149,11 @@ GlobalContactRouter runCCDOnCPU(
     const GeometryBuffer& geometryDirection,
     const ContactDetectionConfig& config)
 {
-  ContactCandidates candidates =
-      detectContactCandidatesAlongDirectionOnCPU(
+  const ContactWorkList work =
+      gatherCollisionWorkListAlongDirectionOnCPUImpl(
           geometry, geometryDirection, config);
-  return refreshActiveContactsFromCandidatesOnCPU(
-      geometry, candidates, config);
+  return resolveCollisionWorkListOnCPUImpl(
+      geometry, geometryDirection, config, work);
 }
 
 }  // namespace detail

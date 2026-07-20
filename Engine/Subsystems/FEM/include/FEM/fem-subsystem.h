@@ -4,6 +4,7 @@
 
 #include <Runtime/buffers.h>
 #include <Runtime/contact-table.h>
+#include <Runtime/geometry-transfer.h>
 #include <Runtime/global-geometry-manager.h>
 #include <Runtime/runtime-scene.h>
 #include <Runtime/subsystem.h>
@@ -34,6 +35,15 @@ struct FEMMeshOffset {
 struct FEMConstraintBinding {
   int mesh = -1;
   runtime::SceneConstraintDesc constraint;
+};
+
+struct FEMMeshRuntimeRef {
+  runtime::GeometryRange points;
+  runtime::GeometryRange surfaceEdges;
+  runtime::GeometryRange surfaceTriangles;
+  runtime::GeometryRange tets;
+  runtime::GeometryTransferMap transfer;
+  TetMaterial material;
 };
 
 class FEMSubsystem final : public runtime::Subsystem {
@@ -105,6 +115,11 @@ class FEMSubsystem final : public runtime::Subsystem {
   {
     return geometry_points_;
   }
+  [[nodiscard]] const std::vector<FEMMeshRuntimeRef>& runtimeMeshes()
+      const noexcept
+  {
+    return runtime_meshes_;
+  }
 
  private:
   friend class FEMCPUBackend;
@@ -138,6 +153,7 @@ class FEMSubsystem final : public runtime::Subsystem {
   std::vector<FEMConstraintBinding> constraints_;
   std::vector<ActiveConstraint> active_constraints_;
   std::vector<FEMMeshOffset> mesh_offsets_;
+  std::vector<FEMMeshRuntimeRef> runtime_meshes_;
   std::vector<FEMVertexSample> samples_;
   std::vector<runtime::PointIdx> geometry_points_;
   runtime::ContactStencils internal_contacts_;

@@ -11,7 +11,6 @@ struct GlobalSolverConfig {
   double newtonGradientTolerance = 1.0e-8;
   double newtonStepTolerance = 1.0e-6;
   double lineSearchArmijo = 1.0e-4;
-  double lineSearchShrink = 0.5;
   double ccdStepSizeScale = 0.9;
   double pcgTolerance = 1.0e-8;
   ContactDetectionStorage contactDetectionStorage =

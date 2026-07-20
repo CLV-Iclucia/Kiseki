@@ -6,6 +6,7 @@
 
 #include <RHI/buffer.h>
 
+#include <array>
 #include <variant>
 #include <vector>
 #include <map>
@@ -23,6 +24,16 @@ struct GlobalContactRouter {
 };
 
 using ContactCandidates = ContactStencils;
+
+struct ContactWorkList {
+  std::vector<std::array<int, 2>> deformablePointTriangles;
+  std::vector<std::array<int, 2>> deformableEdgeEdges;
+
+  [[nodiscard]] bool empty() const noexcept
+  {
+    return deformablePointTriangles.empty() && deformableEdgeEdges.empty();
+  }
+};
 
 struct DeviceContactTable {
   rhi::BufferRef stencils;
@@ -68,6 +79,11 @@ struct ContactDetectionConfig {
     const ContactDetectionConfig& config = {});
 
 [[nodiscard]] ContactCandidates detectContactCandidatesAlongDirection(
+    const GlobalGeometryManager& geometry,
+    const GeometryBuffer& geometryDirection,
+    const ContactDetectionConfig& config = {});
+
+[[nodiscard]] ContactWorkList gatherCollisionWorkListAlongDirection(
     const GlobalGeometryManager& geometry,
     const GeometryBuffer& geometryDirection,
     const ContactDetectionConfig& config = {});

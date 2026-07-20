@@ -43,6 +43,47 @@ TEST(GeometryTable, AppendsEdgesAndTrianglesWithStableIds)
   EXPECT_EQ(geometry.triangleRef(triangle_id).localIndex, 0);
 }
 
+TEST(GeometryTable, StoresTetsWithStableIdsAndRanges)
+{
+  GlobalGeometryManager geometry;
+
+  const auto p0 = geometry.addPoint(SubsystemId{0}, 0, glm::dvec3{0.0});
+  const auto p1 =
+      geometry.addPoint(SubsystemId{0}, 1, glm::dvec3{1.0, 0.0, 0.0});
+  const auto p2 =
+      geometry.addPoint(SubsystemId{0}, 2, glm::dvec3{0.0, 1.0, 0.0});
+  const auto p3 =
+      geometry.addPoint(SubsystemId{0}, 3, glm::dvec3{0.0, 0.0, 1.0});
+
+  const int tet_id = geometry.addTet(p0, p1, p2, p3);
+
+  EXPECT_EQ(tet_id, 0);
+  EXPECT_EQ(geometry.tetCount(), 1);
+  EXPECT_EQ(geometry.tetRange(SubsystemId{0}).first, 0);
+  EXPECT_EQ(geometry.tetRange(SubsystemId{0}).count, 1);
+  EXPECT_EQ(geometry.tetRef(tet_id).localIndex, 0);
+
+  const auto tet_vertices = geometry.globalTet(tet_id);
+  EXPECT_EQ(tet_vertices[0], p0);
+  EXPECT_EQ(tet_vertices[3], p3);
+}
+
+TEST(GeometryTable, RejectsTetWithMixedOwners)
+{
+  GlobalGeometryManager geometry;
+
+  const auto p0 = geometry.addPoint(SubsystemId{0}, 0, glm::dvec3{0.0});
+  const auto p1 =
+      geometry.addPoint(SubsystemId{0}, 1, glm::dvec3{1.0, 0.0, 0.0});
+  const auto p2 =
+      geometry.addPoint(SubsystemId{0}, 2, glm::dvec3{0.0, 1.0, 0.0});
+  const auto p3 =
+      geometry.addPoint(SubsystemId{1}, 0, glm::dvec3{0.0, 0.0, 1.0});
+
+  EXPECT_THROW([[maybe_unused]] const int tet = geometry.addTet(p0, p1, p2, p3),
+               std::invalid_argument);
+}
+
 TEST(GeometryTable, TracksSubsystemRangesAndLocalPointMapping)
 {
   GlobalGeometryManager geometry;
@@ -149,7 +190,7 @@ TEST(GeometryTable, ComputesStaticAndTrajectoryBounds)
       geometry.trajectoryEdgeBounds(edge, directions, 0.5);
   EXPECT_DOUBLE_EQ(swept.lo.y, -0.5);
   EXPECT_DOUBLE_EQ(swept.hi.x, 2.0);
-  EXPECT_DOUBLE_EQ(swept.lo.z, 1.0);
+  EXPECT_DOUBLE_EQ(swept.lo.z, 0.0);
 }
 
 TEST(GeometryTable, StoresInstanceGeometryWithTransform)

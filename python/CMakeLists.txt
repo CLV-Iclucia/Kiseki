@@ -1,6 +1,8 @@
 project(kiseki-python LANGUAGES CXX)
 
-find_package(pybind11 REQUIRED)
+set(PYBIND11_FINDPYTHON ON)
+find_package(Python3 COMPONENTS Interpreter Development.Module REQUIRED)
+find_package(pybind11 CONFIG REQUIRED)
 
 pybind11_add_module(kiseki
     src/module.cc
@@ -33,7 +35,6 @@ if(WIN32)
 endif()
 
 enable_testing()
-find_package(Python3 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND)
   add_test(
       NAME python_test_import

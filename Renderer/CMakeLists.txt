@@ -3,7 +3,7 @@ project(Renderer LANGUAGES CXX)
 find_package(glfw3 REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(glad CONFIG REQUIRED)
-find_package(glad CONFIG REQUIRED)
+find_package(imgui CONFIG REQUIRED)
 
 # Collect source files
 file(GLOB_RECURSE srcs CONFIGURE_DEPENDS src/*.cc src/*.cpp)
@@ -17,7 +17,7 @@ target_include_directories(Renderer PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
-target_link_libraries(Renderer PUBLIC Kiseki::Core glfw OpenGL::GL glad::glad)
+target_link_libraries(Renderer PUBLIC Kiseki::Core glfw OpenGL::GL glad::glad imgui::imgui)
 
 target_compile_features(Renderer PUBLIC cxx_std_20)
 

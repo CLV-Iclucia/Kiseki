@@ -35,6 +35,14 @@ glm::dvec3 initialVelocity(const TetMeshDesc& mesh, int vertex)
   return glm::dvec3(0.0);
 }
 
+std::vector<glm::dvec3> currentPositions(const TetMeshDesc& mesh)
+{
+  if (!mesh.initialPositions.empty()) {
+    return mesh.initialPositions;
+  }
+  return mesh.vertices;
+}
+
 int propertyLane(const std::string& property)
 {
   if (property == "x") {
@@ -139,27 +147,36 @@ void FEMSubsystem::declareGeometry(runtime::GlobalGeometryManager& geometry)
 {
   geometry_points_.clear();
   geometry_points_.reserve(samples_.size());
+  runtime_meshes_.clear();
+  runtime_meshes_.reserve(meshes_.size());
 
   for (int mesh_index = 0; mesh_index < meshes_.size(); mesh_index++) {
     const TetMeshDesc& mesh = meshes_[mesh_index];
     const int sample_base = mesh_offsets_[mesh_index].samples;
-    for (int vertex = 0; vertex < mesh.vertices.size(); vertex++) {
-      geometry_points_.push_back(geometry.addPoint(
-          id_,
-          sample_base + vertex,
-          vertexPosition(mesh_index, vertex),
-          restVertexPosition(mesh_index, vertex)));
-    }
-
-    for (const auto& edge : mesh.surfaceEdges) {
-      geometry.addEdge(geometry_points_.at(sample_base + edge[0]),
-                          geometry_points_.at(sample_base + edge[1]));
-    }
-    for (const auto& triangle : mesh.surfaceTriangles) {
-      geometry.addTriangle(geometry_points_.at(sample_base + triangle[0]),
-                              geometry_points_.at(sample_base + triangle[1]),
-                              geometry_points_.at(sample_base + triangle[2]));
-    }
+    const std::vector<glm::dvec3> positions = currentPositions(mesh);
+    runtime::GeometryTransferMap transfer = runtime::transferGeometry(
+        geometry,
+        runtime::GeometryTransferInput{
+            .subsystem = id_,
+            .localInstanceId = mesh_index,
+            .localSampleOffset = sample_base,
+            .vertices = mesh.vertices,
+            .positions = positions,
+            .edges = mesh.surfaceEdges,
+            .triangles = mesh.surfaceTriangles,
+            .tets = mesh.tets,
+        });
+    geometry_points_.insert(geometry_points_.end(),
+                            transfer.localToGlobalPoint.begin(),
+                            transfer.localToGlobalPoint.end());
+    runtime_meshes_.push_back(FEMMeshRuntimeRef{
+        .points = transfer.points,
+        .surfaceEdges = transfer.edges,
+        .surfaceTriangles = transfer.triangles,
+        .tets = transfer.tets,
+        .transfer = std::move(transfer),
+        .material = mesh.material,
+    });
   }
 }
 

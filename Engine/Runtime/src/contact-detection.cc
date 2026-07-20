@@ -44,6 +44,19 @@ ContactCandidates detectContactCandidatesAlongDirection(
         geometry, geometryDirection, config);
 }
 
+ContactWorkList gatherCollisionWorkListAlongDirection(
+    const GlobalGeometryManager& geometry,
+    const GeometryBuffer& geometryDirection,
+    const ContactDetectionConfig& config)
+{
+    if (geometryDirection.isGPU()) {
+        throw std::runtime_error(
+            "gatherCollisionWorkListAlongDirection requested host work lists but got device geometry");
+    }
+    return detail::gatherCollisionWorkListAlongDirectionOnCPU(
+        geometry, geometryDirection, config);
+}
+
 ContactCandidateDetectionResult
 detectContactCandidatesAndStepSizeAlongDirection(
     const GlobalGeometryManager& geometry,

@@ -114,11 +114,11 @@ std::unique_ptr<ksk::renderer::SceneProxy> buildProxy(
   surface.objectColor = {0.28f, 0.55f, 0.92f};
   surface.triangles.reserve(geometry.triangles.size());
   for (const auto& triangle : geometry.triangles) {
-    surface.triangles.push_back({
-        static_cast<unsigned int>(triangle.p0),
-        static_cast<unsigned int>(triangle.p1),
-        static_cast<unsigned int>(triangle.p2),
-    });
+    surface.triangles.emplace_back(
+        triangle.p0,
+        triangle.p1,
+        triangle.p2
+    );
   }
   ksk::renderer::computeSmoothNormals(surface);
   proxy->meshes.push_back(std::move(surface));
@@ -213,8 +213,7 @@ int main(int argc, char** argv)
   pinRodRoot(scene, hair1, {-0.58, 0.62, 0.02}, 5000.0);
   pinRodRoot(scene, hair2, {-0.52, 0.70, 0.18}, 5000.0);
 
-  ksk::runtime::SimulationRunner runner =
-      ksk::runtime::buildSimulationRunner(scene);
+  ksk::runtime::SimulationRunner runner = ksk::runtime::buildSimulationRunner(scene);
   const ksk::runtime::RuntimeScene& initial_scene =
       runner.simulation().scene();
 

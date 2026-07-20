@@ -1,6 +1,5 @@
 #include <Runtime/global-solver.h>
 
-#include <Runtime/contact-detection.h>
 #include <Runtime/contact-barrier-energy.h>
 
 #include <algorithm>
@@ -60,59 +59,6 @@ DofBuffer createDofBufferLike(const DofBuffer& reference, int scalar_count)
   return DofBuffer::GPU(*reference.device(), scalar_count);
 }
 
-ContactDetectionConfig createContactDetectionConfig(const RuntimeScene& scene,
-                                                    Real toi)
-{
-  const GlobalSolverConfig& solver_config = scene.solverConfig;
-  const Real barrier_distance =
-      solver_config.contactBarrierDistance > 0.0
-          ? solver_config.contactBarrierDistance
-          : solver_config.contactDetectionDistance;
-  return ContactDetectionConfig{
-      .storage = solver_config.contactDetectionStorage,
-      .detectionDistance = solver_config.contactDetectionDistance,
-      .dHat = barrier_distance,
-      .stiffness = solver_config.contactStiffness,
-      .toi = toi,
-  };
-}
-
-ContactDetectionConfig createCurrentBarrierContactConfig(
-    const RuntimeScene& scene)
-{
-  ContactDetectionConfig config = createContactDetectionConfig(scene, 0.0);
-  config.detectionDistance = config.dHat;
-  return config;
-}
-
-void applyRoutedContacts(SimulationContext& simulation,
-                         GlobalContactRouter routed_contacts)
-{
-  RuntimeScene& scene = simulation.scene();
-  scene.contacts = std::move(routed_contacts.globalContacts);
-
-  for (const auto& subsystem : simulation.subsystems()) {
-    ContactStencils contacts;
-    const auto found =
-        routed_contacts.subsystemInternalContacts.find(subsystem->id());
-    if (found != routed_contacts.subsystemInternalContacts.end()) {
-      contacts = std::move(found->second.contacts);
-    }
-    subsystem->applyInternalContacts(std::move(contacts));
-  }
-}
-
-void refreshContactsFromCandidates(SimulationContext& simulation,
-                                   const ContactCandidates& candidates)
-{
-  GlobalContactRouter routed_contacts =
-      refreshActiveContactsFromCandidates(
-          simulation.scene().geometry,
-          candidates,
-          createCurrentBarrierContactConfig(simulation.scene()));
-  applyRoutedContacts(simulation, std::move(routed_contacts));
-}
-
 void synchronizeGeometryFromState(SimulationContext& simulation)
 {
   DofBuffer& q = simulation.q();
@@ -122,26 +68,6 @@ void synchronizeGeometryFromState(SimulationContext& simulation)
     subsystem->readState(q.slice(range), qdot.slice(range));
     subsystem->updateGeometry(simulation.scene().geometry);
   }
-}
-
-ContactCandidates detectCandidatesWithGeometryDirection(
-    SimulationContext& simulation,
-    const GeometryBuffer& geometry_direction,
-    const ContactDetectionConfig& contact_config)
-{
-  return detectContactCandidatesAlongDirection(
-      simulation.scene().geometry, geometry_direction, contact_config);
-}
-
-void refreshContactsAtCurrentGeometry(SimulationContext& simulation)
-{
-  GeometryBuffer zero_direction =
-      GeometryBuffer::CPU(simulation.scene().geometry.pointCount());
-  const ContactCandidates candidates = detectCandidatesWithGeometryDirection(
-      simulation,
-      zero_direction,
-      createCurrentBarrierContactConfig(simulation.scene()));
-  refreshContactsFromCandidates(simulation, candidates);
 }
 
 }  // namespace
@@ -183,7 +109,7 @@ RuntimeStepResult GlobalGaussNewtonSolver::step(SimulationContext& simulation,
       subsystem->updateInternalConstraints(time + dt, dt);
       subsystem->updateGeometry(simulation.scene().geometry);
     }
-    refreshContactsAtCurrentGeometry(simulation);
+    contact_detector_.refreshCurrentContacts(simulation);
 
     for (const auto& subsystem : subsystems) {
       const DofRange range = subsystem->dofRange();
@@ -206,14 +132,14 @@ RuntimeStepResult GlobalGaussNewtonSolver::step(SimulationContext& simulation,
       result.finalStepNorm = 0.0;
       break;
     }
-    const ContactSearchResult line_search_contacts =
-        updateContactsAlongDirection(simulation, direction);
+    const ContactDirectionSearchResult line_search_contacts =
+        contact_detector_.updateAlongDirection(simulation, direction);
 
     const double directional_derivative = gradient.dot(direction);
     if (directional_derivative >= 0.0) {
       q.copyFrom(q_before);
       synchronizeGeometryFromState(simulation);
-      refreshContactsAtCurrentGeometry(simulation);
+      contact_detector_.refreshCurrentContacts(simulation);
       result.finalStepNorm = 0.0;
       break;
     }
@@ -229,7 +155,7 @@ RuntimeStepResult GlobalGaussNewtonSolver::step(SimulationContext& simulation,
     if (!std::isfinite(alpha) || alpha <= 0.0) {
       q.copyFrom(q_before);
       synchronizeGeometryFromState(simulation);
-      refreshContactsAtCurrentGeometry(simulation);
+      contact_detector_.refreshCurrentContacts(simulation);
       result.finalStepNorm = 0.0;
       break;
     }
@@ -240,7 +166,7 @@ RuntimeStepResult GlobalGaussNewtonSolver::step(SimulationContext& simulation,
          line_search++) {
       q.assignLinearCombination(q_before, alpha, direction);
       synchronizeGeometryFromState(simulation);
-      refreshContactsFromCandidates(
+      contact_detector_.refreshFromCandidates(
           simulation, line_search_contacts.candidates);
       const double objective_trial = evaluateObjective(simulation, dt);
       const double armijo_rhs =
@@ -250,13 +176,13 @@ RuntimeStepResult GlobalGaussNewtonSolver::step(SimulationContext& simulation,
         accepted = true;
         break;
       }
-      alpha *= config.lineSearchShrink;
+      alpha *= 0.5;
     }
 
     if (!accepted) {
       q.copyFrom(q_before);
       synchronizeGeometryFromState(simulation);
-      refreshContactsAtCurrentGeometry(simulation);
+      contact_detector_.refreshCurrentContacts(simulation);
       result.finalStepNorm = 0.0;
       break;
     }
@@ -339,32 +265,6 @@ void GlobalGaussNewtonSolver::assembleContactGradient(
   }
 }
 
-GlobalGaussNewtonSolver::ContactSearchResult
-GlobalGaussNewtonSolver::updateContactsAlongDirection(
-    SimulationContext& simulation,
-    const DofBuffer& direction)
-{
-  RuntimeScene& scene = simulation.scene();
-  GeometryBuffer geometry_direction =
-      createGeometryDirectionBuffer(direction, scene.geometry.pointCount());
-
-  for (const auto& subsystem : simulation.subsystems()) {
-    subsystem->mapLocalDirectionToGeometry(
-        direction.slice(subsystem->dofRange()), geometry_direction.view());
-  }
-
-  ContactCandidateDetectionResult detected =
-      detectContactCandidatesAndStepSizeAlongDirection(
-          scene.geometry,
-          geometry_direction,
-          createContactDetectionConfig(scene, 1.0));
-  refreshContactsFromCandidates(simulation, detected.candidates);
-  return ContactSearchResult{
-      .candidates = std::move(detected.candidates),
-      .stepSizeUpperBound = detected.stepSizeUpperBound,
-  };
-}
-
 bool GlobalGaussNewtonSolver::solveNewtonDirection(
     SimulationContext& simulation,
     const DofBuffer& gradient,
@@ -440,8 +340,7 @@ bool GlobalGaussNewtonSolver::solveSingleSubsystemDirection(
 {
   direction.setZero();
 
-  DofBuffer residual =
-      createDofBufferLike(gradient, simulation.scene().dofs.totalScalars);
+  DofBuffer residual = createDofBufferLike(gradient, simulation.scene().dofs.totalScalars);
   residual.assignScaled(-1.0, gradient);
   if (residual.norm() == 0.0) {
     return true;

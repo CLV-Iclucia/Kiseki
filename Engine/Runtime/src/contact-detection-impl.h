@@ -14,6 +14,11 @@ namespace ksk::runtime::detail {
     const GeometryBuffer& geometryDirection,
     const ContactDetectionConfig& config);
 
+[[nodiscard]] ContactWorkList gatherCollisionWorkListAlongDirectionOnCPU(
+    const GlobalGeometryManager& geometry,
+    const GeometryBuffer& geometryDirection,
+    const ContactDetectionConfig& config);
+
 [[nodiscard]] ContactCandidateDetectionResult
 detectContactCandidatesAndStepSizeAlongDirectionOnCPU(
     const GlobalGeometryManager& geometry,

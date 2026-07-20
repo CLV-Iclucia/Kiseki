@@ -182,6 +182,38 @@ int GlobalGeometryManager::addTriangle(PointIdx p0,
   return id;
 }
 
+int GlobalGeometryManager::addTet(PointIdx p0, PointIdx p1, PointIdx p2, PointIdx p3)
+{
+  const GeometryPoint& first = checkedPoint(p0);
+  const GeometryPoint& second = checkedPoint(p1);
+  const GeometryPoint& third = checkedPoint(p2);
+  const GeometryPoint& fourth = checkedPoint(p3);
+  if (first.owner.subsystem != second.owner.subsystem ||
+      first.owner.subsystem != third.owner.subsystem ||
+      first.owner.subsystem != fourth.owner.subsystem ||
+      first.owner.collider != second.owner.collider ||
+      first.owner.collider != third.owner.collider ||
+      first.owner.collider != fourth.owner.collider) {
+    throw std::invalid_argument(
+        "geometry tet vertices belong to different owners");
+  }
+  if (!first.owner.isSubsystem()) {
+    throw std::invalid_argument("geometry tets must belong to a subsystem");
+  }
+
+  const int id = static_cast<int>(tets.size());
+  const GeometryReference ref = addReference(tet_ranges_, first.owner, id);
+  tets.push_back(GeometryTet{
+      .id = id,
+      .ref = ref,
+      .p0 = p0,
+      .p1 = p1,
+      .p2 = p2,
+      .p3 = p3,
+  });
+  return id;
+}
+
 GeometryInstanceId GlobalGeometryManager::addInstance(
     SubsystemId subsystem,
     int localInstanceId,
@@ -304,6 +336,11 @@ int GlobalGeometryManager::triangleCount() const noexcept
   return static_cast<int>(triangles.size());
 }
 
+int GlobalGeometryManager::tetCount() const noexcept
+{
+  return static_cast<int>(tets.size());
+}
+
 GeometryRange GlobalGeometryManager::pointRange(SubsystemId subsystem) const noexcept
 {
   return rangeFor(point_ranges_, subsystem);
@@ -317,6 +354,11 @@ GeometryRange GlobalGeometryManager::edgeRange(SubsystemId subsystem) const noex
 GeometryRange GlobalGeometryManager::triangleRange(SubsystemId subsystem) const noexcept
 {
   return rangeFor(triangle_ranges_, subsystem);
+}
+
+GeometryRange GlobalGeometryManager::tetRange(SubsystemId subsystem) const noexcept
+{
+  return rangeFor(tet_ranges_, subsystem);
 }
 
 GeometryRange GlobalGeometryManager::colliderPointRange(int collider) const noexcept
@@ -351,6 +393,11 @@ GeometryReference GlobalGeometryManager::edgeRef(int edge) const
 GeometryReference GlobalGeometryManager::triangleRef(int triangle) const
 {
   return checkedTriangle(triangle).ref;
+}
+
+GeometryReference GlobalGeometryManager::tetRef(int tet) const
+{
+  return checkedTet(tet).ref;
 }
 
 GeometryOwner GlobalGeometryManager::pointOwner(PointIdx point) const
@@ -396,10 +443,12 @@ GeometryStencilInfo GlobalGeometryManager::classify(std::span<const PointIdx> st
     if (info.subsystemCount == 1) {
       info.subsystems[1] = subsystem;
       info.subsystemCount = 2;
+      info.crossesSubsystems = true;
       continue;
     }
     if (info.subsystems[1] != subsystem) {
       info.valid = false;
+      info.crossesSubsystems = true;
     }
   }
   return info;
@@ -440,6 +489,12 @@ std::array<PointIdx, 3> GlobalGeometryManager::globalTriangle(int triangle) cons
 {
   const GeometryTriangle& entry = checkedTriangle(triangle);
   return {entry.p0, entry.p1, entry.p2};
+}
+
+std::array<PointIdx, 4> GlobalGeometryManager::globalTet(int tet) const
+{
+  const GeometryTet& entry = checkedTet(tet);
+  return {entry.p0, entry.p1, entry.p2, entry.p3};
 }
 
 bool GlobalGeometryManager::triangleContainsPoint(int triangle,
@@ -640,6 +695,12 @@ const GeometryTriangle& GlobalGeometryManager::checkedTriangle(int triangle) con
 {
   assert(triangle >= 0 && triangle < triangles.size());
   return triangles[triangle];
+}
+
+const GeometryTet& GlobalGeometryManager::checkedTet(int tet) const
+{
+  assert(tet >= 0 && tet < static_cast<int>(tets.size()));
+  return tets[static_cast<size_t>(tet)];
 }
 
 const GeometryInstance& GlobalGeometryManager::checkedInstance(

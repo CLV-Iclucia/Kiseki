@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include <Runtime/contact-detection.h>
+#include <Runtime/contact-detector.h>
 #include <Runtime/runtime-scene.h>
 #include <Runtime/simulation-context.h>
 
@@ -27,18 +27,10 @@ class GlobalGaussNewtonSolver {
   }
 
  private:
-  struct ContactSearchResult {
-    ContactCandidates candidates;
-    double stepSizeUpperBound = 1.0;
-  };
-
   [[nodiscard]] static double evaluateObjective(SimulationContext& simulation,
                                                 double dt);
   static void assembleContactGradient(SimulationContext& simulation,
                                       DofBuffer& gradient);
-  [[nodiscard]] static ContactSearchResult updateContactsAlongDirection(
-      SimulationContext& simulation,
-      const DofBuffer& direction);
   [[nodiscard]] static bool solveNewtonDirection(SimulationContext& simulation,
                                                  const DofBuffer& gradient,
                                                  DofBuffer& direction);
@@ -58,6 +50,7 @@ class GlobalGaussNewtonSolver {
 
   int scalar_count_ = 0;
   int geometry_point_count_ = 0;
+  ContactDetector contact_detector_;
 };
 
 class SimulationRunner {

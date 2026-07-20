@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Runtime/runtime-scene.h>
+#include <SceneObjects/geometry-view.h>
 
 #include <array>
 #include <string>
@@ -28,7 +29,25 @@ struct TetMeshDesc {
   std::vector<std::array<int, 3>> surfaceTriangles;
   std::vector<std::array<int, 2>> surfaceEdges;
   TetMaterial material;
+
+  [[nodiscard]] TetMeshView meshView() const noexcept
+  {
+    return TetMeshView{
+        .vertices = vertices,
+        .tets = tets,
+        .surface = SurfaceMeshView{
+            .vertices = vertices,
+            .edges = surfaceEdges,
+            .triangles = surfaceTriangles,
+        },
+    };
+  }
 };
+
+[[nodiscard]] inline TetMeshView viewOf(const TetMeshDesc& mesh) noexcept
+{
+  return mesh.meshView();
+}
 
 struct TetMeshObjectDesc final : runtime::SceneObjectDesc {
   using ObjectType = TetMeshObject;
