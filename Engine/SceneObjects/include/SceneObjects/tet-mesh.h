@@ -14,6 +14,7 @@
 namespace ksk::scene {
 
 struct TetMeshObject {};
+struct ClothMeshObject {};
 
 struct TetMaterial {
   double density = 1000.0;
@@ -71,6 +72,60 @@ struct TetMeshObjectDesc final : runtime::SceneObjectDesc {
       const override;
 
   TetMeshDesc mesh;
+};
+
+struct ClothMaterial {
+  double arealDensity = 1.0;
+  double thickness = 1.0e-3;
+  double stretchStiffness = 1.0e3;
+  double damping = 0.0;
+};
+
+struct ClothMeshDesc {
+  std::vector<glm::dvec3> vertices;
+  std::vector<glm::dvec3> initialPositions;
+  std::vector<glm::dvec3> initialVelocities;
+  std::vector<std::array<int, 3>> triangles;
+  std::vector<std::array<int, 2>> edges;
+  ClothMaterial material;
+
+  [[nodiscard]] SurfaceMeshView meshView() const noexcept
+  {
+    return SurfaceMeshView{
+        .vertices = vertices,
+        .edges = edges,
+        .triangles = triangles,
+    };
+  }
+};
+
+[[nodiscard]] inline SurfaceMeshView viewOf(const ClothMeshDesc& mesh) noexcept
+{
+  return mesh.meshView();
+}
+
+struct ClothMeshObjectDesc final : runtime::SceneObjectDesc {
+  using ObjectType = ClothMeshObject;
+
+  explicit ClothMeshObjectDesc(std::string tag = {})
+      : SceneObjectDesc(std::move(tag))
+  {
+  }
+
+  [[nodiscard]] runtime::ObjectTypeId typeId() const noexcept override
+  {
+    return runtime::elementTypeId<ClothMeshObject>();
+  }
+
+  [[nodiscard]] std::string_view typeName() const noexcept override
+  {
+    return "ClothMeshObject";
+  }
+
+  [[nodiscard]] std::vector<runtime::PropertyDescriptor> listProperties()
+      const override;
+
+  ClothMeshDesc mesh;
 };
 
 }  // namespace ksk::scene

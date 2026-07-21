@@ -22,7 +22,7 @@ Vector<T, Dim> cwiseMax(const Vector<T, Dim> &a, const Vector<T, Dim> &b) {
 template<typename T, int Dim>
 struct BBox {
   Vector<T, Dim> lo{std::numeric_limits<T>::max()};
-  Vector<T, Dim> hi{std::numeric_limits<T>::min()};
+  Vector<T, Dim> hi{std::numeric_limits<T>::lowest()};
   BBox() = default;
   explicit BBox(const Vector<T, Dim> &p) : lo(p), hi(p) {}
   BBox(const Vector<T, Dim> &lo, const Vector<T, Dim> &hi) : lo(lo), hi(hi) {

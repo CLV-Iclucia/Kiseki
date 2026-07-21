@@ -23,17 +23,15 @@
 #define SIM_PROFILE_VALUE(name, val) \
     do { TracyPlot(name, static_cast<double>(val)); } while(0)
 
-// 带颜色标记（方便在时间线中区分不同阶段）
 #define SIM_PROFILE_SCOPE_COLOR(name, color) ZoneScopedNC(name, color)
 
-// 常用颜色
 namespace ksk::core::profiler_colors {
-    inline constexpr unsigned int kGradient   = 0xFF6B6B;  // 红
-    inline constexpr unsigned int kHessian    = 0x4ECDC4;  // 青
-    inline constexpr unsigned int kSolver     = 0x45B7D1;  // 蓝
-    inline constexpr unsigned int kCollision  = 0xFFA07A;  // 橙
-    inline constexpr unsigned int kLineSearch = 0x98D8C8;  // 绿
-    inline constexpr unsigned int kEnergy     = 0xDDA0DD;  // 紫
+    inline constexpr unsigned int kRed   = 0xFF6B6B;
+    inline constexpr unsigned int kCyan    = 0x4ECDC4;
+    inline constexpr unsigned int kBlue     = 0x45B7D1;
+    inline constexpr unsigned int kOrange  = 0xFFA07A;
+    inline constexpr unsigned int kGreen = 0x98D8C8;
+    inline constexpr unsigned int kPurple     = 0xDDA0DD;
 }
 
 #else // TRACY_ENABLE not defined

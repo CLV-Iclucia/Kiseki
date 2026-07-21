@@ -13,6 +13,7 @@ struct GlobalSolverConfig {
   double lineSearchArmijo = 1.0e-4;
   double ccdStepSizeScale = 0.9;
   double pcgTolerance = 1.0e-8;
+  bool enableContact = true;
   ContactDetectionStorage contactDetectionStorage =
       ContactDetectionStorage::Host;
   double contactDetectionDistance = 0.0;

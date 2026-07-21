@@ -18,4 +18,22 @@ std::vector<runtime::PropertyDescriptor> TetMeshObjectDesc::listProperties()
   };
 }
 
+std::vector<runtime::PropertyDescriptor> ClothMeshObjectDesc::listProperties()
+    const
+{
+  const int vertex_count = static_cast<int>(mesh.vertices.size());
+  return {
+      {"material.arealDensity", runtime::PropertyType::Scalar, 1, 1,
+       "Cloth mesh areal density"},
+      {"material.thickness", runtime::PropertyType::Scalar, 1, 1,
+       "Cloth mesh thickness"},
+      {"x", runtime::PropertyType::Scalar, 1, vertex_count,
+       "Cloth mesh vertex x-position"},
+      {"y", runtime::PropertyType::Scalar, 1, vertex_count,
+       "Cloth mesh vertex y-position"},
+      {"z", runtime::PropertyType::Scalar, 1, vertex_count,
+       "Cloth mesh vertex z-position"},
+  };
+}
+
 }  // namespace ksk::scene

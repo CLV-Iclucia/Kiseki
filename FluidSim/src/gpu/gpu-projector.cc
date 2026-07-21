@@ -64,14 +64,14 @@ void GPUProjector::solve(CommandList& cmd, GPUGridState& grid, Real dt) {
     SIM_PROFILE_FUNCTION();
 
     {
-        SIM_PROFILE_SCOPE_COLOR("GPUProjector/BuildSystem", ksk::core::profiler_colors::kHessian);
+        SIM_PROFILE_SCOPE_COLOR("GPUProjector/BuildSystem", ksk::core::profiler_colors::kCyan);
         buildWeightsAndSystem(cmd, grid, dt);
     }
     cmd.memoryBarrier(BarrierDesc::StageComputeShader, BarrierDesc::StageComputeShader);
 
     auto ps = makePressureSystem(grid.gridSize);
     {
-        SIM_PROFILE_SCOPE_COLOR("GPUProjector/LinearSolve", ksk::core::profiler_colors::kSolver);
+        SIM_PROFILE_SCOPE_COLOR("GPUProjector/LinearSolve", ksk::core::profiler_colors::kBlue);
         solver_->solve(cmd, ps);
     }
     cmd.memoryBarrier(BarrierDesc::StageComputeShader, BarrierDesc::StageComputeShader);

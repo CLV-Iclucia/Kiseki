@@ -368,13 +368,11 @@ namespace ksk::der
 
         const auto& offsets = subsystem_.rodOffsets();
         auto& rods = subsystem_.rods();
-        for (int rod_index = 0; rod_index < static_cast<int>(rods.size());
-             ++rod_index)
+        for (int rod_index = 0; rod_index < rods.size(); ++rod_index)
         {
             Rod& rod = rods[rod_index];
             const int base = offsets[rod_index].q;
-            for (int vertex = 0; vertex < static_cast<int>(rod.state().size());
-                 ++vertex)
+            for (int vertex = 0; vertex < rod.state().size(); ++vertex)
             {
                 for (int lane = 0; lane < 4; ++lane)
                 {

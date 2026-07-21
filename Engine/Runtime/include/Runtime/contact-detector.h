@@ -5,19 +5,18 @@
 
 namespace ksk::runtime {
 
-struct ContactDirectionSearchResult {
-  ContactCandidates candidates;
+struct CcdStepBoundResult {
+  ContactCandidates sweptCandidates;
   Real stepSizeUpperBound = 1.0;
 };
 
 class ContactDetector {
  public:
-  void refreshCurrentContacts(SimulationContext& simulation) const;
+  // Rebuild the active barrier constraints at the scene's current geometry.
+  void rebuildActiveContacts(SimulationContext& simulation) const;
 
-  void refreshFromCandidates(SimulationContext& simulation,
-                             const ContactCandidates& candidates) const;
-
-  [[nodiscard]] ContactDirectionSearchResult updateAlongDirection(
+  // Use swept CCD only to bound the step length along a proposed direction.
+  [[nodiscard]] CcdStepBoundResult computeCcdStepBound(
       SimulationContext& simulation,
       const DofBuffer& direction) const;
 

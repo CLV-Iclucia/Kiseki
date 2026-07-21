@@ -55,7 +55,7 @@ void IpcIntegrator::step(Real dt) {
 
   Real E_prev;
   {
-    SIM_PROFILE_SCOPE_COLOR("InitialEnergy", ksk::core::profiler_colors::kEnergy);
+    SIM_PROFILE_SCOPE_COLOR("InitialEnergy", ksk::core::profiler_colors::kPurple);
     E_prev = barrierAugmentedIncrementalPotentialEnergy(x_t, h);
   }
   spdlog::info("[IPC] E_prev = {}", E_prev);
@@ -67,7 +67,7 @@ void IpcIntegrator::step(Real dt) {
     // Compute negative gradient directly as BlockVector<3>
     maths::BlockVector<3> negG;
     {
-      SIM_PROFILE_SCOPE_COLOR("Gradient", ksk::core::profiler_colors::kGradient);
+      SIM_PROFILE_SCOPE_COLOR("Gradient", ksk::core::profiler_colors::kRed);
       negG = barrierAugmentedIncrementalPotentialEnergyGradient(x_t, h);
       negG *= -1.0;
       system().constraints().zeroConstrainedGradient(negG);
@@ -76,13 +76,13 @@ void IpcIntegrator::step(Real dt) {
     // Compute Hessian directly as BlockSparseMatrix<3>
     maths::BlockSparseMatrix<3> H;
     {
-      SIM_PROFILE_SCOPE_COLOR("HessianAssembly", ksk::core::profiler_colors::kHessian);
+      SIM_PROFILE_SCOPE_COLOR("HessianAssembly", ksk::core::profiler_colors::kCyan);
       H = spdProjectHessian(h);
     }
 
     // Linear solve
     {
-      SIM_PROFILE_SCOPE_COLOR("LinearSolve", ksk::core::profiler_colors::kSolver);
+      SIM_PROFILE_SCOPE_COLOR("LinearSolve", ksk::core::profiler_colors::kBlue);
       p.setZero();
       auto result = solver->solve(H, negG, p);
       if (!result.converged)
@@ -107,7 +107,7 @@ void IpcIntegrator::step(Real dt) {
     // CCD + line search
     Real alpha;
     {
-      SIM_PROFILE_SCOPE_COLOR("CCD", ksk::core::profiler_colors::kCollision);
+      SIM_PROFILE_SCOPE_COLOR("CCD", ksk::core::profiler_colors::kOrange);
       Real alphaElastic = computeStepSizeUpperBound(p);
       Real alphaKinematic = 1.0;
       if (!system().colliders().empty()) {
@@ -122,7 +122,7 @@ void IpcIntegrator::step(Real dt) {
           "Invalid state: collision happened within an integration step");
 
     {
-      SIM_PROFILE_SCOPE_COLOR("LineSearch", ksk::core::profiler_colors::kLineSearch);
+      SIM_PROFILE_SCOPE_COLOR("LineSearch", ksk::core::profiler_colors::kGreen);
       precomputeCollisionPairs(p, alpha);
       Real E;
       do {

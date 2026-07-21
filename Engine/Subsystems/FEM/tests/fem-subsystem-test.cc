@@ -41,6 +41,25 @@ TetMeshDesc makeSingleTet()
   return mesh;
 }
 
+ClothMeshDesc makeSquareCloth()
+{
+  ClothMeshDesc mesh;
+  mesh.vertices = {
+      glm::dvec3(0.0, 0.0, 0.0),
+      glm::dvec3(1.0, 0.0, 0.0),
+      glm::dvec3(0.0, 1.0, 0.0),
+      glm::dvec3(1.0, 1.0, 0.0),
+  };
+  mesh.triangles = {
+      std::array<int, 3>{0, 1, 2},
+      std::array<int, 3>{1, 3, 2},
+  };
+  mesh.material.arealDensity = 2.0;
+  mesh.material.thickness = 0.05;
+  mesh.material.stretchStiffness = 100.0;
+  return mesh;
+}
+
 TEST(FEMSubsystem, EmitsSurfaceGeometry)
 {
   FEMSubsystem subsystem(runtime::SubsystemId{3}, {makeSingleTet()});
@@ -117,6 +136,79 @@ TEST(FEMSubsystem, MapsPositionDirectionToGeometry)
   EXPECT_DOUBLE_EQ(dx.cpu()[1].x, 1.0);
   EXPECT_DOUBLE_EQ(dx.cpu()[1].y, 2.0);
   EXPECT_DOUBLE_EQ(dx.cpu()[1].z, 3.0);
+}
+
+TEST(FEMSubsystem, EmitsClothSurfaceGeometry)
+{
+  runtime::RuntimeSceneDesc scene;
+  const runtime::ObjectRef cloth_ref = addClothMesh(scene, makeSquareCloth());
+
+  runtime::SimulationContext simulation = runtime::buildSimulation(scene);
+
+  EXPECT_EQ(simulation.scene().dofs.totalScalars, 12);
+  EXPECT_EQ(simulation.scene().geometry.points.size(), 4);
+  EXPECT_EQ(simulation.scene().geometry.edges.size(), 5);
+  EXPECT_EQ(simulation.scene().geometry.triangles.size(), 2);
+  EXPECT_EQ(simulation.scene().geometry.tets.size(), 0);
+  EXPECT_DOUBLE_EQ(simulation.scene().geometry.points[0].radius, 0.05);
+  EXPECT_DOUBLE_EQ(simulation.scene().geometry.edges[0].radius, 0.05);
+  EXPECT_DOUBLE_EQ(simulation.scene().geometry.triangles[0].thickness, 0.05);
+
+  const std::vector<runtime::PropertyDescriptor> properties =
+      scene.listProperties(cloth_ref);
+  EXPECT_TRUE(std::any_of(properties.begin(), properties.end(),
+                         [&](const runtime::PropertyDescriptor& property) {
+                           return property.name == "material.arealDensity" &&
+                                  property.ownerId == cloth_ref.id;
+                         }));
+  EXPECT_TRUE(std::any_of(properties.begin(), properties.end(),
+                         [&](const runtime::PropertyDescriptor& property) {
+                           return property.name == "material.thickness" &&
+                                  property.ownerId == cloth_ref.id;
+                         }));
+}
+
+TEST(FEMSubsystem, MixedTetAndClothHaveContiguousOffsets)
+{
+  runtime::RuntimeSceneDesc scene;
+  addTetMesh(scene, makeSingleTet());
+  addClothMesh(scene, makeSquareCloth());
+
+  runtime::SimulationContext simulation = runtime::buildSimulation(scene);
+
+  EXPECT_EQ(simulation.scene().dofs.totalScalars, 24);
+  EXPECT_EQ(simulation.scene().geometry.points.size(), 8);
+  EXPECT_EQ(simulation.scene().geometry.triangles.size(), 6);
+  EXPECT_EQ(simulation.scene().geometry.tets.size(), 1);
+}
+
+TEST(FEMSubsystem, DeformedClothHasElasticGradient)
+{
+  ClothMeshDesc mesh = makeSquareCloth();
+  mesh.initialPositions = mesh.vertices;
+  mesh.initialPositions[1] = glm::dvec3(1.2, 0.0, 0.0);
+  FEMSubsystem subsystem(
+      runtime::SubsystemId{0},
+      std::vector<FEMPrimitive>{
+          FEMClothPrimitive{
+              .mesh = mesh,
+              .offset = {},
+              .runtime = {},
+          },
+      },
+      {},
+      0,
+      glm::dvec3(0.0));
+  auto q = runtime::DofBuffer::CPU(subsystem.localScalarCount());
+  auto qdot = runtime::DofBuffer::CPU(subsystem.localScalarCount());
+  subsystem.writeState(q.view(), qdot.view());
+  subsystem.beginStep(q.view(), qdot.view(), 0.01);
+  subsystem.prepareLocalOperator(0.01);
+
+  auto g = runtime::DofBuffer::CPU(subsystem.localScalarCount());
+  subsystem.assembleLocalGradient(g.view());
+
+  EXPECT_GT(g.norm(), 1.0e-6);
 }
 
 TEST(FEMSubsystem, RestTetHasZeroElasticGradient)

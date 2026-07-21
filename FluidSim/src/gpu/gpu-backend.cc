@@ -105,7 +105,7 @@ void GPUFluidBackend::initialize(const FluidScene& scene) {
 }
 
 void GPUFluidBackend::computeCFL() {
-    SIM_PROFILE_SCOPE_COLOR("GPUFluid/ComputeCFL", ksk::core::profiler_colors::kSolver);
+    SIM_PROFILE_SCOPE_COLOR("GPUFluid/ComputeCFL", ksk::core::profiler_colors::kBlue);
 
     // GPU two-pass reduction: compute max particle speed
     uint32_t numGroups = (grid_.numParticles + 255) / 256;
@@ -149,7 +149,7 @@ void GPUFluidBackend::step(Real dt) {
 
     // Compute dynamic CFL from particle velocities
     {
-        SIM_PROFILE_SCOPE_COLOR("GPUFluid/CFL", ksk::core::profiler_colors::kSolver);
+        SIM_PROFILE_SCOPE_COLOR("GPUFluid/CFL", ksk::core::profiler_colors::kBlue);
         computeCFL();
     }
     Real cflDt = (cachedMaxSpeed_ > 1e-6)
@@ -483,7 +483,7 @@ void GPUFluidBackend::substep(CommandList& cmd, Real dt) {
 
     // ---- 4. Pressure solve (build weights → build system → CG → project) ----
     {
-        SIM_PROFILE_SCOPE_COLOR("GPUFluid/Pressure", ksk::core::profiler_colors::kSolver);
+        SIM_PROFILE_SCOPE_COLOR("GPUFluid/Pressure", ksk::core::profiler_colors::kBlue);
         projector_->solve(cmd, grid_, dt);
     }
     barrier();

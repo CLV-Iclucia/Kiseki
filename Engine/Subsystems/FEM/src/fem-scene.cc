@@ -45,7 +45,8 @@ void FEMSubsystemDesc::build(runtime::SubsystemBuildContext& context) const
   }
 
   std::vector<TetMeshDesc> runtime_meshes;
-  runtime_meshes.reserve(meshes.size());
+  std::vector<FEMPrimitive> runtime_primitives;
+  runtime_primitives.reserve(meshes.size());
   std::vector<FEMConstraintBinding> runtime_constraints;
   const runtime::RuntimeSceneDesc& scene = context.sceneDesc();
 
@@ -53,12 +54,23 @@ void FEMSubsystemDesc::build(runtime::SubsystemBuildContext& context) const
        ++mesh_index) {
     const runtime::ObjectId mesh_id = meshes[mesh_index];
     runtime::ObjectRef mesh_ref = scene.findObjectById(mesh_id);
-    const TetMeshObjectDesc* mesh_desc =
-        scene.findObjectDescAs<TetMeshObjectDesc>(mesh_ref);
-    if (!mesh_desc) {
-      throw std::runtime_error("FEM subsystem references a missing tet mesh");
+    if (const TetMeshObjectDesc* mesh_desc =
+            scene.findObjectDescAs<TetMeshObjectDesc>(mesh_ref)) {
+      runtime_primitives.push_back(FEMTetMeshPrimitive{
+          .mesh = mesh_desc->mesh,
+          .offset = {},
+          .runtime = {},
+      });
+    } else if (const ClothMeshObjectDesc* cloth_desc =
+                   scene.findObjectDescAs<ClothMeshObjectDesc>(mesh_ref)) {
+      runtime_primitives.push_back(FEMClothPrimitive{
+          .mesh = cloth_desc->mesh,
+          .offset = {},
+          .runtime = {},
+      });
+    } else {
+      throw std::runtime_error("FEM subsystem references a missing mesh");
     }
-    runtime_meshes.push_back(mesh_desc->mesh);
 
     for (const runtime::SceneConstraintDesc& constraint : scene.constraints) {
       if (constraint.object.id == mesh_id) {
@@ -72,7 +84,7 @@ void FEMSubsystemDesc::build(runtime::SubsystemBuildContext& context) const
 
   context.addSubsystem(
       std::make_unique<FEMSubsystem>(context.nextSubsystemId(),
-                                     std::move(runtime_meshes),
+                                     std::move(runtime_primitives),
                                      std::move(runtime_constraints),
                                      context.nextScalarOffset(),
                                      context.gravity()),
@@ -91,6 +103,18 @@ runtime::ObjectRef addTetMesh(runtime::RuntimeSceneDesc& scene,
   return mesh_ref;
 }
 
+runtime::ObjectRef addClothMesh(runtime::RuntimeSceneDesc& scene,
+                                ClothMeshDesc mesh,
+                                std::string tag)
+{
+  auto mesh_desc = std::make_unique<ClothMeshObjectDesc>(std::move(tag));
+  mesh_desc->mesh = std::move(mesh);
+
+  runtime::ObjectRef mesh_ref = scene.registerObject(std::move(mesh_desc));
+  scene.assignObjectToSubsystem("fem", mesh_ref.id, createFEMSubsystemDesc);
+  return mesh_ref;
+}
+
 void addConstraint(runtime::RuntimeSceneDesc& scene,
                    runtime::ObjectRef mesh,
                    std::string property,
@@ -98,8 +122,8 @@ void addConstraint(runtime::RuntimeSceneDesc& scene,
                    double stiffness,
                    runtime::ScalarConstraintTarget target)
 {
-  if (!mesh.isA<TetMeshObject>()) {
-    throw std::runtime_error("cannot add FEM constraint to non-tet-mesh object");
+  if (!mesh.isA<TetMeshObject>() && !mesh.isA<ClothMeshObject>()) {
+    throw std::runtime_error("cannot add FEM constraint to non-FEM mesh object");
   }
   scene.addConstraint(mesh, std::move(property), sample, stiffness,
                       std::move(target));

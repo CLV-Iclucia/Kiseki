@@ -3,14 +3,20 @@
 #include <FEM/fem-subsystem.h>
 
 #include <Contact/contact-barrier.h>
+#include <Core/profiler.h>
 
 #include <Eigen/SparseCholesky>
 
+#include <glm/geometric.hpp>
+
 #include <algorithm>
 #include <array>
+#include <cmath>
+#include <iostream>
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 namespace ksk::engine::fem
@@ -83,6 +89,32 @@ namespace ksk::engine::fem
             return 0;
         }
 
+        const char* contactCaseName(runtime::ContactCase type)
+        {
+            switch (type)
+            {
+            case runtime::ContactCase::PP:
+                return "PP";
+            case runtime::ContactCase::PE:
+                return "PE";
+            case runtime::ContactCase::PT:
+                return "PT";
+            case runtime::ContactCase::EE:
+                return "EE";
+            }
+            return "unknown";
+        }
+
+        double dofViewNorm(runtime::ConstDofView view)
+        {
+            double squared_norm = 0.0;
+            for (const double value : view.cpu())
+            {
+                squared_norm += value * value;
+            }
+            return std::sqrt(squared_norm);
+        }
+
         ksk::engine::contact::EBarrierStencil barrierStencilType(
             runtime::ContactCase type)
         {
@@ -116,21 +148,25 @@ namespace ksk::engine::fem
         glm::dvec3 localVertexPosition(const FEMSubsystem& subsystem,
                                        const FEMVertexSample& sample)
         {
-            const TetMeshDesc& mesh =
-                subsystem.meshes().at(static_cast<size_t>(sample.mesh));
-            if (!mesh.initialPositions.empty())
-            {
-                return mesh.initialPositions.at(static_cast<size_t>(sample.vertex));
-            }
-            return mesh.vertices.at(static_cast<size_t>(sample.vertex));
+            return subsystem.vertexPosition(sample.mesh, sample.vertex);
         }
 
         glm::dvec3 localRestVertexPosition(const FEMSubsystem& subsystem,
                                            const FEMVertexSample& sample)
         {
-            return subsystem.meshes()
-                            .at(sample.mesh)
-                            .vertices.at(sample.vertex);
+            return subsystem.restVertexPosition(sample.mesh, sample.vertex);
+        }
+
+        double triangleArea(const std::vector<glm::dvec3>& vertices,
+                            const std::array<int, 3>& triangle)
+        {
+            const glm::dvec3 e0 =
+                vertices.at(static_cast<size_t>(triangle[1])) -
+                vertices.at(static_cast<size_t>(triangle[0]));
+            const glm::dvec3 e1 =
+                vertices.at(static_cast<size_t>(triangle[2])) -
+                vertices.at(static_cast<size_t>(triangle[0]));
+            return 0.5 * glm::length(glm::cross(e0, e1));
         }
 
         struct LocalContactStencil
@@ -243,13 +279,13 @@ namespace ksk::engine::fem
                 return 0.0;
             }
 
-            const ksk::engine::contact::GIPCBarrierStencil barrier =
+            const contact::GIPCBarrierStencil barrier =
                 makeBarrierStencil(*local, contact.type);
             if (g == nullptr)
             {
                 return ksk::engine::contact::computeGIPCBarrierEnergy(barrier);
             }
-            const ksk::engine::contact::LocalBarrierGradient barrier_gradient =
+            const contact::LocalBarrierGradient barrier_gradient =
                 ksk::engine::contact::computeGIPCBarrierGradient(barrier);
             scatterBarrierValues(*local, barrier_gradient.gradient, *g);
             return barrier_gradient.energy;
@@ -354,77 +390,55 @@ namespace ksk::engine::fem
     void FEMCPUBackend::writeState(runtime::DofView q,
                                    runtime::DofView qdot) const
     {
+        SIM_PROFILE_SCOPE("FEMCPUBackend/WriteState");
         requireCPU(q, "FEMCPUBackend::writeState");
         requireCPU(qdot, "FEMCPUBackend::writeState");
         requireDofCount(q, subsystem_.range_.scalarCount, "FEMCPUBackend::writeState");
         requireDofCount(qdot, subsystem_.range_.scalarCount, "FEMCPUBackend::writeState");
 
-        for (int mesh_index = 0;
-             mesh_index < subsystem_.meshes_.size();
-             ++mesh_index)
-        {
-            const TetMeshDesc& mesh = subsystem_.meshes_[mesh_index];
-            const int base = subsystem_.mesh_offsets_[mesh_index].q;
-            for (int vertex = 0; vertex < static_cast<int>(mesh.vertices.size());
-                 ++vertex)
-            {
-                const glm::dvec3 position =
-                    subsystem_.vertexPosition(mesh_index, vertex);
-                const glm::dvec3 velocity =
-                    subsystem_.vertexVelocity(mesh_index, vertex);
-                q[base + 3 * vertex + 0] = position.x;
-                q[base + 3 * vertex + 1] = position.y;
-                q[base + 3 * vertex + 2] = position.z;
-                qdot[base + 3 * vertex + 0] = velocity.x;
-                qdot[base + 3 * vertex + 1] = velocity.y;
-                qdot[base + 3 * vertex + 2] = velocity.z;
-            }
+        for (const FEMVertexSample& sample : subsystem_.samples()) {
+            const glm::dvec3 position =
+                subsystem_.vertexPosition(sample.mesh, sample.vertex);
+            const glm::dvec3 velocity =
+                subsystem_.vertexVelocity(sample.mesh, sample.vertex);
+            q[sample.qOffset + 0] = position.x;
+            q[sample.qOffset + 1] = position.y;
+            q[sample.qOffset + 2] = position.z;
+            qdot[sample.qOffset + 0] = velocity.x;
+            qdot[sample.qOffset + 1] = velocity.y;
+            qdot[sample.qOffset + 2] = velocity.z;
         }
     }
 
     void FEMCPUBackend::readState(runtime::ConstDofView q,
                                   runtime::ConstDofView qdot)
     {
+        SIM_PROFILE_SCOPE("FEMCPUBackend/ReadState");
         requireCPU(q, "FEMCPUBackend::readState");
         requireCPU(qdot, "FEMCPUBackend::readState");
         requireDofCount(q, subsystem_.range_.scalarCount, "FEMCPUBackend::readState");
         requireDofCount(qdot, subsystem_.range_.scalarCount, "FEMCPUBackend::readState");
 
-        for (int mesh_index = 0;
-             mesh_index < static_cast<int>(subsystem_.meshes_.size());
-             ++mesh_index)
-        {
-            TetMeshDesc& mesh = subsystem_.meshes_[mesh_index];
-            const int base = subsystem_.mesh_offsets_[mesh_index].q;
-            if (mesh.initialPositions.empty())
-            {
-                mesh.initialPositions = mesh.vertices;
-            }
-            if (mesh.initialVelocities.empty())
-            {
-                mesh.initialVelocities.resize(mesh.vertices.size(), glm::dvec3(0.0));
-            }
-            for (int vertex = 0; vertex < mesh.vertices.size(); vertex++)
-            {
-                subsystem_.setVertexPosition(
-                    mesh_index, vertex,
-                    glm::dvec3(
-                        q[base + 3 * vertex + 0],
-                        q[base + 3 * vertex + 1],
-                        q[base + 3 * vertex + 2]));
-                subsystem_.setVertexVelocity(
-                    mesh_index, vertex,
-                    glm::dvec3(qdot[base + 3 * vertex + 0],
-                               qdot[base + 3 * vertex + 1],
-                               qdot[base + 3 * vertex + 2]));
-            }
+        for (const FEMVertexSample& sample : subsystem_.samples()) {
+            subsystem_.setVertexPosition(
+                sample.mesh, sample.vertex,
+                glm::dvec3(q[sample.qOffset + 0],
+                           q[sample.qOffset + 1],
+                           q[sample.qOffset + 2]));
+            subsystem_.setVertexVelocity(
+                sample.mesh, sample.vertex,
+                glm::dvec3(qdot[sample.qOffset + 0],
+                           qdot[sample.qOffset + 1],
+                           qdot[sample.qOffset + 2]));
         }
+        subsystem_.rebuildCompatibilityViews();
     }
 
     void FEMCPUBackend::beginStep(runtime::ConstDofView q,
                                   runtime::ConstDofView qdot,
                                   double dt)
     {
+        SIM_PROFILE_SCOPE("FEMCPUBackend/BeginStep");
         step_dt_ = dt;
         step_start_ = gatherLocalVector(q, subsystem_.range_.scalarCount);
         inertial_target_ =
@@ -436,6 +450,7 @@ namespace ksk::engine::fem
                                    runtime::DofView qdot,
                                    double dt)
     {
+        SIM_PROFILE_SCOPE("FEMCPUBackend/AcceptStep");
         if (step_start_.size() != subsystem_.range_.scalarCount)
         {
             throw std::runtime_error("FEM CPU backend step has not begun");
@@ -454,6 +469,8 @@ namespace ksk::engine::fem
                                             runtime::ConstDofView qdot,
                                             double dt)
     {
+        SIM_PROFILE_SCOPE_COLOR("FEMCPUBackend/EvaluateObjective",
+                                ksk::core::profiler_colors::kPurple);
         (void)qdot;
         const Eigen::VectorXd local_q = gatherLocalVector(q, subsystem_.range_.scalarCount);
         const Eigen::VectorXd residual = local_q - inertial_target_;
@@ -472,9 +489,12 @@ namespace ksk::engine::fem
             const double diff = value - constraint.target;
             objective += 0.5 * constraint.stiffness * diff * diff;
         }
-        for (const runtime::ContactStencil& contact : subsystem_.internal_contacts_)
         {
-            objective += appendContactGradientAndEnergy(subsystem_, contact, nullptr);
+            SIM_PROFILE_SCOPE("FEMCPUBackend/EvaluateObjective/InternalContacts");
+            for (const runtime::ContactStencil& contact : subsystem_.internal_contacts_)
+            {
+                objective += appendContactGradientAndEnergy(subsystem_, contact, nullptr);
+            }
         }
         return objective;
     }
@@ -486,16 +506,18 @@ namespace ksk::engine::fem
 
     void FEMCPUBackend::prepareLocalOperator(double dt)
     {
+        SIM_PROFILE_SCOPE_COLOR("FEMCPUBackend/PrepareLocalOperator",
+                                ksk::core::profiler_colors::kCyan);
         if (mass_diagonal_.size() != subsystem_.range_.scalarCount)
         {
             mass_diagonal_ = buildMassDiagonal();
         }
 
         std::vector<Eigen::Triplet<double>> triplets;
-        triplets.reserve(static_cast<size_t>(
+        triplets.reserve(
             subsystem_.range_.scalarCount +
             144 +
-            144 * subsystem_.internal_contacts_.size()));
+            144 * subsystem_.internal_contacts_.size());
         for (int i = 0; i < subsystem_.range_.scalarCount; ++i)
         {
             triplets.emplace_back(i, i, mass_diagonal_[i] / (dt * dt));
@@ -506,20 +528,31 @@ namespace ksk::engine::fem
             triplets.emplace_back(
                 constraint.qOffset, constraint.qOffset, constraint.stiffness);
         }
-        subsystem_.assembleElasticHessian(subsystem_.gatherCurrentState(), triplets);
-        for (const runtime::ContactStencil& contact : subsystem_.internal_contacts_)
         {
-            appendContactHessianTriplets(subsystem_, contact, triplets);
+            SIM_PROFILE_SCOPE("FEMCPUBackend/PrepareLocalOperator/Elastic");
+            subsystem_.assembleElasticHessian(subsystem_.gatherCurrentState(), triplets);
+        }
+        {
+            SIM_PROFILE_SCOPE("FEMCPUBackend/PrepareLocalOperator/InternalContacts");
+            for (const runtime::ContactStencil& contact : subsystem_.internal_contacts_)
+            {
+                appendContactHessianTriplets(subsystem_, contact, triplets);
+            }
         }
 
-        local_matrix_.resize(subsystem_.range_.scalarCount,
-                             subsystem_.range_.scalarCount);
-        local_matrix_.setFromTriplets(triplets.begin(), triplets.end());
-        local_matrix_.makeCompressed();
+        {
+            SIM_PROFILE_SCOPE("FEMCPUBackend/PrepareLocalOperator/CompressMatrix");
+            local_matrix_.resize(subsystem_.range_.scalarCount,
+                                 subsystem_.range_.scalarCount);
+            local_matrix_.setFromTriplets(triplets.begin(), triplets.end());
+            local_matrix_.makeCompressed();
+        }
     }
 
     void FEMCPUBackend::assembleLocalGradient(runtime::DofView g) const
     {
+        SIM_PROFILE_SCOPE_COLOR("FEMCPUBackend/AssembleLocalGradient",
+                                ksk::core::profiler_colors::kRed);
         requireCPU(g, "FEMCPUBackend::assembleLocalGradient");
         requireDofCount(g, subsystem_.range_.scalarCount, "FEMCPUBackend::assembleLocalGradient");
         if (step_dt_ <= 0.0)
@@ -531,9 +564,12 @@ namespace ksk::engine::fem
         Eigen::VectorXd local_gradient =
             (mass_diagonal_.array() * (current - inertial_target_).array()).matrix() /
             (step_dt_ * step_dt_);
+        const double inertial_norm = local_gradient.norm();
         subsystem_.assembleElasticGradient(current, local_gradient);
+        const double after_elastic_norm = local_gradient.norm();
         addGravityGradient(
             local_gradient, mass_diagonal_, subsystem_.gravity_);
+        const double after_gravity_norm = local_gradient.norm();
         for (const FEMSubsystem::ActiveConstraint& constraint :
              subsystem_.active_constraints_)
         {
@@ -541,19 +577,74 @@ namespace ksk::engine::fem
                 constraint.stiffness *
                 (current[constraint.qOffset] - constraint.target);
         }
+        const double after_constraints_norm = local_gradient.norm();
         for (int i = 0; i < subsystem_.range_.scalarCount; ++i)
         {
             g[i] += local_gradient[i];
         }
-        for (const runtime::ContactStencil& contact : subsystem_.internal_contacts_)
+        double max_internal_contact_delta = 0.0;
+        const runtime::ContactStencil* worst_internal_contact = nullptr;
         {
-            appendContactGradientAndEnergy(subsystem_, contact, &g);
+            SIM_PROFILE_SCOPE("FEMCPUBackend/AssembleLocalGradient/InternalContacts");
+            for (const runtime::ContactStencil& contact : subsystem_.internal_contacts_)
+            {
+                const double before_contact_norm = dofViewNorm(g.asConst());
+                appendContactGradientAndEnergy(subsystem_, contact, &g);
+                const double after_contact_norm = dofViewNorm(g.asConst());
+                const double delta =
+                    std::abs(after_contact_norm - before_contact_norm);
+                if (delta > max_internal_contact_delta)
+                {
+                    max_internal_contact_delta = delta;
+                    worst_internal_contact = &contact;
+                }
+            }
+        }
+        const double final_norm = dofViewNorm(g.asConst());
+        if (!std::isfinite(final_norm) || final_norm > 1.0e10)
+        {
+            std::cerr << "[fem-cpu] suspicious local gradient subsystem="
+                      << subsystem_.id_
+                      << " scalars=" << subsystem_.range_.scalarCount
+                      << " inertial=" << inertial_norm
+                      << " after_elastic=" << after_elastic_norm
+                      << " after_gravity=" << after_gravity_norm
+                      << " after_constraints=" << after_constraints_norm
+                      << " final_with_internal_contacts=" << final_norm
+                      << " internal_contacts="
+                      << subsystem_.internal_contacts_.size()
+                      << " active_constraints="
+                      << subsystem_.active_constraints_.size()
+                      << '\n';
+            if (worst_internal_contact != nullptr)
+            {
+                std::cerr << "[fem-cpu] worst internal contact type="
+                          << contactCaseName(worst_internal_contact->type)
+                          << " ids=[";
+                const int point_count =
+                    contactPointCount(worst_internal_contact->type);
+                for (int i = 0; i < point_count; ++i)
+                {
+                    if (i > 0)
+                    {
+                        std::cerr << ',';
+                    }
+                    std::cerr << worst_internal_contact->geometryIds[
+                        static_cast<size_t>(i)];
+                }
+                std::cerr << "] delta_norm=" << max_internal_contact_delta
+                          << " dHat=" << worst_internal_contact->dHat
+                          << " thickness=" << worst_internal_contact->thickness
+                          << " stiffness=" << worst_internal_contact->stiffness
+                          << '\n';
+            }
         }
     }
 
     void FEMCPUBackend::applyLocalMatrix(runtime::ConstDofView x,
                                          runtime::DofView y) const
     {
+        SIM_PROFILE_SCOPE("FEMCPUBackend/ApplyLocalMatrix");
         if (local_matrix_.rows() != subsystem_.range_.scalarCount)
         {
             throw std::runtime_error("FEM CPU backend local operator is not prepared");
@@ -572,37 +663,58 @@ namespace ksk::engine::fem
     void FEMCPUBackend::solveLocalSystem(runtime::ConstDofView b,
                                          runtime::DofView x) const
     {
-        requireCPU(b, "FEMCPUBackend::solveLocalSystem");
-        requireCPU(x, "FEMCPUBackend::solveLocalSystem");
-        requireDofCount(b, subsystem_.range_.scalarCount, "FEMCPUBackend::solveLocalSystem");
-        requireDofCount(x, subsystem_.range_.scalarCount, "FEMCPUBackend::solveLocalSystem");
-        if (local_matrix_.rows() != subsystem_.range_.scalarCount)
+        SIM_PROFILE_SCOPE_COLOR("FEMCPUBackend/SolveLocalSystem",
+                                ksk::core::profiler_colors::kBlue);
         {
-            throw std::runtime_error("FEM CPU backend local operator is not prepared");
+            SIM_PROFILE_SCOPE("FEMCPUBackend/SolveLocalSystem/Validate");
+            requireCPU(b, "FEMCPUBackend::solveLocalSystem");
+            requireCPU(x, "FEMCPUBackend::solveLocalSystem");
+            requireDofCount(b, subsystem_.range_.scalarCount, "FEMCPUBackend::solveLocalSystem");
+            requireDofCount(x, subsystem_.range_.scalarCount, "FEMCPUBackend::solveLocalSystem");
+            if (local_matrix_.rows() != subsystem_.range_.scalarCount)
+            {
+                throw std::runtime_error("FEM CPU backend local operator is not prepared");
+            }
         }
-
         Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
-        solver.compute(local_matrix_);
+        {
+            SIM_PROFILE_SCOPE("FEMCPUBackend/SolveLocalSystem/Factorize");
+            solver.compute(local_matrix_);
+        }
         if (solver.info() != Eigen::Success)
         {
             throw std::runtime_error("failed to factor FEM CPU backend local matrix");
         }
-        const Eigen::VectorXd local_x =
-            solver.solve(gatherLocalVector(b, subsystem_.range_.scalarCount));
+
+        Eigen::VectorXd local_b;
+        {
+            SIM_PROFILE_SCOPE("FEMCPUBackend/SolveLocalSystem/GatherRhs");
+            local_b = gatherLocalVector(b, subsystem_.range_.scalarCount);
+        }
+
+        Eigen::VectorXd local_x;
+        {
+            SIM_PROFILE_SCOPE("FEMCPUBackend/SolveLocalSystem/Solve");
+            local_x = solver.solve(local_b);
+        }
         if (solver.info() != Eigen::Success)
         {
             throw std::runtime_error("failed to solve FEM CPU backend local system");
         }
 
-        for (int i = 0; i < subsystem_.range_.scalarCount; ++i)
         {
-            x[i] = local_x[i];
+            SIM_PROFILE_SCOPE("FEMCPUBackend/SolveLocalSystem/ScatterSolution");
+            for (int i = 0; i < subsystem_.range_.scalarCount; ++i)
+            {
+                x[i] = local_x[i];
+            }
         }
     }
 
     void FEMCPUBackend::mapLocalDirectionToGeometry(runtime::ConstDofView localDq,
                                                runtime::GeometryView globalDx) const
     {
+        SIM_PROFILE_SCOPE("FEMCPUBackend/MapLocalDirectionToGeometry");
         requireCPU(localDq, "FEMCPUBackend::mapLocalDirectionToGeometry");
         requireCPU(globalDx, "FEMCPUBackend::mapLocalDirectionToGeometry");
         if (subsystem_.geometry_points_.size() != subsystem_.samples_.size())
@@ -634,6 +746,7 @@ namespace ksk::engine::fem
         runtime::ConstGeometryView pointGradient,
         runtime::DofView g) const
     {
+        SIM_PROFILE_SCOPE("FEMCPUBackend/ScatterContactGradient");
         requireCPU(pointGradient, "FEMCPUBackend::scatterContactGradient");
         requireCPU(g, "FEMCPUBackend::scatterContactGradient");
         if (points.size() != static_cast<size_t>(pointGradient.pointCount()))
@@ -705,22 +818,45 @@ namespace ksk::engine::fem
 
     Eigen::VectorXd FEMCPUBackend::buildMassDiagonal() const
     {
+        SIM_PROFILE_SCOPE("FEMCPUBackend/BuildMassDiagonal");
         Eigen::VectorXd mass =
             Eigen::VectorXd::Zero(subsystem_.range_.scalarCount);
-        for (int mesh_index = 0;
-             mesh_index < static_cast<int>(subsystem_.meshes_.size());
-             ++mesh_index)
-        {
-            const TetMeshDesc& mesh = subsystem_.meshes_[mesh_index];
-            const double vertex_mass = std::max(1.0e-12, mesh.material.density);
-            const int base = subsystem_.mesh_offsets_[mesh_index].q;
-            for (int vertex = 0; vertex < static_cast<int>(mesh.vertices.size());
-                 ++vertex)
-            {
-                mass[base + 3 * vertex + 0] = vertex_mass;
-                mass[base + 3 * vertex + 1] = vertex_mass;
-                mass[base + 3 * vertex + 2] = vertex_mass;
-            }
+        for (const FEMPrimitive& primitive : subsystem_.primitives()) {
+            std::visit([&](const auto& value) {
+                using Primitive = std::decay_t<decltype(value)>;
+                const int base = value.offset.q;
+                if constexpr (std::is_same_v<Primitive, FEMTetMeshPrimitive>) {
+                    const double vertex_mass =
+                        std::max(1.0e-12, value.mesh.material.density);
+                    for (int vertex = 0;
+                         vertex < static_cast<int>(value.mesh.vertices.size());
+                         ++vertex) {
+                        mass[base + 3 * vertex + 0] = vertex_mass;
+                        mass[base + 3 * vertex + 1] = vertex_mass;
+                        mass[base + 3 * vertex + 2] = vertex_mass;
+                    }
+                } else {
+                    std::vector<double> vertex_mass(value.mesh.vertices.size(), 0.0);
+                    for (const auto& triangle : value.mesh.triangles) {
+                        const double face_mass =
+                            triangleArea(value.mesh.vertices, triangle) *
+                            value.mesh.material.arealDensity / 3.0;
+                        for (int vertex : triangle) {
+                            vertex_mass.at(static_cast<size_t>(vertex)) += face_mass;
+                        }
+                    }
+                    for (int vertex = 0;
+                         vertex < static_cast<int>(value.mesh.vertices.size());
+                         ++vertex) {
+                        const double lumped =
+                            std::max(1.0e-12,
+                                     vertex_mass[static_cast<size_t>(vertex)]);
+                        mass[base + 3 * vertex + 0] = lumped;
+                        mass[base + 3 * vertex + 1] = lumped;
+                        mass[base + 3 * vertex + 2] = lumped;
+                    }
+                }
+            }, primitive);
         }
         return mass;
     }

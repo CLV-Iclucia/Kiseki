@@ -23,7 +23,23 @@ struct GlobalContactRouter {
   std::map<SubsystemId, SubsystemContactData> subsystemInternalContacts;
 };
 
-using ContactCandidates = ContactStencils;
+enum class EContactCandidate : std::uint16_t {
+  PointTriangle,
+  EdgeEdge,
+  PointPoint,
+  PointEdge,
+};
+
+struct ContactCandidate {
+  EContactCandidate kind = EContactCandidate::PointPoint;
+  std::array<int, 4> geometryIds{-1, -1, -1, -1};
+  Real detectionDistance = 0.0;
+  Real dHat = 0.0;
+  Real stiffness = 0.0;
+  Real reservedDistance = 0.0;
+};
+
+using ContactCandidates = std::vector<ContactCandidate>;
 
 struct ContactWorkList {
   std::vector<std::array<int, 2>> deformablePointTriangles;

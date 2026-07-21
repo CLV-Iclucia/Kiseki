@@ -82,7 +82,7 @@ TEST(ContactDetection, RoutesSameSubsystemPointPointToInternal)
             ContactCase::PP);
 }
 
-TEST(ContactDetection, EdgeEdgePassKeepsEdgeEdgeContactsOnly)
+TEST(ContactDetection, EdgeEdgePassPreservesInteriorEdgeEdgeFeature)
 {
   GlobalGeometryManager geometry;
   const PointIdx a0 =
@@ -103,6 +103,86 @@ TEST(ContactDetection, EdgeEdgePassKeepsEdgeEdgeContactsOnly)
   ASSERT_EQ(routed.globalContacts.size(), 1);
   EXPECT_EQ(routed.globalContacts[0].type, ContactCase::EE);
   EXPECT_TRUE(routed.subsystemInternalContacts.empty());
+}
+
+TEST(ContactDetection, EdgeEdgePassLowersEndpointEdgeFeature)
+{
+  GlobalGeometryManager geometry;
+  const PointIdx a0 =
+      geometry.addPoint(SubsystemId{0}, 0, glm::dvec3(0.0, 0.0, 0.0));
+  const PointIdx a1 =
+      geometry.addPoint(SubsystemId{0}, 1, glm::dvec3(1.0, 0.0, 0.0));
+  const PointIdx b0 =
+      geometry.addPoint(SubsystemId{1}, 0, glm::dvec3(1.0005, -0.5, 0.0));
+  const PointIdx b1 =
+      geometry.addPoint(SubsystemId{1}, 1, glm::dvec3(1.0005, 0.5, 0.0));
+  [[maybe_unused]] const int first = geometry.addEdge(a0, a1);
+  [[maybe_unused]] const int second = geometry.addEdge(b0, b1);
+
+  auto direction = GeometryBuffer::CPU(geometry.pointCount());
+
+  const GlobalContactRouter routed = runCCD(geometry, direction);
+
+  ASSERT_EQ(routed.globalContacts.size(), 1);
+  EXPECT_EQ(routed.globalContacts[0].type, ContactCase::PE);
+  EXPECT_EQ(routed.globalContacts[0].geometryIds[0], a1);
+  EXPECT_EQ(routed.globalContacts[0].geometryIds[1], b0);
+  EXPECT_EQ(routed.globalContacts[0].geometryIds[2], b1);
+  EXPECT_TRUE(routed.subsystemInternalContacts.empty());
+}
+
+TEST(ContactDetection, EdgeEdgePassLowersEndpointEndpointFeature)
+{
+  GlobalGeometryManager geometry;
+  const PointIdx a0 =
+      geometry.addPoint(SubsystemId{0}, 0, glm::dvec3(0.0, 0.0, 0.0));
+  const PointIdx a1 =
+      geometry.addPoint(SubsystemId{0}, 1, glm::dvec3(1.0, 0.0, 0.0));
+  const PointIdx b0 =
+      geometry.addPoint(SubsystemId{1}, 0, glm::dvec3(1.0005, 0.0005, 0.0));
+  const PointIdx b1 =
+      geometry.addPoint(SubsystemId{1}, 1, glm::dvec3(2.0, 0.0005, 0.0));
+  [[maybe_unused]] const int first = geometry.addEdge(a0, a1);
+  [[maybe_unused]] const int second = geometry.addEdge(b0, b1);
+
+  auto direction = GeometryBuffer::CPU(geometry.pointCount());
+
+  const GlobalContactRouter routed = runCCD(geometry, direction);
+
+  ASSERT_EQ(routed.globalContacts.size(), 1);
+  EXPECT_EQ(routed.globalContacts[0].type, ContactCase::PP);
+  EXPECT_EQ(routed.globalContacts[0].geometryIds[0], a1);
+  EXPECT_EQ(routed.globalContacts[0].geometryIds[1], b0);
+  EXPECT_TRUE(routed.subsystemInternalContacts.empty());
+}
+
+TEST(ContactDetection, RefreshActivePointEdgeCandidateReclassifiesEndpoint)
+{
+  GlobalGeometryManager geometry;
+  const PointIdx point =
+      geometry.addPoint(SubsystemId{0}, 0, glm::dvec3(-0.0005, 0.0, 0.0));
+  const PointIdx e0 =
+      geometry.addPoint(SubsystemId{1}, 0, glm::dvec3(0.0, 0.0, 0.0));
+  const PointIdx e1 =
+      geometry.addPoint(SubsystemId{1}, 1, glm::dvec3(1.0, 0.0, 0.0));
+  [[maybe_unused]] const int edge = geometry.addEdge(e0, e1);
+  ContactCandidates candidates;
+  candidates.push_back(ContactCandidate{
+      .kind = EContactCandidate::PointEdge,
+      .geometryIds = {point, e0, e1, -1},
+      .detectionDistance = 1.0e-3,
+      .dHat = 1.0e-3,
+      .stiffness = 1.0e5,
+      .reservedDistance = 0.0,
+  });
+
+  const GlobalContactRouter routed =
+      refreshActiveContactsFromCandidates(geometry, candidates);
+
+  ASSERT_EQ(routed.globalContacts.size(), 1);
+  EXPECT_EQ(routed.globalContacts[0].type, ContactCase::PP);
+  EXPECT_EQ(routed.globalContacts[0].geometryIds[0], point);
+  EXPECT_EQ(routed.globalContacts[0].geometryIds[1], e0);
 }
 
 TEST(ContactDetection, GathersTypedEdgeEdgeWork)
@@ -128,6 +208,33 @@ TEST(ContactDetection, GathersTypedEdgeEdgeWork)
   ASSERT_EQ(work.deformableEdgeEdges.size(), 1);
   EXPECT_EQ(work.deformableEdgeEdges[0][0], first);
   EXPECT_EQ(work.deformableEdgeEdges[0][1], second);
+}
+
+TEST(ContactDetection, DetectsCoarseEdgeEdgeCandidateSeparatelyFromBarrier)
+{
+  GlobalGeometryManager geometry;
+  const PointIdx a0 =
+      geometry.addPoint(SubsystemId{0}, 0, glm::dvec3(-0.5, 0.0, 0.0));
+  const PointIdx a1 =
+      geometry.addPoint(SubsystemId{0}, 1, glm::dvec3(0.5, 0.0, 0.0));
+  const PointIdx b0 =
+      geometry.addPoint(SubsystemId{1}, 0, glm::dvec3(0.0, -0.5, 0.0005));
+  const PointIdx b1 =
+      geometry.addPoint(SubsystemId{1}, 1, glm::dvec3(0.0, 0.5, 0.0005));
+  [[maybe_unused]] const int first = geometry.addEdge(a0, a1);
+  [[maybe_unused]] const int second = geometry.addEdge(b0, b1);
+
+  auto direction = GeometryBuffer::CPU(geometry.pointCount());
+
+  const ContactCandidates candidates =
+      detectContactCandidatesAlongDirection(geometry, direction);
+
+  ASSERT_EQ(candidates.size(), 1);
+  EXPECT_EQ(candidates[0].kind, EContactCandidate::EdgeEdge);
+  EXPECT_EQ(candidates[0].geometryIds[0], a0);
+  EXPECT_EQ(candidates[0].geometryIds[1], a1);
+  EXPECT_EQ(candidates[0].geometryIds[2], b0);
+  EXPECT_EQ(candidates[0].geometryIds[3], b1);
 }
 
 TEST(ContactDetection, GathersCoplanarPointTriangleWorkWithLBVH)

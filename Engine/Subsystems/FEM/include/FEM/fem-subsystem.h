@@ -11,6 +11,7 @@
 
 #include <memory>
 #include <span>
+#include <variant>
 #include <vector>
 
 #include <Eigen/Core>
@@ -46,6 +47,20 @@ struct FEMMeshRuntimeRef {
   TetMaterial material;
 };
 
+struct FEMTetMeshPrimitive {
+  TetMeshDesc mesh;
+  FEMMeshOffset offset;
+  FEMMeshRuntimeRef runtime;
+};
+
+struct FEMClothPrimitive {
+  ClothMeshDesc mesh;
+  FEMMeshOffset offset;
+  FEMMeshRuntimeRef runtime;
+};
+
+using FEMPrimitive = std::variant<FEMTetMeshPrimitive, FEMClothPrimitive>;
+
 class FEMSubsystem final : public runtime::Subsystem {
  public:
   FEMSubsystem(runtime::SubsystemId id,
@@ -53,6 +68,11 @@ class FEMSubsystem final : public runtime::Subsystem {
                std::vector<FEMConstraintBinding> constraints = {},
                int scalarOffset = 0,
                glm::dvec3 gravity = glm::dvec3(0.0));
+  FEMSubsystem(runtime::SubsystemId id,
+               std::vector<FEMPrimitive> primitives,
+               std::vector<FEMConstraintBinding> constraints,
+               int scalarOffset,
+               glm::dvec3 gravity);
   ~FEMSubsystem() override;
 
   [[nodiscard]] runtime::SubsystemId id() const noexcept override;
@@ -103,7 +123,7 @@ class FEMSubsystem final : public runtime::Subsystem {
 
   [[nodiscard]] const std::vector<TetMeshDesc>& meshes() const noexcept
   {
-    return meshes_;
+    return compatibility_meshes_;
   }
   [[nodiscard]] int localScalarCount() const noexcept;
   [[nodiscard]] const std::vector<FEMVertexSample>& samples() const noexcept
@@ -120,6 +140,15 @@ class FEMSubsystem final : public runtime::Subsystem {
   {
     return runtime_meshes_;
   }
+  [[nodiscard]] const std::vector<FEMPrimitive>& primitives() const noexcept
+  {
+    return primitives_;
+  }
+  [[nodiscard]] glm::dvec3 vertexPosition(int mesh, int vertex) const;
+  [[nodiscard]] glm::dvec3 restVertexPosition(int mesh, int vertex) const;
+  void setVertexPosition(int mesh, int vertex, const glm::dvec3& position);
+  [[nodiscard]] glm::dvec3 vertexVelocity(int mesh, int vertex) const;
+  void setVertexVelocity(int mesh, int vertex, const glm::dvec3& velocity);
 
  private:
   friend class FEMCPUBackend;
@@ -131,6 +160,7 @@ class FEMSubsystem final : public runtime::Subsystem {
   };
 
   void rebuildSamples();
+  void rebuildCompatibilityViews();
   void updateConstraintTargets(double time);
   [[nodiscard]] Eigen::VectorXd gatherCurrentState() const;
   [[nodiscard]] double elasticEnergy(const Eigen::VectorXd& localQ) const;
@@ -139,20 +169,15 @@ class FEMSubsystem final : public runtime::Subsystem {
   void assembleElasticHessian(
       const Eigen::VectorXd& localQ,
       std::vector<Eigen::Triplet<double>>& triplets) const;
-  [[nodiscard]] glm::dvec3 vertexPosition(int mesh, int vertex) const;
-  [[nodiscard]] glm::dvec3 restVertexPosition(int mesh, int vertex) const;
-  void setVertexPosition(int mesh, int vertex, const glm::dvec3& position);
-  [[nodiscard]] glm::dvec3 vertexVelocity(int mesh, int vertex) const;
-  void setVertexVelocity(int mesh, int vertex, const glm::dvec3& velocity);
   [[nodiscard]] int constraintLocalOffset(
       const FEMConstraintBinding& binding) const;
   runtime::SubsystemId id_;
   runtime::DofRange range_;
   glm::dvec3 gravity_;
-  std::vector<TetMeshDesc> meshes_;
+  std::vector<FEMPrimitive> primitives_;
+  std::vector<TetMeshDesc> compatibility_meshes_;
   std::vector<FEMConstraintBinding> constraints_;
   std::vector<ActiveConstraint> active_constraints_;
-  std::vector<FEMMeshOffset> mesh_offsets_;
   std::vector<FEMMeshRuntimeRef> runtime_meshes_;
   std::vector<FEMVertexSample> samples_;
   std::vector<runtime::PointIdx> geometry_points_;
